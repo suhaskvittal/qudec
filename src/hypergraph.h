@@ -6,6 +6,7 @@
 #ifndef HYPERGRAPH_h
 #define HYPERGRAPH_h
 
+#include <array>
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
@@ -13,59 +14,59 @@
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
 
-template <class VERTEX_DATA_TYPE, class EDGE_DATA_TYPE, bool IMMUTABLE=false>
+using GRAPH_COMPONENT_ID = int32_t;
+
+template <class VERTEX_DATA_TYPE, class EDGE_DATA_TYPE, size_t MAX_ORDER=3>
 class HYPERGRAPH
 {
 public:
-    using id_type = uint32_t;
+    static_assert(MAX_ORDER > 1, "MAX_ORDER must be greater than 1");
 
-    struct vertex_type
+    using id_type = GRAPH_COMPONENT_ID;
+
+    struct VERTEX
     {
         id_type          id;
         VERTEX_DATA_TYPE data;
     };
-    
-    using vertex_ptr = vertex_type*;
 
-    struct edge_type
+    struct EDGE
     {
-        id_type                 id;
-        std::vector<vertex_ptr> vertices{};
-        EDGE_DATA_TYPE          data;
+        using vertex_list_type = std::array<VERTEX*, MAX_ORDER>;
+
+        vertex_list_type  vertices{};
+        size_t            order;
+        EDGE_DATA_TYPE    data;
     };
 
-    using edge_ptr = edge_type*;
-
-    constexpr static id_type INVALID{-1};
+    using adjacency_list_entry = std::pair<
+                                        VERTEX*,
+                                        std::conditional_t<MAX_ORDER == 2, VERTEX*, std::vector<VERTEX*>>
+                                        >;    
+    using adjacency_list = std::vector<adjacency_list_entry>;
 protected:
-    using incidence_array_type = std::vector<edge_ptr>;
+    std::vector<VERTEX*> vertices_;
+    std::vector<EDGE*>   edges_;
 
-    std::vector<vertex_ptr> vertices_;
-    std::vector<edge_ptr>   edges_;
-
-    std::unordered_map<id_type, vertex_ptr> vertex_id_map_;
-    std::unordered_map<id_type, edge_ptr>   edge_id_map_;
-
-    std::unordered_map<vertex_ptr, incidence_array_type> incidence_map_;
+    std::unordered_map<id_type, VERTEX*> vertex_id_map_;
+    std::unordered_map<VERTEX*, adjacency_list> adjacency_;
 public:
     HYPERGRAPH(size_t reserve_vertices=1024, size_t reserve_edges=4096);
     ~HYPERGRAPH();
 
-    HYPERGRAPH<VERTEX_DATA_TYPE, EDGE_DATA_TYPE, true> immutable_copy() const;
+    VERTEX*                     add_vertex(id_type, VERTEX_DATA_TYPE);
+    template <class ITER> EDGE* add_edge(ITER v_begin, ITER v_end, EDGE_DATA_TYPE);
 
-    vertex_ptr add_vertex(id_type, VERTEX_DATA_TYPE);
-    edge_ptr   add_edge(id_type, std::vector<vertex_ptr>, EDGE_DATA_TYPE);
+    VERTEX* get_vertex(id_type) const;
+    void remove_vertex(VERTEX*);
 
-    vertex_ptr get_vertex(id_type) const;
-    edge_ptr   get_edge(id_type) const;
+    template <class ITER> EDGE*               get_edge_and_fail_if_nonunique(ITER v_begin, ITER v_end);
+    template <class ITER> std::vector<EDGE*>  get_all_incident_edges(ITER v_begin, ITER v_end);
+    void remove_edge(EDGE*);
 
-    void remove_vertex(vertex_ptr);
-    void remove_edge(edge_ptr);
-
-    std::vector<edge_ptr> get_common_edges(std::vector<vertex_ptr>);
-
-    const std::vector<vertex_ptr>& get_vertices() const { return vertices_; }
-    const std::vector<edge_ptr>&   get_edges() const { return edges_; }
+    const std::vector<VERTEX*>& get_vertices() const { return vertices_; }
+    const std::vector<EDGE*>&   get_edges() const { return edges_; }
+    const adjacency_list&       get_adjacency_list(VERTEX* v) const { return adjacency_.at(v); }
 };
 
 /////////////////////////////////////////////////////

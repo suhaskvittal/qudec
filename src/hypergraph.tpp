@@ -3,8 +3,12 @@
  *  date:   9 October 2025
  */
 
-#define TEMPL_PARAMS    template <class V_t, class E_t, bool IM>
-#define TEMPL_CLASS     HYPERGRAPH<V_t, E_t, IM>
+#include <algorithm>
+#include <array>
+#include <stdexcept>
+
+#define TEMPL_PARAMS    template <class VERTEX_DATA_TYPE, class EDGE_DATA_TYPE, size_t MAX_ORDER>
+#define TEMPL_CLASS     HYPERGRAPH<VERTEX_DATA_TYPE, EDGE_DATA_TYPE, MAX_ORDER>
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
@@ -28,58 +32,76 @@ TEMPL_CLASS::~HYPERGRAPH()
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-TEMPL_PARAMS typename TEMPL_CLASS::vertex_ptr
+TEMPL_PARAMS typename TEMPL_CLASS::VERTEX*
 TEMPL_CLASS::add_vertex(id_type id, VERTEX_DATA_TYPE data)
 {
-    if constexpr (IM)
-        throw std::runtime_error("cannot modify immutable hypergraph");
-    
-    vertex_ptr v{new vertex_type{id, data}};
+    if (vertex_id_map_.find(id) != vertex_id_map_.end())
+        throw std::runtime_error("vertex already exists");
+
+    VERTEX* v = new VERTEX{id, data};
     vertices_.push_back(v);
     vertex_id_map_[id] = v;
     return v;
 }
 
-TEMPL_PARAMS typename TEMPL_CLASS::edge_ptr
-TEMPL_CLASS::add_edge(id_type id, std::vector<vertex_ptr> vertex_list, EDGE_DATA_TYPE data)
+TEMPL_PARAMS template <class ITER> typename TEMPL_CLASS::EDGE*
+TEMPL_CLASS::add_edge(ITER v_begin, ITER v_end, EDGE_DATA_TYPE data)
 {
-    if constexpr (IM)
-        throw std::runtime_error("cannot modify immutable hypergraph");
+    size_t order = std::distance(v_begin, v_end);
+    if (order < 2)
+        throw std::runtime_error("edge must have at least 2 vertices");
+    if (order > MAX_ORDER)
+        throw std::runtime_error("vertex list size exceeds MAX_ORDER");
 
-    edge_ptr e{new edge_type{id, vertex_list, data}};
+    EDGE::vertex_list_type vertex_list(v_begin, v_end);
+    EDGE* e = new EDGE{vertex_list, order, data};
     edges_.push_back(e);
 
-    for (auto* v : vertex_list)
-        incidence_map_[v].push_back(e);
+    if constexpr (MAX_ORDER == 2)
+    {
+        VERTEX* v = vertex_list[0],
+                w = vertex_list[1];
+        adjacency_[v].emplace_back(w, e);
+        adjacency_[w].emplace_back(v, e);
+    }
+    else
+    {
+        for (size_t i = 0; i < e->order; i++)
+        {
+            VERTEX* v = e->vertices[i];
+            auto& v_adj = adjacency_[v];
+            for (size_t j = i+1; j < e->order; j++)
+            {
+                VERTEX* w = e->vertices[j];
+                auto it = std::find_if(v_adj.begin(), v_adj.end(),
+                                        [w] (const auto& entry) { return entry.first == w; });
+                if (it == v_adj.end())
+                    v_adj.emplace_back(w, std::vector<EDGE*>{e});
+                else
+                    it->second.push_back(e);
+            }
+        }
+    }
 
-    edge_id_map_[id] = e;
     return e;
 }
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-TEMPL_PARAMS typename TEMPL_CLASS::vertex_ptr
+TEMPL_PARAMS typename TEMPL_CLASS::VERTEX*
 TEMPL_CLASS::get_vertex(id_type id) const
 {
-    return vertex_id_map_.at(id);
-}
-
-TEMPL_PARAMS typename TEMPL_CLASS::edge_ptr
-TEMPL_CLASS::get_edge(id_type id) const
-{
-    return edge_id_map_.at(id);
+    auto it = vertex_id_map_.find(id);
+    return it == vertex_id_map_.end() ? nullptr : it->second;
 }
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
 TEMPL_PARAMS void
-TEMPL_CLASS::remove_vertex(vertex_ptr v)
+TEMPL_CLASS::remove_vertex(VERTEX* v)
 {
-    if constexpr (IM)
-        throw std::runtime_error("cannot modify immutable hypergraph");
-
     auto it = std::find(vertices_.begin(), vertices_.end(), v);
     if (it == vertices_.end())
         throw std::runtime_error("vertex not found");
@@ -87,22 +109,119 @@ TEMPL_CLASS::remove_vertex(vertex_ptr v)
 
     // remove all edges that contain this vertex -- do a copy as we will modify the original
     // entry
-    incidence_array_type incidence_list(incidence_map_[v]);
-    for (auto* e : incidence_list)
-        remove_edge(e);
+    adjacency_list v_adj = adjacency_[v];
+    if constexpr (MAX_ORDER == 2)
+    {
+        // max_order 2 is simple -- can remove as we see the edges
+        for (auto& [w, e] : v_adj)
+            remove_edge(e);
+    }
+    else
+    {
+        // a bit harder when max_order > 2 as we need to worry about duplicates
+        std::unordered_set<EDGE*> incident_edges;  // there may be duplicates, so use a set
+        incident_edges.reserve(v_adj.size());
+        for (auto& [w, e_list] : v_adj)
+        {
+            for (auto* e : e_list)
+                incident_edges.insert(e);
+        }
+    
+        for (EDGE* e : incident_edges)
+            remove_edge(e);
+    }
 
     // remove the vertex from the incidence map
     vertex_id_map_.erase(v->id);
-    incidence_map_.erase(v);
+    adjacency_.erase(v);
     delete v;
 }
 
-TEMPL_PARAMS void
-TEMPL_CLASS::remove_edge(edge_ptr e)
-{
-    if constexpr (IM)
-        throw std::runtime_error("cannot modify immutable hypergraph");
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
 
+TEMPL_PARAMS template <class ITER> typename TEMPL_CLASS::EDGE*
+TEMPL_CLASS::get_edge_and_fail_if_nonunique(ITER v_begin, ITER v_end)
+{
+    std::vector<EDGE*> edges = get_all_incident_edges(v_begin, v_end);
+    if (edges.size() > 1)
+        throw std::runtime_error("non-unique edge");
+    return edges.empty() ? nullptr : edges[0];
+}
+
+TEMPL_PARAMS template <class ITER> std::vector<typename TEMPL_CLASS::EDGE*>
+TEMPL_CLASS::get_all_incident_edges(ITER v_begin, ITER v_end)
+{
+    const size_t v_count = std::distance(v_begin, v_end);
+    
+    // if `v_count > MAX_ORDER`, then there are no edges that are incident on all vertices
+    if (v_count > MAX_ORDER)
+        return {};
+
+    std::vector<EDGE*> common_edges;
+    common_edges.reserve(4);
+
+    if (v_begin == v_end)
+        throw std::runtime_error("empty vertex list");
+
+    VERTEX* v0 = *v_begin;
+    const auto& v0_adj = adjacency_[v0];
+    if (v_count > 2)
+    {
+        VERTEX* v1 = *(v_begin+1);
+        
+        // we only need to check `v1`'s entry in `adjacency_[v0]` since at least these
+        // edges are incident on both `v0` and `v1`
+        auto adj_it = std::find_if(v0_adj.begin(), v0_adj.end(),
+                                    [v1] (const auto& entry) { return entry.first == v1; });
+        const auto& [__unused_w, e_list] = *adj_it;
+
+        // now, make sure `v_begin+2 ... v_end-1` are also incident on all edges in `e_list`
+        std::copy_if(e_list.begin(), e_list.end(), std::back_inserter(common_edges),
+                    [v_begin, v_end] (EDGE* e) 
+                    {
+                        return std::all_of(v_begin+2, v_end,
+                                    [e] (VERTEX* v) 
+                                    { 
+                                        return std::find(e->vertices.begin(), e->vertices.end(), v) 
+                                                                != e->vertices.end();
+                                    });
+                    });
+    }
+    if (v_count == 2)
+    {
+        VERTEX* v1 = *(v_begin+1);
+        auto it = std::find_if(v0_adj.begin(), v0_adj.end(),
+                                [v1] (const auto& entry) { return entry.first == v1; });
+        if (it != v0_adj.end())
+        {
+            if constexpr (MAX_ORDER == 2)
+                common_edges.push_back(it->second);
+            else
+                common_edges = it->second;
+        }
+    }
+    else if (v_count == 1)
+    {
+        // copy all edges that are incident on v0
+        for (const auto& [__unused_w, e_singleton_or_list] : v0_adj)
+        {
+            if constexpr (MAX_ORDER == 2)
+                common_edges.push_back(e_singleton_or_list);
+            else
+                common_edges.insert(common_edges.end(), e_singleton_or_list.begin(), e_singleton_or_list.end());
+        }
+    }
+
+    return common_edges;
+}
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
+TEMPL_PARAMS void
+TEMPL_CLASS::remove_edge(EDGE* e)
+{
     auto it = std::find(edges_.begin(), edges_.end(), e);
     if (it == edges_.end())
         throw std::runtime_error("edge not found");
@@ -110,35 +229,34 @@ TEMPL_CLASS::remove_edge(edge_ptr e)
 
     for (auto* v : e->vertices)
     {
-        auto& inc = incidence_map_[v];
-        auto it = std::find(inc.begin(), inc.end(), e);
-        inc.erase(it);
+        const auto& v_adj = adjacency_[v];
+        if constexpr (MAX_ORDER == 2)
+        {
+            // max_order == 2 : just find the entry and delete it
+            auto it = std::find_if(v_adj.begin(), v_adj.end(),
+                                    [e] (const auto& entry) { return entry.second == e; });
+            if (it != v_adj.end())
+                v_adj.erase(it);
+        }
+        else
+        {
+            // more involved for max_order > 2: need to find the entry containing the list,
+            // and handle the case where the list is empty after deleting `e`
+            auto it = std::remove_if(v_adj.begin(), v_adj.end(),
+                                    [e] (auto& [w, e_list]) 
+                                    { 
+                                        // we will mark `e_list` for removal if it is empty after removing `e`
+                                        auto it = std::find(e_list.begin(), e_list.end(), e);
+                                        if (it != e_list.end())
+                                            e_list.erase(it);
+                                        return e_list.empty();
+                                    });
+            v_adj.erase(it, v_adj.end());
+        }
     }
 
     edge_id_map_.erase(e->id);
     delete e;
-}
-
-////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////
-
-TEMPL_PARAMS std::vector<typename TEMPL_CLASS::edge_ptr>
-TEMPL_CLASS::get_common_edges(std::vector<vertex_ptr> vertex_list)
-{
-    std::vector<edge_ptr> common_edges;
-
-    vertex_ptr v0 = vertex_list[0];
-    for (edge_ptr e : incidence_map_[v0])
-    {
-        bool has_all = std::all_of(vertex_list.begin()+1, vertex_list.end(),
-                                [e] (vertex_ptr v) 
-                                { 
-                                    return std::find(e->vertices.begin(), e->vertices.end(), v) != e->vertices.end();
-                                });
-        if (has_all)
-            common_edges.push_back(e);
-    }
-    return common_edges;
 }
 
 ////////////////////////////////////////////////////////////////
