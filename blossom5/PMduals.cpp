@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include "PMimplementation.h"
+#include "MinCost/MinCost.h"
 
 namespace b5 {
-#include "MinCost/MinCost.h"
 
 
 void PerfectMatching::ComputeEpsGlobal()

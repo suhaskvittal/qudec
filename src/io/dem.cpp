@@ -27,11 +27,13 @@ read_dem_block_helper(const stim::DetectorErrorModel& dem, DEM_READ_RESULT& resu
     {
         if (inst.type == stim::DemInstructionType::DEM_ERROR)
         {
-            result.errors.emplace_back(read_dem_error(inst, info));
+            auto errors = read_dem_error(inst, info);
+            result.errors.insert(result.errors.end(), errors.begin(), errors.end());
         }
         else if (inst.type == stim::DemInstructionType::DEM_DETECTOR)
         {
-            result.detectors.push_back(read_detector_decl(inst.target_data[0], info));
+            auto decl = read_detector_decl(inst, info);
+            result.detectors.insert(result.detectors.end(), decl.begin(), decl.end());
         }
         else if (inst.type == stim::DemInstructionType::DEM_REPEAT_BLOCK)
         {
@@ -52,8 +54,8 @@ read_dem_block_helper(const stim::DetectorErrorModel& dem, DEM_READ_RESULT& resu
 ////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////
 
-DETECTOR_DATA
-read_detector_decl(const stim::DemTarget& t, DEM_BLOCK_INFO& info)
+std::vector<DEM_READ_RESULT::detector_type>
+read_detector_decl(const stim::DemInstruction& inst, DEM_BLOCK_INFO& info)
 {
     // copy coordinates
     std::array<float, DEM_BLOCK_INFO::MAX_COORD> coords(info.coord_shift);
@@ -64,13 +66,21 @@ read_detector_decl(const stim::DemTarget& t, DEM_BLOCK_INFO& info)
     int color_id = std::round(coords[DEM_COLOR_COORD_IDX]);
     bool is_flag = std::round(coords[DEM_FLAG_COORD_IDX]) > 0.0f;
 
+    // compute id:
     DETECTOR_DATA data
     {
         static_cast<DETECTOR_DATA::COLOR>(color_id),
         is_flag
     };
 
-    return data;
+    std::vector<DEM_READ_RESULT::detector_type> decl(inst.target_data.size());
+    std::transform(inst.target_data.begin(), inst.target_data.end(), decl.begin(),
+                [&data, s=info.id_shift] (const stim::DemTarget& t) 
+                { 
+                    return std::make_pair(t.data + s, data);
+                });
+
+    return decl;
 }
 
 ////////////////////////////////////////////////////////////

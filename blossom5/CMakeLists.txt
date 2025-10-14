@@ -66,11 +66,11 @@ set(BLOSSOM5_ALL_SOURCES
     ${BLOSSOM5_MINCOST_SOURCES}
 )
 
-# Create the library
-add_library(blossom5 STATIC ${BLOSSOM5_ALL_SOURCES})
+# Create the library as a shared/dynamic library
+add_library(blossom5 SHARED ${BLOSSOM5_ALL_SOURCES})
 
-# Set include directories
-target_include_directories(blossom5 PUBLIC 
+# Set include directories as PUBLIC so they are available to consumers
+target_include_directories(blossom5 PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/GEOM
     ${CMAKE_CURRENT_SOURCE_DIR}/MinCost
@@ -85,10 +85,13 @@ if(NOT APPLE)
     endif()
 endif()
 
-# Set target properties
+# Set target properties for shared library
 set_target_properties(blossom5 PROPERTIES
     OUTPUT_NAME "blossom5"
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    POSITION_INDEPENDENT_CODE ON
 )
 
 # Install rules

@@ -1,0 +1,24 @@
+/*
+ *  author: Suhas Vittal
+ *  date:   12 October 2025
+ */
+
+#ifndef DECODER_COMMON_h
+#define DECODER_COMMON_h
+
+#include "decoding_graph.h"
+
+#include <unordered_set>
+
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
+struct DECODER_RESULT
+{
+    std::unordered_set<int64_t> flipped_observables;
+};
+
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
+#endif  // DECODER_COMMON_h

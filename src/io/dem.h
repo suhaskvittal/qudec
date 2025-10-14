@@ -34,9 +34,10 @@ struct DEM_BLOCK_INFO
 struct DEM_READ_RESULT
 {
     // first part is detectors, second part is the actual data
+    using detector_type = std::pair<int64_t, DETECTOR_DATA>;
     using error_type = std::pair<std::vector<int64_t>, DECODER_ERROR_DATA>;
 
-    std::vector<DETECTOR_DATA> detectors;
+    std::vector<detector_type> detectors;
     std::vector<error_type>    errors;
 };
 
@@ -44,8 +45,8 @@ DEM_READ_RESULT read_dem_block(const stim::DetectorErrorModel& dem);
 
 void read_dem_block_helper(const stim::DetectorErrorModel& dem, DEM_READ_RESULT&, DEM_BLOCK_INFO&);
 
-DETECTOR_DATA                            read_detector_decl(const stim::DemTarget& t, DEM_BLOCK_INFO& info);
-std::vector<DEM_READ_RESULT::error_type> read_dem_error(const stim::DemInstruction& inst, DEM_BLOCK_INFO& info);
+std::vector<DEM_READ_RESULT::detector_type> read_detector_decl(const stim::DemInstruction&, DEM_BLOCK_INFO& info);
+std::vector<DEM_READ_RESULT::error_type>    read_dem_error(const stim::DemInstruction&, DEM_BLOCK_INFO& info);
 
 ////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////

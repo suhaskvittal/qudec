@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include "GeomPerfectMatching.h"
-
-namespace b5 {
 #include "GPMkdtree.h"
 #include "../timer.h"
+
+namespace b5 {
 
 
 

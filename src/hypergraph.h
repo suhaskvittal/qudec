@@ -9,7 +9,10 @@
 #include <array>
 #include <cstdint>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
+#include <algorithm>
+#include <stdexcept>
 
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
@@ -41,7 +44,7 @@ public:
 
     using adjacency_list_entry = std::pair<
                                         VERTEX*,
-                                        std::conditional_t<MAX_ORDER == 2, VERTEX*, std::vector<VERTEX*>>
+                                        std::conditional_t<MAX_ORDER == 2, EDGE*, std::vector<EDGE*>>
                                         >;    
     using adjacency_list = std::vector<adjacency_list_entry>;
 protected:
@@ -67,6 +70,8 @@ public:
     const std::vector<VERTEX*>& get_vertices() const { return vertices_; }
     const std::vector<EDGE*>&   get_edges() const { return edges_; }
     const adjacency_list&       get_adjacency_list(VERTEX* v) const { return adjacency_.at(v); }
+
+    constexpr static size_t max_order() { return MAX_ORDER; }
 };
 
 /////////////////////////////////////////////////////

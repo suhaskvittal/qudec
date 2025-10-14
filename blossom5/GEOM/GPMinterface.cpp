@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include "GeomPerfectMatching.h"
+#include "GPMkdtree.h"
 
 namespace b5 {
-#include "GPMkdtree.h"
 
 
 GeomPerfectMatching::GeomPerfectMatching(int nodeNum, int _DIM)

@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include "GPMkdtree.h"
+#include "../timer.h"
 
 namespace b5 {
-#include "../timer.h"
 
 
 // 'mapping' must be of size 2*N. (array[N], ... array[2*N-1] is used as a temporary buffer).

@@ -6,6 +6,8 @@
 #ifndef DECODER_EVAL_h
 #define DECODER_EVAL_h
 
+#include "decoder/common.h"
+
 #include "stim/circuit/circuit.h"
 #include "stim/mem/simd_bits.h"
 
@@ -25,18 +27,13 @@ struct DECODER_STATS
 
     hw_histogram_type time_us_by_hamming_weight{};
     hw_histogram_type trials_by_hamming_weight{};
-}
-
-/////////////////////////////////////////////////////
-/////////////////////////////////////////////////////
-
-struct DECODER_RESULT
-{
-    std::unordered_set<int64_t> flipped_observables;
 };
 
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
 /*
- * Calls `IMPL::decode` which should take in a `std::vector<int64_t>` of
+ * Calls `IMPL::decode` which should take in a `std::vector<GRAPH_COMPONENT_ID>` of
  * detector indices that are flipped, and return a `DECODER_RESULT`
  *
  * This function manages any updates to `DECODER_STATS` during the call

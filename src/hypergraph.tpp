@@ -53,14 +53,15 @@ TEMPL_CLASS::add_edge(ITER v_begin, ITER v_end, EDGE_DATA_TYPE data)
     if (order > MAX_ORDER)
         throw std::runtime_error("vertex list size exceeds MAX_ORDER");
 
-    EDGE::vertex_list_type vertex_list(v_begin, v_end);
+    typename EDGE::vertex_list_type vertex_list;
+    std::copy(v_begin, v_end, vertex_list.begin());
     EDGE* e = new EDGE{vertex_list, order, data};
     edges_.push_back(e);
 
     if constexpr (MAX_ORDER == 2)
     {
-        VERTEX* v = vertex_list[0],
-                w = vertex_list[1];
+        VERTEX* v = vertex_list[0];
+        VERTEX* w = vertex_list[1];
         adjacency_[v].emplace_back(w, e);
         adjacency_[w].emplace_back(v, e);
     }
@@ -168,25 +169,35 @@ TEMPL_CLASS::get_all_incident_edges(ITER v_begin, ITER v_end)
     const auto& v0_adj = adjacency_[v0];
     if (v_count > 2)
     {
-        VERTEX* v1 = *(v_begin+1);
-        
-        // we only need to check `v1`'s entry in `adjacency_[v0]` since at least these
-        // edges are incident on both `v0` and `v1`
-        auto adj_it = std::find_if(v0_adj.begin(), v0_adj.end(),
-                                    [v1] (const auto& entry) { return entry.first == v1; });
-        const auto& [__unused_w, e_list] = *adj_it;
+        if constexpr (MAX_ORDER == 2)
+        {
+            // we just need this to avoid compile errors in this block
+            // -- note that we will never reach this code because of the `v_count > MAX_ORDER`
+            // check above
+            return {};
+        }
+        else
+        {
+            VERTEX* v1 = *(v_begin+1);
+            
+            // we only need to check `v1`'s entry in `adjacency_[v0]` since at least these
+            // edges are incident on both `v0` and `v1`
+            auto adj_it = std::find_if(v0_adj.begin(), v0_adj.end(),
+                                        [v1] (const auto& entry) { return entry.first == v1; });
+            const auto& [__unused_w, e_list] = *adj_it;
 
-        // now, make sure `v_begin+2 ... v_end-1` are also incident on all edges in `e_list`
-        std::copy_if(e_list.begin(), e_list.end(), std::back_inserter(common_edges),
-                    [v_begin, v_end] (EDGE* e) 
-                    {
-                        return std::all_of(v_begin+2, v_end,
-                                    [e] (VERTEX* v) 
-                                    { 
-                                        return std::find(e->vertices.begin(), e->vertices.end(), v) 
-                                                                != e->vertices.end();
-                                    });
-                    });
+            // now, make sure `v_begin+2 ... v_end-1` are also incident on all edges in `e_list`
+            std::copy_if(e_list.begin(), e_list.end(), std::back_inserter(common_edges),
+                        [v_begin, v_end] (EDGE* e) 
+                        {
+                            return std::all_of(v_begin+2, v_end,
+                                        [e] (VERTEX* v) 
+                                        { 
+                                            return std::find(e->vertices.begin(), e->vertices.end(), v) 
+                                                                    != e->vertices.end();
+                                        });
+                        });
+        }
     }
     if (v_count == 2)
     {
@@ -243,8 +254,9 @@ TEMPL_CLASS::remove_edge(EDGE* e)
             // more involved for max_order > 2: need to find the entry containing the list,
             // and handle the case where the list is empty after deleting `e`
             auto it = std::remove_if(v_adj.begin(), v_adj.end(),
-                                    [e] (auto& [w, e_list]) 
-                                    { 
+                                    [e] (auto& p)
+                                    {
+                                        auto& e_list = p.second;
                                         // we will mark `e_list` for removal if it is empty after removing `e`
                                         auto it = std::find(e_list.begin(), e_list.end(), e);
                                         if (it != e_list.end())
@@ -255,7 +267,6 @@ TEMPL_CLASS::remove_edge(EDGE* e)
         }
     }
 
-    edge_id_map_.erase(e->id);
     delete e;
 }
 

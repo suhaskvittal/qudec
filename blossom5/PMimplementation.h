@@ -43,6 +43,8 @@
 
 #define PM_THRESHOLD ((REAL)1e-12)
 
+namespace b5 {
+
 struct PerfectMatching::Node
 {
 	unsigned int	is_outer : 1; // 0 - the node is contained in another blossom, 1 - it's the outermost node
@@ -351,6 +353,7 @@ struct PerfectMatching::TreeEdgeIterator
 		}\
 	}
 
+}  // namespace b5
 
 #endif
 

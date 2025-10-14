@@ -5,6 +5,8 @@
 
 #include "stim/simulators/frame_simulator.h"
 
+#include <chrono>
+
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
 
@@ -16,15 +18,17 @@ decode(IMPL& impl,
         bool do_not_clock)
 {
     // create detector list from `detector_flips`
-    std::vector<int64_t> detector_list;
+    std::vector<GRAPH_COMPONENT_ID> detector_list;
     for (size_t i = 0; i < detector_flips.num_bits_padded(); i++)
     {
         if (detector_flips[i])
-            detector_list.push_back(static_cast<int64_t>(i));
+            detector_list.push_back(static_cast<GRAPH_COMPONENT_ID>(i));
     }
 
+    size_t hw = detector_list.size();
+
     stats.trials++;
-    stats.trials_by_hamming_weight[detector_list.size()]++;
+    stats.trials_by_hamming_weight[hw]++;
 
     // if there are no detector flips, then exit early:
     if (detector_list.empty())
@@ -34,17 +38,17 @@ decode(IMPL& impl,
     }
 
     // start clock:
-    std::chrono::steady_clock::time_point start_time;
+    std::chrono::steady_clock::time_point start_time, end_time;
     if (!do_not_clock)
         start_time = std::chrono::steady_clock::now();
 
-    DECODER_RESULT result = impl.decode(detector_list);
+    DECODER_RESULT result = impl.decode(std::move(detector_list));
 
     if (!do_not_clock)
         end_time = std::chrono::steady_clock::now();
     uint64_t time_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
     stats.total_time_us += time_us;
-    stats.time_us_by_hamming_weight[detector_list.size()] += time_us;
+    stats.time_us_by_hamming_weight[hw] += time_us;
 
     // check if result is an error:
     bool any_mismatch{false};
