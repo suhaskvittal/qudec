@@ -6,6 +6,7 @@
 #include "decoder/surface_code.h"
 #include "graph/distance.h"
 
+#include <iostream>
 #include <mutex>
 #include <thread>
 
@@ -41,8 +42,10 @@ create_sc_decoding_graph_from_circuit(const stim::Circuit& circuit)
  * */
 
 BLOSSOM5::BLOSSOM5(const stim::Circuit& circuit)
-    :dg{create_sc_decoding_graph_from_circuit(circuit)}
-{}
+    :dg{create_sc_decoding_graph_from_circuit(circuit)},
+    boundary_id(dg->get_vertices().size()-1)
+{
+}
 
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
@@ -50,12 +53,17 @@ BLOSSOM5::BLOSSOM5(const stim::Circuit& circuit)
 constexpr auto DIJKSTRA_WF = [] (const auto* e) { return e->data.quantized_weight; };
 
 DECODER_RESULT
-BLOSSOM5::decode(std::vector<GRAPH_COMPONENT_ID>&& dets) const
+BLOSSOM5::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_strm) const
 {
+    // add boundary if odd number of dets:
+    if (dets.size() & 1)
+        dets.push_back(boundary_id);
+
     // initialize b5 object
     const size_t n = dets.size();
     const size_t m = (n*(n-1)) >> 1;
     b5::PerfectMatching pm(n, m);
+    pm.options.verbose = false;
 
     std::vector<graph::DIJKSTRA_RESULT<weight_type>> dijkstra_results(n);
 
@@ -65,7 +73,14 @@ BLOSSOM5::decode(std::vector<GRAPH_COMPONENT_ID>&& dets) const
              et_end = dets.end();
         auto result = graph::dijkstra<weight_type>(*dg, dets[i], DIJKSTRA_WF, true, et_begin, et_end);
         for (size_t j = i+1; j < n; j++)
+        {
             pm.AddEdge(i, j, result.dist[dets[j]]);
+
+#if defined(DEBUG_DECODER)
+            debug_strm << "added edge between " << dets[i] << " and " << dets[j] 
+                        << " with weight " << result.dist[dets[j]] << "\n";
+#endif
+        }
 
         dijkstra_results[i] = std::move(result);
     }
@@ -92,12 +107,24 @@ BLOSSOM5::decode(std::vector<GRAPH_COMPONENT_ID>&& dets) const
         std::transform(id_path.begin(), id_path.end(), vertex_path.begin(),
                         [this] (GRAPH_COMPONENT_ID id) { return dg->get_vertex(id); });
 
+        [[ maybe_unused ]] std::unordered_map<int64_t, size_t> path_flips;
         for (auto it = vertex_path.begin(); it != vertex_path.end()-1; it++)
         {
             auto* e = dg->get_edge_and_fail_if_nonunique(it, it+2);
             for (auto obs_id : e->data.flipped_observables)
+            {
                 observable_flips_by_id[obs_id] ^= 1;
+                path_flips[obs_id] ^= 1;
+            }
         }
+
+#if defined (DEBUG_DECODER)
+        debug_strm << "match between " << src_id << " and " << dst_id << ", flipped observables:";
+        for (const auto& [x, flips] : path_flips)
+            if (flips & 1)
+                debug_strm << " " << x;
+        debug_strm << "\n";
+#endif
     }
 
     std::unordered_set<int64_t> flipped_observables;
@@ -107,6 +134,65 @@ BLOSSOM5::decode(std::vector<GRAPH_COMPONENT_ID>&& dets) const
         if (flips & 1)
             flipped_observables.insert(x);
     }
+
+#if defined (DEBUG_DECODER)
+    debug_strm << "final flipped observables:";
+    for (auto x : flipped_observables)
+        debug_strm << " " << x;
+    debug_strm << "\n";
+#endif
+
+    return DECODER_RESULT{flipped_observables};
+}
+
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
+/*
+ * PyMatching Implementation:
+ * */
+
+PYMATCHING::PYMATCHING(const stim::Circuit& circuit)
+    :dem{stim::circuit_to_dem(circuit, {true, true, false, 0.0, false, false})},
+    user_graph{pm::detector_error_model_to_user_graph(dem, false, pm::NUM_DISTINCT_WEIGHTS)},
+    mwpm{user_graph.to_mwpm(pm::NUM_DISTINCT_WEIGHTS, false)},
+    num_observables{user_graph.get_num_observables()}
+{
+}
+
+DECODER_RESULT
+PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_strm) const
+{
+    // Convert detector IDs to PyMatching format (uint64_t vector)
+    std::vector<uint64_t> detection_events;
+    detection_events.reserve(dets.size());
+    for (auto det_id : dets) {
+        detection_events.push_back(static_cast<uint64_t>(det_id));
+    }
+
+    // Create observables array
+    std::vector<uint8_t> observables(num_observables, 0);
+
+    // Perform matching using PyMatching's decode function
+    pm::total_weight_int weight = 0;
+    pm::decode_detection_events(const_cast<pm::Mwpm&>(mwpm), detection_events,
+                                observables.data(), weight, false);
+
+    // Convert observables to result format
+    std::unordered_set<int64_t> flipped_observables;
+    for (size_t i = 0; i < observables.size(); i++) {
+        if (observables[i] & 1) {
+            flipped_observables.insert(static_cast<int64_t>(i));
+        }
+    }
+
+#if defined(DEBUG_DECODER)
+    debug_strm << "PyMatching decoded " << dets.size() << " detectors, flipped observables:";
+    for (auto obs : flipped_observables) {
+        debug_strm << " " << obs;
+    }
+    debug_strm << " (weight: " << weight << ")\n";
+#endif
 
     return DECODER_RESULT{flipped_observables};
 }

@@ -4,11 +4,17 @@
  */
 
 #include "stim/simulators/frame_simulator.h"
+#include "decoder/surface_code.h"
 
 #include <chrono>
+#include <type_traits>
 
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
+
+// Type trait to check if IMPL is PYMATCHING
+template<typename T>
+constexpr bool is_pymatching_v = std::is_same_v<T, PYMATCHING>;
 
 template <class IMPL> void
 decode(IMPL& impl, 
@@ -42,7 +48,17 @@ decode(IMPL& impl,
     if (!do_not_clock)
         start_time = std::chrono::steady_clock::now();
 
-    DECODER_RESULT result = impl.decode(std::move(detector_list));
+    std::stringstream debug_strm;
+    DECODER_RESULT result;
+
+    // Use constexpr type checking for PyMatching (allows for future customization)
+    if constexpr (is_pymatching_v<IMPL>) {
+        // PyMatching: uses PyMatching's internal MWPM algorithm
+        result = impl.decode(detector_list, debug_strm);
+    } else {
+        // Other decoders: use standard interface
+        result = impl.decode(detector_list, debug_strm);
+    }
 
     if (!do_not_clock)
         end_time = std::chrono::steady_clock::now();
@@ -60,6 +76,26 @@ decode(IMPL& impl,
     }
 
     stats.errors += any_mismatch;
+
+#if defined (DEBUG_DECODER)
+    if (any_mismatch)
+    {
+        std::cerr << "TRIAL " << stats.trials << " ==================================== \n";
+        std::cerr << "detectors =";
+        for (auto d : detector_list)
+            std::cerr << " " << d;
+        std::cerr << "\ndecoder debug out--------------\n\n";
+        std::cerr << debug_strm.str() << "\n";
+        std::cerr << "------------------------------\n\n";
+        std::cerr << "true flipped observables:";
+        for (size_t i = 0; i < observable_flips.num_bits_padded(); i++)
+        {
+            if (observable_flips[i])
+                std::cerr << " " << i;
+        }
+        std::cerr << "\n";
+    }
+#endif
 }
 
 /////////////////////////////////////////////////////
@@ -76,18 +112,23 @@ benchmark_decoder(const stim::Circuit& circuit,
     using frame_sim_type = stim::FrameSimulator<stim::MAX_BITWORD_WIDTH>;
 
     std::mt19937_64 rng(seed);
-    frame_sim_type sim(circuit.compute_stats(), 
-                        stim::FrameSimulatorMode::STORE_DETECTIONS_TO_MEMORY,
-                        batch_size,
-                        std::move(rng));
+
+    size_t num_batches{0};
 
     DECODER_STATS stats;
     while (num_trials)
     {
+        if (num_batches % 20 == 0)
+            std::cout << "\n[ trials remaining = " << std::setw(12) << std::right << num_trials << " ]\t";
+        (std::cout << ".").flush();
+
         uint64_t trials_this_batch = std::min(num_trials, batch_size);
         num_trials -= trials_this_batch;
 
-        sim.reset_all();
+        frame_sim_type sim(circuit.compute_stats(), 
+                            stim::FrameSimulatorMode::STORE_DETECTIONS_TO_MEMORY,
+                            trials_this_batch,
+                            std::move(rng));
         sim.do_circuit(circuit);
 
         auto detector_table = std::move(sim.det_record.storage);
@@ -99,7 +140,12 @@ benchmark_decoder(const stim::Circuit& circuit,
 
         for (uint64_t s = 0; s < trials_this_batch; s++)
             decode(impl, stats, std::move(detector_table[s]), std::move(observable_table[s]), do_not_clock);
+
+        rng = std::move(sim.rng);
+
+        num_batches++;
     }
+    std::cout << "\n";
 
     return stats;
 }

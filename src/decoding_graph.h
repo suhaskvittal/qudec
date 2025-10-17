@@ -20,6 +20,8 @@ struct DETECTOR_DATA
     // make sure to use `RED = 1` in your stim circuits!!!!
     enum class COLOR { NONE, RED, GREEN, BLUE };
 
+    GRAPH_COMPONENT_ID base_detector_id;
+    GRAPH_COMPONENT_ID round_id;
     COLOR              color{COLOR::NONE};
     bool               is_flag{false};
     bool               is_boundary{false};

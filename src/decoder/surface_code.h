@@ -13,6 +13,12 @@
 #include <stim/dem/detector_error_model.h>
 #include <stim/util_top/circuit_to_dem.h>
 
+#include <pymatching/sparse_blossom/driver/user_graph.h>
+#include <pymatching/sparse_blossom/driver/mwpm_decoding.h>
+#include <pymatching/sparse_blossom/matcher/mwpm.h>
+
+#include <iosfwd>
+
 /*
  * This file contains all decoders for the surface code.
  * The simple-to-implement decoders are implemented in `surface_code.cpp`
@@ -41,9 +47,29 @@ public:
     using weight_type = DECODER_ERROR_DATA::quantized_weight_type;
 private:
     std::unique_ptr<SC_DECODING_GRAPH> dg;
+
+    GRAPH_COMPONENT_ID boundary_id;
 public:
     BLOSSOM5(const stim::Circuit&);
-    DECODER_RESULT decode(std::vector<GRAPH_COMPONENT_ID>&&) const;
+    DECODER_RESULT decode(std::vector<GRAPH_COMPONENT_ID>, std::ostream& debug_strm) const;
+};
+
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
+struct PYMATCHING
+{
+public:
+    using weight_type = double;
+private:
+    stim::DetectorErrorModel dem;
+    mutable pm::UserGraph user_graph;
+    mutable pm::Mwpm mwpm;
+    size_t num_observables;
+
+public:
+    PYMATCHING(const stim::Circuit&);
+    DECODER_RESULT decode(std::vector<GRAPH_COMPONENT_ID>, std::ostream& debug_strm) const;
 };
 
 /////////////////////////////////////////////////////

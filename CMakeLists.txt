@@ -31,6 +31,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Add subdirectories for dependencies
 add_subdirectory(stim)
 add_subdirectory(blossom5)
+add_subdirectory(PyMatching)
 
 ###################################################
 # Source files
@@ -41,6 +42,7 @@ set(QUDEC_FILES
     src/decoding_graph.cpp
     src/decoder/surface_code.cpp
     src/io/dem.cpp
+    src/gen.cpp
 )
 
 ###################################################
@@ -50,7 +52,8 @@ set(QUDEC_FILES
 add_library(qudeclib SHARED ${QUDEC_FILES})
 target_include_directories(qudeclib PUBLIC "src")
 target_compile_options(qudeclib PUBLIC ${COMPILE_OPTIONS})
-target_link_libraries(qudeclib PUBLIC libstim blossom5)
+target_link_libraries(qudeclib PUBLIC libstim blossom5 libpymatching)
+#target_compile_definitions(qudeclib PUBLIC -DDEBUG_DECODER)
 
 ###################################################
 # Main executable

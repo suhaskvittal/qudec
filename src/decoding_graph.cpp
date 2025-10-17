@@ -30,6 +30,14 @@ read_surface_code_decoding_graph(const stim::DetectorErrorModel& dem)
     {
         if (dets.size() > 2 || dets.empty())
         {
+            std::cerr << "error info:"
+                    << "\n\terror prob = " << ed.error_probability
+                    << "\n\tdetectors =";
+            for (auto d : dets)
+                std::cerr << " " << d;
+
+            std::cerr << "\n";
+                
             throw std::runtime_error("SC_DECODING_GRAPH: got error with " + std::to_string(dets.size()) + " detectors");
         }
         else

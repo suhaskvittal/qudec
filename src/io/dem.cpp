@@ -46,7 +46,7 @@ read_dem_block_helper(const stim::DetectorErrorModel& dem, DEM_READ_RESULT& resu
         {
             for (size_t i = 0; i < inst.arg_data.size(); ++i)
                 info.coord_shift[i] += inst.arg_data[i];
-            info.id_shift += inst.target_data[0].data;
+            info.id_shift += inst.target_data[0].val();
         }
     }
 }
@@ -63,12 +63,16 @@ read_detector_decl(const stim::DemInstruction& inst, DEM_BLOCK_INFO& info)
         coords[i] += inst.arg_data[i];
 
     // get information from coordinates
+    GRAPH_COMPONENT_ID base_detector_id = std::round(coords[DEM_BASE_DETECTOR_ID_COORD_IDX]);
+    GRAPH_COMPONENT_ID round_id = std::round(coords[DEM_ROUND_ID_COORD_IDX]);
     int color_id = std::round(coords[DEM_COLOR_COORD_IDX]);
     bool is_flag = std::round(coords[DEM_FLAG_COORD_IDX]) > 0.0f;
 
     // compute id:
     DETECTOR_DATA data
     {
+        base_detector_id,
+        round_id,
         static_cast<DETECTOR_DATA::COLOR>(color_id),
         is_flag
     };
@@ -77,7 +81,7 @@ read_detector_decl(const stim::DemInstruction& inst, DEM_BLOCK_INFO& info)
     std::transform(inst.target_data.begin(), inst.target_data.end(), decl.begin(),
                 [&data, s=info.id_shift] (const stim::DemTarget& t) 
                 { 
-                    return std::make_pair(t.data + s, data);
+                    return std::make_pair(t.val() + s, data);
                 });
 
     return decl;
@@ -96,15 +100,19 @@ read_dem_error(const stim::DemInstruction& inst, DEM_BLOCK_INFO& info)
         [&errors, &info, error_prob] (std::span<const stim::DemTarget> tg)
         {
             std::vector<int64_t> detectors;
+    
+            if (error_prob < 1e-18)
+                return;
+
             DECODER_ERROR_DATA ed{error_prob};
 
             // identify detectors and observables:
             for (const auto& t : tg)
             {
                 if (t.is_observable_id())
-                    ed.flipped_observables.insert(t.data);
+                    ed.flipped_observables.insert(t.val());
                 else
-                    detectors.push_back(t.data + info.id_shift);
+                    detectors.push_back(t.val() + info.id_shift);
             }
 
             errors.emplace_back(detectors, ed);
