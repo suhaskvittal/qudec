@@ -24,9 +24,16 @@ print_stat(std::ostream& out, std::string name, T value)
 {
     out << std::setw(64) << std::left << name;
     if constexpr (std::is_floating_point<T>::value)
-        out << std::setw(12) << std::right << std::fixed << std::setprecision(8) << value;
+    {
+        if (value < 1e-3)
+            out << std::setw(12) << std::right << std::scientific << std::setprecision(4) << value;
+        else
+            out << std::setw(12) << std::right << std::fixed << std::setprecision(8) << value;
+    }
     else
+    {
         out << std::setw(12) << std::right << value;
+    }
     out << "\n";
 }
 
@@ -34,6 +41,25 @@ template <class INTA, class INTB> double
 fpdiv(INTA a, INTB b)
 {
     return static_cast<double>(a) / static_cast<double>(b);
+}
+
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
+template <class IMPL> void
+print_decoder_stats(std::ostream& out, const IMPL& dec)
+{
+}
+
+template <class IMPL, class... IMPL_ARGS> DECODER_STATS
+eval_decoder(const stim::Circuit& circuit, uint64_t num_trials, IMPL_ARGS... args)
+{
+    IMPL decoder(circuit, std::forward<IMPL_ARGS>(args)...);
+    auto out = benchmark_decoder(circuit, decoder, num_trials);
+
+    print_decoder_stats(std::cout, decoder);
+
+    return out;
 }
 
 /////////////////////////////////////////////////////
@@ -55,6 +81,8 @@ main(int argc, char* argv[])
     double e_readout;
     double e_idle;
 
+    std::string decoder;
+
     ARGPARSE()
         .optional("-f", "--stim-file", "stim file", stim_file, "")
         .optional("-d", "--code-distance", "code distance", code_distance, 3)
@@ -69,6 +97,9 @@ main(int argc, char* argv[])
         .optional("-e2", "--e-g2q", "gate error rate (2Q)", e_g2q, 1e-3)
         .optional("-em", "--e-readout", "readout error rate", e_readout, 1e-3)
         .optional("-ei", "--e-idle", "idle error rate", e_idle, 1e-4)
+
+        // decoder:
+        .optional("", "--decoder", "decoder to use", decoder, "promatch_pymatching")
         .parse(argc, argv);
 
     stim::Circuit circuit;
@@ -109,16 +140,27 @@ main(int argc, char* argv[])
         fclose(fin);
     }
 
-    // initialize decoder:
-//  BLOSSOM5 decoder(circuit);
-    PYMATCHING decoder(circuit);
+    FPD_CONFIG fpd_conf;
+    fpd_conf.cache_chain_limit = code_distance >> 2;
 
-    auto stats = benchmark_decoder(circuit, decoder, num_trials);
+    DECODER_STATS stats;
+    if (decoder == "promatch_pymatching")
+        stats = eval_decoder<PROMATCH_SW<PYMATCHING>>(circuit, num_trials, PYMATCHING(circuit));
+    else if (decoder == "pymatching")
+        stats = eval_decoder<PYMATCHING>(circuit, num_trials);
+    else if (decoder == "fpd_pymatching")
+        stats = eval_decoder<FPD<PYMATCHING>>(circuit, num_trials, PYMATCHING(circuit), FPD_CONFIG{});
+    else if (decoder == "blossom5")
+        stats = eval_decoder<BLOSSOM5>(circuit, num_trials);
+    else
+        throw std::runtime_error("invalid decoder: " + decoder);
 
     double ler = fpdiv(stats.errors, stats.trials);
     double mean_time_us = fpdiv(stats.total_time_us, stats.trials);
     double mean_time_us_nontrivial = fpdiv(stats.total_time_us, stats.trials - stats.trivial_trials);
 
+    print_stat(std::cout, "LOGICAL_ERRORS", stats.errors);
+    print_stat(std::cout, "TRIALS", stats.trials);
     print_stat(std::cout, "LOGICAL_ERROR_RATE", ler);
     print_stat(std::cout, "MEAN_TIME_US", mean_time_us);
     print_stat(std::cout, "MEAN_TIME_US_NONTRIVIAL", mean_time_us_nontrivial);

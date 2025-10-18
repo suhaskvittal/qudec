@@ -8,13 +8,10 @@
 
 #include "decoder/common.h"
 
-#include "stim/circuit/circuit.h"
-#include "stim/mem/simd_bits.h"
+#include <stim/circuit/circuit.h>
 
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
-
-using syndrome_type = stim::simd_bits<stim::MAX_BITWORD_WIDTH>;
 
 struct DECODER_STATS
 {

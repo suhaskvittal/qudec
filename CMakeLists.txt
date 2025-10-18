@@ -12,7 +12,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
             )
 else()
     set(COMPILE_OPTIONS
-            -O3
+            -Ofast
             -flto=auto
             -fstrict-aliasing
             -march=native

@@ -63,6 +63,8 @@ public:
     VERTEX* get_vertex(id_type) const;
     void remove_vertex(VERTEX*);
 
+    EDGE* get_edge_and_fail_if_nonunique(VERTEX*, VERTEX*);
+
     template <class ITER> EDGE*               get_edge_and_fail_if_nonunique(ITER v_begin, ITER v_end);
     template <class ITER> std::vector<EDGE*>  get_all_incident_edges(ITER v_begin, ITER v_end);
     void remove_edge(EDGE*);

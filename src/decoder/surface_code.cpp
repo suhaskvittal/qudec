@@ -89,20 +89,19 @@ BLOSSOM5::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_strm)
 
     // determine frame changes -- it is faster to just count the parity
     // of observable flips rather than modifying a set over and over again
-    std::unordered_map<int64_t, size_t> observable_flips_by_id{};
-    observable_flips_by_id.reserve(4);
+    DECODER_RESULT result;
     for (size_t i = 0; i < n; i++)
     {
         size_t j = pm.GetMatch(i);
         if (j < i)  // avoid double counting
             continue;
 
-        auto result = std::move(dijkstra_results[i]);
+        auto dijk_result = std::move(dijkstra_results[i]);
 
         GRAPH_COMPONENT_ID src_id = dets[i],
                            dst_id = dets[j];
 
-        auto id_path = graph::dijkstra_path(result.prev, src_id, dst_id, true);
+        auto id_path = graph::dijkstra_path(dijk_result.prev, src_id, dst_id, true);
         std::vector<SC_DECODING_GRAPH::VERTEX*> vertex_path(id_path.size());
         std::transform(id_path.begin(), id_path.end(), vertex_path.begin(),
                         [this] (GRAPH_COMPONENT_ID id) { return dg->get_vertex(id); });
@@ -113,7 +112,7 @@ BLOSSOM5::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_strm)
             auto* e = dg->get_edge_and_fail_if_nonunique(it, it+2);
             for (auto obs_id : e->data.flipped_observables)
             {
-                observable_flips_by_id[obs_id] ^= 1;
+                result.flipped_observables[obs_id] ^= 1;
                 path_flips[obs_id] ^= 1;
             }
         }
@@ -127,22 +126,7 @@ BLOSSOM5::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_strm)
 #endif
     }
 
-    std::unordered_set<int64_t> flipped_observables;
-    flipped_observables.reserve(4);
-    for (const auto& [x, flips] : observable_flips_by_id)
-    {
-        if (flips & 1)
-            flipped_observables.insert(x);
-    }
-
-#if defined (DEBUG_DECODER)
-    debug_strm << "final flipped observables:";
-    for (auto x : flipped_observables)
-        debug_strm << " " << x;
-    debug_strm << "\n";
-#endif
-
-    return DECODER_RESULT{flipped_observables};
+    return result;
 }
 
 /////////////////////////////////////////////////////
@@ -166,9 +150,8 @@ PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_str
     // Convert detector IDs to PyMatching format (uint64_t vector)
     std::vector<uint64_t> detection_events;
     detection_events.reserve(dets.size());
-    for (auto det_id : dets) {
+    for (auto det_id : dets)
         detection_events.push_back(static_cast<uint64_t>(det_id));
-    }
 
     // Create observables array
     std::vector<uint8_t> observables(num_observables, 0);
@@ -179,22 +162,9 @@ PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_str
                                 observables.data(), weight, false);
 
     // Convert observables to result format
-    std::unordered_set<int64_t> flipped_observables;
-    for (size_t i = 0; i < observables.size(); i++) {
-        if (observables[i] & 1) {
-            flipped_observables.insert(static_cast<int64_t>(i));
-        }
-    }
-
-#if defined(DEBUG_DECODER)
-    debug_strm << "PyMatching decoded " << dets.size() << " detectors, flipped observables:";
-    for (auto obs : flipped_observables) {
-        debug_strm << " " << obs;
-    }
-    debug_strm << " (weight: " << weight << ")\n";
-#endif
-
-    return DECODER_RESULT{flipped_observables};
+    DECODER_RESULT result;
+    memmove(result.flipped_observables.u8, observables.data(), observables.size());
+    return result;
 }
 
 /////////////////////////////////////////////////////

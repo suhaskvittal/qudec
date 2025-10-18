@@ -66,11 +66,17 @@ private:
     mutable pm::UserGraph user_graph;
     mutable pm::Mwpm mwpm;
     size_t num_observables;
-
 public:
     PYMATCHING(const stim::Circuit&);
     DECODER_RESULT decode(std::vector<GRAPH_COMPONENT_ID>, std::ostream& debug_strm) const;
 };
+
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
+// Other decoders:
+#include "promatch.h"
+#include "fpd.h"
 
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////

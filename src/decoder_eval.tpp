@@ -51,14 +51,7 @@ decode(IMPL& impl,
     std::stringstream debug_strm;
     DECODER_RESULT result;
 
-    // Use constexpr type checking for PyMatching (allows for future customization)
-    if constexpr (is_pymatching_v<IMPL>) {
-        // PyMatching: uses PyMatching's internal MWPM algorithm
-        result = impl.decode(detector_list, debug_strm);
-    } else {
-        // Other decoders: use standard interface
-        result = impl.decode(detector_list, debug_strm);
-    }
+    result = impl.decode(detector_list, debug_strm);
 
     if (!do_not_clock)
         end_time = std::chrono::steady_clock::now();
@@ -67,14 +60,7 @@ decode(IMPL& impl,
     stats.time_us_by_hamming_weight[hw] += time_us;
 
     // check if result is an error:
-    bool any_mismatch{false};
-    for (size_t i = 0; i < observable_flips.num_bits_padded(); i++)
-    {
-        bool truth_is_flipped = observable_flips[i];
-        bool prediction_is_flipped = result.flipped_observables.count(static_cast<int64_t>(i)) > 0;
-        any_mismatch |= (truth_is_flipped ^ prediction_is_flipped);
-    }
-
+    bool any_mismatch = result.flipped_observables != observable_flips;
     stats.errors += any_mismatch;
 
 #if defined (DEBUG_DECODER)
@@ -87,13 +73,21 @@ decode(IMPL& impl,
         std::cerr << "\ndecoder debug out--------------\n\n";
         std::cerr << debug_strm.str() << "\n";
         std::cerr << "------------------------------\n\n";
-        std::cerr << "true flipped observables:";
+
+        std::cerr << "\nprediction:";
+        for (size_t i = 0; i < result.flipped_observables.num_bits_padded(); i++)
+        {
+            if (result.flipped_observables[i])
+                std::cerr << " " << i;
+        }
+
+        std::cerr << "\ntrue flipped observables:";
         for (size_t i = 0; i < observable_flips.num_bits_padded(); i++)
         {
             if (observable_flips[i])
                 std::cerr << " " << i;
         }
-        std::cerr << "\n";
+        std::cerr << "\n\n";
     }
 #endif
 }
@@ -113,14 +107,17 @@ benchmark_decoder(const stim::Circuit& circuit,
 
     std::mt19937_64 rng(seed);
 
-    size_t num_batches{0};
+    [[ maybe_unused ]] size_t num_batches{0};
 
     DECODER_STATS stats;
     while (num_trials)
     {
-        if (num_batches % 20 == 0)
+#if !defined(DEBUG_DECODER)
+        if (num_batches % 100 == 0)
             std::cout << "\n[ trials remaining = " << std::setw(12) << std::right << num_trials << " ]\t";
-        (std::cout << ".").flush();
+        if (num_batches % 10 == 0)
+            (std::cout << ".").flush();
+#endif
 
         uint64_t trials_this_batch = std::min(num_trials, batch_size);
         num_trials -= trials_this_batch;

@@ -141,6 +141,13 @@ TEMPL_CLASS::remove_vertex(VERTEX* v)
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
+TEMPL_PARAMS typename TEMPL_CLASS::EDGE*
+TEMPL_CLASS::get_edge_and_fail_if_nonunique(VERTEX* v, VERTEX* w)
+{
+    std::array<VERTEX*, 2> vlist{v, w};
+    return get_edge_and_fail_if_nonunique(vlist.begin(), vlist.end());
+}
+
 TEMPL_PARAMS template <class ITER> typename TEMPL_CLASS::EDGE*
 TEMPL_CLASS::get_edge_and_fail_if_nonunique(ITER v_begin, ITER v_end)
 {
@@ -272,3 +279,6 @@ TEMPL_CLASS::remove_edge(EDGE* e)
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
+
+#undef TEMPL_PARAMS
+#undef TEMPL_CLASS  
