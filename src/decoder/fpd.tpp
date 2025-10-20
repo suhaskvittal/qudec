@@ -45,13 +45,6 @@ TEMPL_CLASS::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_st
 
     // identify preferences:
     std::vector<preference_entry_type> prefs = compute_prefs(dets);
-    if (prefs.empty())
-    {
-        if (dets.back() == boundary_index)
-            dets.pop_back();
-        return ll_decoder.decode(dets, debug_strm);
-    }
-
     syndrome_type flipped_obs{DEFAULT_OBS_BIT_WIDTH};
 
     // only operate on detectors with single preferences:
@@ -174,14 +167,7 @@ TEMPL_CLASS::compute_prefs(const std::vector<GRAPH_COMPONENT_ID>& dets) const
         }
 
         if (prefs[i].pref != NO_PREF)
-        {
             prefs[prefs[i].pref].count++;
-        }
-        else if (conf.do_not_predecode_if_any_without_pref)
-        {
-            prefs.clear();
-            break;
-        }
     }
 
     return prefs;
