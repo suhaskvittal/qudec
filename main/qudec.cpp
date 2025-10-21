@@ -95,7 +95,7 @@ main(int argc, char* argv[])
         .optional("-t2", "--t2", "T2 time in ns", t2, 250'000)
         .optional("-e1", "--e-g1q", "gate error rate (1Q)", e_g1q, 1e-4)
         .optional("-e2", "--e-g2q", "gate error rate (2Q)", e_g2q, 1e-3)
-        .optional("-em", "--e-readout", "readout error rate", e_readout, 1e-3)
+        .optional("-em", "--e-readout", "readout error rate", e_readout, 3e-3)
         .optional("-ei", "--e-idle", "idle error rate", e_idle, 1e-4)
 
         // decoder:

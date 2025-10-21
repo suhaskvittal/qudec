@@ -203,20 +203,6 @@ SC_SCHEDULE_INFO::SC_SCHEDULE_INFO(size_t distance)
             qubits_in_this_timestep.insert(q);
         }
     }
-
-    // print check order:
-    for (const auto& [c, cx_order] : check_cx_order)
-    {
-        std::cout << "check " << c << " :";
-        for (auto q : cx_order)
-        {
-            if (q == NO_QUBIT)
-                std::cout << " _";
-            else
-                std::cout << " " << q;
-        }
-        std::cout << " (x = " << x_check_set.count(c) << ")\n";
-    }
 #endif
 }
 
@@ -257,7 +243,7 @@ sc_memory(const CIRCUIT_CONFIG& config, size_t rounds, size_t distance, bool is_
         const auto& q_info = config.qubits.at(q);
         auto [ex,ey,ez] = pauli_twirling_approx(q_info.t1_ns, q_info.t2_ns, config.round_ns);
         if (ex > 0 || ey > 0 || ez > 0)
-            round_circuit.safe_append_u("PAULI_CHANNEL_1", {q}, {ex,0,0});
+            round_circuit.safe_append_u("PAULI_CHANNEL_1", {q}, {ex,ey,ez});
     }
     
     // reset parity qubits
