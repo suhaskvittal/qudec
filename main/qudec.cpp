@@ -99,7 +99,7 @@ main(int argc, char* argv[])
         .optional("-ei", "--e-idle", "idle error rate", e_idle, 1e-4)
 
         // decoder:
-        .optional("", "--decoder", "decoder to use", decoder, "promatch_pymatching")
+        .optional("", "--decoder", "decoder to use", decoder, "pymatching")
         .parse(argc, argv);
 
     stim::Circuit circuit;

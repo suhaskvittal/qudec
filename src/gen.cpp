@@ -3,7 +3,7 @@
  * */
 
 #include "gen.h"
-#include "stim/circuit/circuit.h"
+#include "gen/scheduling.h"
 
 #include <algorithm>
 #include <numeric>
@@ -98,112 +98,6 @@ pauli_twirling_approx(uint64_t t1_ns, uint64_t t2_ns, uint64_t round_ns)
     z = 0.25 * (1 - 2.0*exp(-fr/ft2) + exp(-fr/ft1));
 
     return std::make_tuple(x, y, z);
-}
-
-////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////
-
-std::vector<stim_qubit_type>
-get_cx_order(stim_qubit_type nw, stim_qubit_type ne, stim_qubit_type sw, stim_qubit_type se, bool is_x_check)
-{
-    if (is_x_check) 
-        return {nw, ne, sw, se};
-    else
-        return {nw, sw, ne, se};
-}
-
-SC_SCHEDULE_INFO::SC_SCHEDULE_INFO(size_t distance)
-    :data_qubits(distance*distance),
-    x_obs(distance),
-    z_obs(distance)
-{
-    // initialize data structures describing syndrome extraction circuit:
-    std::iota(data_qubits.begin(), data_qubits.end(), 0);
-
-    x_check_qubits.reserve((distance*distance-1)/2);
-    z_check_qubits.reserve((distance*distance-1)/2);
-
-    // start with bulk checks first:
-    stim_qubit_type check_qubit{distance*distance};
-    for (size_t r = 0; r < distance-1; r++)
-    {
-        for (size_t c = 0; c < distance-1; c++)
-        {
-            bool is_x_check = ((r+c) & 1) == 0;
-
-            stim_qubit_type nw = r*distance + c;
-            stim_qubit_type ne = r*distance + c+1;
-            stim_qubit_type sw = (r+1)*distance + c;
-            stim_qubit_type se = (r+1)*distance + c+1;
-
-            std::vector<stim_qubit_type> cx_order = get_cx_order(nw, ne, sw, se, is_x_check);
-            if (is_x_check)
-                x_check_qubits.push_back(check_qubit);
-            else
-                z_check_qubits.push_back(check_qubit);
-
-            check_cx_order[check_qubit] = cx_order;
-            check_qubit++;
-        }
-    }
-
-    // now handle boundary checks:
-    for (size_t i = 0; i < distance-1; i++)
-    {
-        std::vector<stim_qubit_type> z_cx_order, x_cx_order;
-        if (i & 1)  // z check on right boundary, x check on upper boundary
-        {
-            stim_qubit_type zq1 = (i+1)*distance - 1,
-                            zq2 = (i+2)*distance - 1,
-                            xq1 = i,
-                            xq2 = i+1;
-            z_cx_order = get_cx_order(zq1, NO_QUBIT, zq2, NO_QUBIT, false);
-            x_cx_order = get_cx_order(NO_QUBIT, NO_QUBIT, xq1, xq2, true);
-        }
-        else  // z check on left boundary, x check on lower boundary
-        {
-            stim_qubit_type zq1 = i*distance,
-                            zq2 = (i+1)*distance,
-                            xq1 = (distance-1)*distance + i,
-                            xq2 = (distance-1)*distance + i+1;
-
-            z_cx_order = get_cx_order(NO_QUBIT, zq1, NO_QUBIT, zq2, false);
-            x_cx_order = get_cx_order(xq1, xq2, NO_QUBIT, NO_QUBIT, true);
-        }
-
-        z_check_qubits.push_back(check_qubit);
-        check_cx_order[check_qubit] = z_cx_order;
-        check_qubit++;
-
-        x_check_qubits.push_back(check_qubit);
-        check_cx_order[check_qubit] = x_cx_order;
-        check_qubit++;
-    }
-
-    x_check_set = std::unordered_set<stim_qubit_type>(x_check_qubits.begin(), x_check_qubits.end());
-
-    for (size_t i = 0; i < distance; i++)
-    {
-        x_obs[i] = i*distance;  // leftmost column
-        z_obs.at(i) = (distance-1)*distance + i;  // bottom row
-    }
-
-#if defined(GEN_VERIFY_CX_SCHEDULE)
-    // make sure no qubit is scheduled at the same timestep:
-    for (size_t t = 0; t < 4; t++)
-    {
-        std::unordered_set<stim_qubit_type> qubits_in_this_timestep;
-        for (const auto& [__unused_check, cx_order] : check_cx_order)
-        {
-            stim_qubit_type q = cx_order.at(t);
-            if (q == NO_QUBIT)
-                continue;
-            if (qubits_in_this_timestep.count(q))
-                throw std::runtime_error("qubit " + std::to_string(q) + " is scheduled at the same timestep twice");
-            qubits_in_this_timestep.insert(q);
-        }
-    }
-#endif
 }
 
 ////////////////////////////////////////////////////////////////
