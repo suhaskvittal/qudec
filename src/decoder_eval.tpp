@@ -60,7 +60,10 @@ decode(IMPL& impl,
     stats.time_us_by_hamming_weight[hw] += time_us;
 
     // check if result is an error:
-    bool any_mismatch = result.flipped_observables != observable_flips;
+    bool any_mismatch{false};
+    for (size_t i = 0; i < result.flipped_observables.num_bits_padded() && i < observable_flips.num_bits_padded(); i++)
+        any_mismatch |= (result.flipped_observables[i] != observable_flips[i]);
+
     stats.errors += any_mismatch;
 
 #if defined (DEBUG_DECODER)

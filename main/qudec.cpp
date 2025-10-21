@@ -14,7 +14,7 @@
 #include <iomanip>
 #include <iostream>
 
-#define USE_STIM_GENERATED_CIRCUITS
+//#define USE_STIM_GENERATED_CIRCUITS
 
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
@@ -126,12 +126,7 @@ main(int argc, char* argv[])
                                     .set_e_readout(e_readout)
                                     .set_e_idle(e_idle);
         circuit = gen::sc_memory(conf, num_rounds, code_distance); 
-
-        std::cout << "GENERATED STIM CIRCUIT (d = " << code_distance << ", r = " << num_rounds << ") ===============================\n" 
-                    << circuit 
-                    << "\n===================================================================\n";
 #endif
-
     }
     else
     {

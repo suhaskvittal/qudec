@@ -103,6 +103,15 @@ pauli_twirling_approx(uint64_t t1_ns, uint64_t t2_ns, uint64_t round_ns)
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
+std::vector<stim_qubit_type>
+get_cx_order(stim_qubit_type nw, stim_qubit_type ne, stim_qubit_type sw, stim_qubit_type se, bool is_x_check)
+{
+    if (is_x_check) 
+        return {nw, ne, sw, se};
+    else
+        return {nw, sw, ne, se};
+}
+
 SC_SCHEDULE_INFO::SC_SCHEDULE_INFO(size_t distance)
     :data_qubits(distance*distance),
     x_obs(distance),
@@ -127,13 +136,7 @@ SC_SCHEDULE_INFO::SC_SCHEDULE_INFO(size_t distance)
             stim_qubit_type sw = (r+1)*distance + c;
             stim_qubit_type se = (r+1)*distance + c+1;
 
-            std::vector<stim_qubit_type> cx_order;
-            cx_order.reserve(4);
-            if (is_x_check)
-                cx_order = {nw, ne, sw, se};
-            else
-                cx_order = {nw, sw, ne, se};
-
+            std::vector<stim_qubit_type> cx_order = get_cx_order(nw, ne, sw, se, is_x_check);
             if (is_x_check)
                 x_check_qubits.push_back(check_qubit);
             else
@@ -148,16 +151,14 @@ SC_SCHEDULE_INFO::SC_SCHEDULE_INFO(size_t distance)
     for (size_t i = 0; i < distance-1; i++)
     {
         std::vector<stim_qubit_type> z_cx_order, x_cx_order;
-        z_cx_order.reserve(4);
-        x_cx_order.reserve(4);
         if (i & 1)  // z check on right boundary, x check on upper boundary
         {
             stim_qubit_type zq1 = (i+1)*distance - 1,
                             zq2 = (i+2)*distance - 1,
                             xq1 = i,
                             xq2 = i+1;
-            z_cx_order = {zq1, zq2, NO_QUBIT, NO_QUBIT}; 
-            x_cx_order = {NO_QUBIT, NO_QUBIT, xq1, xq2};
+            z_cx_order = get_cx_order(zq1, NO_QUBIT, zq2, NO_QUBIT, false);
+            x_cx_order = get_cx_order(NO_QUBIT, NO_QUBIT, xq1, xq2, true);
         }
         else  // z check on left boundary, x check on lower boundary
         {
@@ -166,8 +167,8 @@ SC_SCHEDULE_INFO::SC_SCHEDULE_INFO(size_t distance)
                             xq1 = (distance-1)*distance + i,
                             xq2 = (distance-1)*distance + i+1;
 
-            z_cx_order = {NO_QUBIT, NO_QUBIT, zq1, zq2};
-            x_cx_order = {xq1, xq2, NO_QUBIT, NO_QUBIT};
+            z_cx_order = get_cx_order(NO_QUBIT, zq1, NO_QUBIT, zq2, false);
+            x_cx_order = get_cx_order(xq1, xq2, NO_QUBIT, NO_QUBIT, true);
         }
 
         z_check_qubits.push_back(check_qubit);
@@ -255,20 +256,27 @@ sc_memory(const CIRCUIT_CONFIG& config, size_t rounds, size_t distance, bool is_
     {
         const auto& q_info = config.qubits.at(q);
         auto [ex,ey,ez] = pauli_twirling_approx(q_info.t1_ns, q_info.t2_ns, config.round_ns);
-//      round_circuit.safe_append_u("PAULI_CHANNEL_1", {q}, {ex,ey,ez});
+        if (ex > 0 || ey > 0 || ez > 0)
+            round_circuit.safe_append_u("PAULI_CHANNEL_1", {q}, {ex,0,0});
     }
     
     // reset parity qubits
     error_free_round_circuit.safe_append_u("R", all_check_qubits);
     round_circuit.safe_append_u("R", all_check_qubits);
     for (auto q : all_check_qubits)
-        round_circuit.safe_append_ua("X_ERROR", {q}, config.qubits.at(q).e_g1q);
+    {
+        if (config.qubits.at(q).e_g1q > 0)
+            round_circuit.safe_append_ua("X_ERROR", {q}, config.qubits.at(q).e_g1q);
+    }
 
     // initialize parity qubits
     error_free_round_circuit.safe_append_u("H", schedule_info.x_check_qubits);
     round_circuit.safe_append_u("H", schedule_info.x_check_qubits);
     for (auto q : schedule_info.x_check_qubits)
-        round_circuit.safe_append_ua("DEPOLARIZE1", {q}, config.qubits.at(q).e_g1q);
+    {
+        if (config.qubits.at(q).e_g1q > 0)
+            round_circuit.safe_append_ua("DEPOLARIZE1", {q}, config.qubits.at(q).e_g1q);
+    }
 
     // do cnot gates:
     for (size_t t = 0; t < 4; t++)
@@ -292,8 +300,8 @@ sc_memory(const CIRCUIT_CONFIG& config, size_t rounds, size_t distance, bool is_
             }
         }
 
-        error_free_round_circuit.safe_append_u("CNOT", targets);
-        round_circuit.safe_append_u("CNOT", targets);
+        error_free_round_circuit.safe_append_u("CX", targets);
+        round_circuit.safe_append_u("CX", targets);
 
         // inject CX error
         for (size_t i = 0; i < targets.size(); i += 2)
@@ -303,7 +311,8 @@ sc_memory(const CIRCUIT_CONFIG& config, size_t rounds, size_t distance, bool is_
             std::vector<stim_qubit_type> args{q1, q2};
 
             const auto& cpl = config.couplings.at(q1).at(q2);
-            round_circuit.safe_append_ua("DEPOLARIZE2", {q1,q2}, cpl.e_g2q);
+            if (cpl.e_g2q > 0)
+                round_circuit.safe_append_ua("DEPOLARIZE2", {q1,q2}, cpl.e_g2q);
         }
 
         // inject idling error on any qubits that did not do a CX
@@ -315,17 +324,29 @@ sc_memory(const CIRCUIT_CONFIG& config, size_t rounds, size_t distance, bool is_
                     [&cx_targets] (stim_qubit_type q) { return !cx_targets.count(q); });
 
         for (auto q : idle_qubits)
-            round_circuit.safe_append_ua("DEPOLARIZE1", {q}, config.qubits.at(q).e_idle);
+        {
+            if (config.qubits.at(q).e_idle > 0)
+                round_circuit.safe_append_ua("DEPOLARIZE1", {q}, config.qubits.at(q).e_idle);
+        }
+
+        error_free_round_circuit.safe_append_u("TICK", {});
+        round_circuit.safe_append_u("TICK", {});
     }
 
     // measure parity qubits
     error_free_round_circuit.safe_append_u("H", schedule_info.x_check_qubits);
     round_circuit.safe_append_u("H", schedule_info.x_check_qubits);
     for (auto q : schedule_info.x_check_qubits)
-        round_circuit.safe_append_ua("DEPOLARIZE1", {q}, config.qubits.at(q).e_g1q);
+    {
+        if (config.qubits.at(q).e_g1q > 0)
+            round_circuit.safe_append_ua("DEPOLARIZE1", {q}, config.qubits.at(q).e_g1q);
+    }
 
     for (auto q : all_check_qubits)
-        round_circuit.safe_append_ua("X_ERROR", {q}, config.qubits.at(q).e_readout);
+    {
+        if (config.qubits.at(q).e_readout > 0)
+            round_circuit.safe_append_ua("X_ERROR", {q}, config.qubits.at(q).e_readout);
+    }
     error_free_round_circuit.safe_append_u("M", all_check_qubits);
     round_circuit.safe_append_u("M", all_check_qubits);
 
@@ -375,9 +396,9 @@ sc_memory(const CIRCUIT_CONFIG& config, size_t rounds, size_t distance, bool is_
         {
             if (q == SC_SCHEDULE_INFO::NO_QUBIT)
                 continue;
-            meas_list.push_back((dq_meas_order.at(q)+1) | stim::TARGET_RECORD_BIT);
+            meas_list.push_back((n_data_meas - dq_meas_order.at(q)) | stim::TARGET_RECORD_BIT);
         }
-        epilog.safe_append_u("DETECTOR", meas_list, {detector_id, rounds});
+        epilog.safe_append_u("DETECTOR", meas_list, {detector_id, 0});
         detector_id++;
     }
 
