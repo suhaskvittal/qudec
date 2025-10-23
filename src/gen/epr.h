@@ -27,17 +27,10 @@ struct EPR_GEN_CONFIG
     CIRCUIT_CONFIG hw2_config;
 };
 
-struct PINNED_QUBIT
-{
-    stim_qubit_type qubit;
-    size_t          owner_id;
-    stim_qubit_type pinned_check_qubit;
-};
-
 //////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////
 
-stim::Circuit sc_epr_generation(const EPR_GEN_CONFIG&, size_t rounds, size_t distance);
+stim::Circuit sc_epr_generation(const EPR_GEN_CONFIG&, size_t rounds, size_t distance, bool do_memory_experiment);
 
 //////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////
