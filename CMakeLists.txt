@@ -43,6 +43,8 @@ set(QUDEC_FILES
     src/decoder/surface_code.cpp
     src/io/dem.cpp
     src/gen.cpp
+    src/gen/scheduling.cpp
+    src/gen/utils.cpp
 )
 
 ###################################################
@@ -53,7 +55,6 @@ add_library(qudeclib SHARED ${QUDEC_FILES})
 target_include_directories(qudeclib PUBLIC "src")
 target_compile_options(qudeclib PUBLIC ${COMPILE_OPTIONS})
 target_link_libraries(qudeclib PUBLIC libstim blossom5 libpymatching)
-#target_compile_definitions(qudeclib PUBLIC -DDEBUG_DECODER)
 
 ###################################################
 # Main executable

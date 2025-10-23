@@ -6,6 +6,10 @@
 #include "decoding_graph.h"
 #include "io/dem.h"
 
+#include <stim/simulators/error_matcher.h>
+
+#include <iostream>
+
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
 
@@ -61,6 +65,58 @@ read_surface_code_decoding_graph(const stim::DetectorErrorModel& dem)
     }
 
     return gr;
+}
+
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
+bool
+search_for_bad_dem_errors(const stim::DetectorErrorModel& dem, const stim::Circuit& circuit)
+{
+    bool found_bad_errors{false};
+
+    stim::DetectorErrorModel bad_errors_dem;
+
+    dem.iter_flatten_error_instructions([&](const stim::DemInstruction& error_inst)
+    {
+        bool has_detectors{false};
+        bool has_observables{false};
+
+        for (const auto& target : error_inst.target_data)
+        {
+            if (target.is_relative_detector_id())
+                has_detectors = true;
+            else if (target.is_observable_id())
+                has_observables = true;
+        }
+
+        if (!has_detectors && has_observables)
+        {
+            found_bad_errors = true;
+
+            bad_errors_dem.append_error_instruction(
+                error_inst.arg_data[0],
+                error_inst.target_data,
+                ""
+            );
+        }
+    });
+
+    if (found_bad_errors)
+    {
+        std::cerr << "Found errors that only flip observables (no detectors):\n";
+
+        auto explained_errors = stim::ErrorMatcher::explain_errors_from_circuit(
+            circuit,
+            &bad_errors_dem,
+            true
+        );
+
+        for (const auto& explained_error : explained_errors)
+            std::cerr << explained_error << "\n";
+    }
+
+    return found_bad_errors;
 }
 
 /////////////////////////////////////////////////////

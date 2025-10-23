@@ -29,6 +29,10 @@ create_sc_decoding_graph_from_circuit(const stim::Circuit& circuit)
     };
 
     stim::DetectorErrorModel dem = stim::circuit_to_dem(circuit, SC_DEM_OPTS);
+
+    if (search_for_bad_dem_errors(dem, circuit))
+        throw std::runtime_error("SC_DECODING_GRAPH: found bad DEM errors");
+
     auto* dg = read_surface_code_decoding_graph(dem);
     quantize_all_edge_weights(dg);
     return dg;
@@ -117,13 +121,14 @@ BLOSSOM5::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_strm)
             }
         }
 
-#if defined (DEBUG_DECODER)
-        debug_strm << "match between " << src_id << " and " << dst_id << ", flipped observables:";
-        for (const auto& [x, flips] : path_flips)
-            if (flips & 1)
-                debug_strm << " " << x;
-        debug_strm << "\n";
-#endif
+        if (GL_DEBUG_DECODER)
+        {
+            debug_strm << "match between " << src_id << " and " << dst_id << ", flipped observables:";
+            for (const auto& [x, flips] : path_flips)
+                if (flips & 1)
+                    debug_strm << " " << x;
+            debug_strm << "\n";
+        }
     }
 
     return result;

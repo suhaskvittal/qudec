@@ -66,16 +66,18 @@ decode(IMPL& impl,
 
     stats.errors += any_mismatch;
 
-#if defined (DEBUG_DECODER)
-    if (any_mismatch)
+    if (GL_DEBUG_DECODER && any_mismatch)
     {
         std::cerr << "TRIAL " << stats.trials << " ==================================== \n";
         std::cerr << "detectors =";
         for (auto d : detector_list)
             std::cerr << " " << d;
-        std::cerr << "\ndecoder debug out--------------\n\n";
-        std::cerr << debug_strm.str() << "\n";
-        std::cerr << "------------------------------\n\n";
+
+        std::cerr << "\ndecoder debug out:";
+        std::string line;
+        while (std::getline(debug_strm, line))
+            std::cerr << "\n\t" << line;
+        std::cerr << "\n";
 
         std::cerr << "\nprediction:";
         for (size_t i = 0; i < result.flipped_observables.num_bits_padded(); i++)
@@ -92,7 +94,6 @@ decode(IMPL& impl,
         }
         std::cerr << "\n\n";
     }
-#endif
 }
 
 /////////////////////////////////////////////////////
@@ -115,12 +116,13 @@ benchmark_decoder(const stim::Circuit& circuit,
     DECODER_STATS stats;
     while (num_trials)
     {
-#if !defined(DEBUG_DECODER)
-        if (num_batches % 100 == 0)
-            std::cout << "\n[ trials remaining = " << std::setw(12) << std::right << num_trials << " ]\t";
-        if (num_batches % 10 == 0)
-            (std::cout << ".").flush();
-#endif
+        if (!GL_DEBUG_DECODER)
+        {
+            if (num_batches % 100 == 0)
+                std::cout << "\n[ trials remaining = " << std::setw(12) << std::right << num_trials << " ]\t";
+            if (num_batches % 10 == 0)
+                (std::cout << ".").flush();
+        }
 
         uint64_t trials_this_batch = std::min(num_trials, batch_size);
         num_trials -= trials_this_batch;

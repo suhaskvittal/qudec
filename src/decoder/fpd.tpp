@@ -82,12 +82,13 @@ TEMPL_CLASS::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_st
     std::copy_if(dets.begin(), dets.end(), std::back_inserter(unmatched_dets), 
                     [b=boundary_index] (auto id) { return id >= 0 && id != b; });
 
-#if defined(DEBUG_DECODER)
-    debug_strm << "FPD: unmatched detectors:";
-    for (auto d : unmatched_dets)
-        debug_strm << " " << d;
-    debug_strm << "\n";
-#endif
+    if (GL_DEBUG_DECODER)
+    {
+        debug_strm << "FPD: unmatched detectors:";
+        for (auto d : unmatched_dets)
+            debug_strm << " " << d;
+        debug_strm << "\n";
+    }
 
     if (unmatched_dets.empty())
     {

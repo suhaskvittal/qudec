@@ -65,4 +65,12 @@ quantize_all_edge_weights(DG_PTR& dg)
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
 
+/// Searches for bad detector error model errors that only flip observables (no detectors).
+/// Uses stim's explain_errors utility to analyze these errors.
+/// Returns true if any such errors are found, false otherwise.
+bool search_for_bad_dem_errors(const stim::DetectorErrorModel& dem, const stim::Circuit& circuit);
+
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
 #endif

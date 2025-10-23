@@ -28,8 +28,8 @@ struct CIRCUIT_CONFIG
 {
     struct QUBIT_INFO
     {
-        uint64_t t1_ns{500'000};
-        uint64_t t2_ns{250'000};
+        uint64_t t1_ns{1'000'000};
+        uint64_t t2_ns{500'000};
         double   e_readout{1e-3};
         double   e_g1q{1e-4};
         double   e_idle{1e-4};
@@ -65,25 +65,23 @@ struct CIRCUIT_CONFIG
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-struct SC_SCHEDULE_INFO
-{
-};
-
-////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////
-
 // returns X, Y, Z error probabilities given T1, T2, and round latency (all in ns)
 std::tuple<double,double,double> pauli_twirling_approx(uint64_t t1_ns, uint64_t t2_ns, uint64_t round_ns);
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
+constexpr size_t sc_memory_get_qubit_count(size_t d) { return 2*d*d-1; }
+constexpr size_t sc_stability_get_qubit_count(size_t d) { return d*d + (d-1)*(d-1) + 2*d; }
+
+
 stim::Circuit sc_memory(const CIRCUIT_CONFIG&, size_t rounds, size_t distance, bool is_memory_x=false);
+stim::Circuit sc_stability(const CIRCUIT_CONFIG&, size_t rounds, size_t distance, bool is_boundary_x=false);
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-#include "gen/epr.h"
+//#include "gen/epr.h"
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////

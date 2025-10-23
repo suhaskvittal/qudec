@@ -11,10 +11,14 @@
 #include <stim/gen/gen_surface_code.h>
 
 #include <cstdio>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 
 //#define USE_STIM_GENERATED_CIRCUITS
+
+// Global debug configuration variable definition
+bool GL_DEBUG_DECODER = false;
 
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
@@ -73,6 +77,7 @@ main(int argc, char* argv[])
     int64_t     num_rounds;
     int64_t     num_trials;
 
+    double phys_error;
     int64_t round_time;
     int64_t t1;
     int64_t t2;
@@ -81,6 +86,8 @@ main(int argc, char* argv[])
     double e_readout;
     double e_idle;
 
+    std::string experiment;
+    std::string generated_stim_output_file;
     std::string decoder;
 
     ARGPARSE()
@@ -90,43 +97,70 @@ main(int argc, char* argv[])
         .optional("-t", "--trials", "number of trials to run", num_trials, 1'000'000)
 
         // circuit timing:
+        .optional("-p", "--phys-error", "physical error rate", phys_error, 1e-3)
         .optional("-rt", "--round-time", "round time in ns", round_time, 1200)
-        .optional("-t1", "--t1", "T1 time in ns", t1, 500'000)
-        .optional("-t2", "--t2", "T2 time in ns", t2, 250'000)
+        .optional("-t1", "--t1", "T1 time in us", t1, 1000)
+        .optional("-t2", "--t2", "T2 time in us", t2, 500)
         .optional("-e1", "--e-g1q", "gate error rate (1Q)", e_g1q, 1e-4)
         .optional("-e2", "--e-g2q", "gate error rate (2Q)", e_g2q, 1e-3)
         .optional("-em", "--e-readout", "readout error rate", e_readout, 3e-3)
         .optional("-ei", "--e-idle", "idle error rate", e_idle, 1e-4)
 
+        // experiment name:
+        .optional("", "--experiment", "experiment name -- do not set if stim-file is used", experiment, "sc_memory_z")
+        .optional("", "--generated-stim-output-file", "output file for generated stim circuit", generated_stim_output_file, "generated.stim.out")
+
         // decoder:
         .optional("", "--decoder", "decoder to use", decoder, "pymatching")
+        .optional("-dd", "--debug-decoder", "enable decoder debug output", GL_DEBUG_DECODER, false)
         .parse(argc, argv);
+
+    // update error and timing based on value of p
+    double scale_factor = phys_error / 1e-3;
+    t1 *= 1.0/scale_factor;
+    t2 *= 1.0/scale_factor;
+    e_g1q *= scale_factor;
+    e_g2q *= scale_factor;
+    e_readout *= scale_factor;
+    e_idle *= scale_factor;
 
     stim::Circuit circuit;
     if (stim_file.empty())
     {
-        const size_t sc_qubit_count = 2*code_distance*code_distance - 1;
+        size_t qubit_count;
+        if (experiment == "sc_memory_x" || experiment == "sc_memory_z")
+            qubit_count = gen::sc_memory_get_qubit_count(code_distance);
+        else if (experiment == "sc_stability_x" || experiment == "sc_stability_z")
+            qubit_count = gen::sc_stability_get_qubit_count(code_distance);
+        else
+            throw std::runtime_error("invalid experiment: " + experiment);
 
-#if defined(USE_STIM_GENERATED_CIRCUITS)
-        stim::CircuitGenParameters params(num_rounds, code_distance, "rotated_memory_z");
-        params.before_round_data_depolarization = e_g2q;
-        params.after_reset_flip_probability = e_g1q;
-        params.before_measure_flip_probability = e_readout;
-        params.after_clifford_depolarization = e_g2q;
-        auto gen_circuit = stim::generate_surface_code_circuit(params);
-        circuit = gen_circuit.circuit;
-#else
         gen::CIRCUIT_CONFIG conf = gen::CIRCUIT_CONFIG()
-                                    .set_qubit_count(sc_qubit_count)
+                                    .set_qubit_count(qubit_count)
                                     .set_round_ns(round_time)
-                                    .set_t1_ns(t1)
-                                    .set_t2_ns(t2)
+                                    .set_t1_ns(t1*1000)
+                                    .set_t2_ns(t2*1000)
                                     .set_e_g1q(e_g1q)
                                     .set_e_g2q(e_g2q)
                                     .set_e_readout(e_readout)
                                     .set_e_idle(e_idle);
-        circuit = gen::sc_memory(conf, num_rounds, code_distance); 
-#endif
+
+        if (experiment == "sc_memory_x" || experiment == "sc_memory_z")
+            circuit = gen::sc_memory(conf, num_rounds, code_distance, experiment == "sc_memory_x"); 
+        else if (experiment == "sc_stability_x" || experiment == "sc_stability_z")
+            circuit = gen::sc_stability(conf, num_rounds, code_distance, experiment == "sc_stability_x");
+
+        if (code_distance <= 3)
+        {
+            std::cout << "======================== GENERATED CIRCUIT ==========================\n";
+            std::cout << circuit << "\n";
+            std::cout << "=====================================================================\n";
+        }
+
+        // spit out circuit to output file:
+        std::ofstream out(generated_stim_output_file);
+        out << circuit.str() << "\n";
+        out.close();
     }
     else
     {

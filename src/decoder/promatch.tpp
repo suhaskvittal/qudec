@@ -36,9 +36,8 @@ TEMPL_CLASS::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_st
     bool done{false};
     while (!done)
     {
-#if defined (DEBUG_DECODER)
-        debug_strm << "promatch: step\n";
-#endif
+        if (GL_DEBUG_DECODER)
+            debug_strm << "promatch: step\n";
         done = !promatch_step(pm, pm_obs_flips, debug_strm);
     }
 
@@ -51,12 +50,13 @@ TEMPL_CLASS::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_st
             unmatched_dets.push_back(dets[i]);
     }
 
-#if defined (DEBUG_DECODER)
-    debug_strm << "promatch: unmatched detectors:";
-    for (auto d : unmatched_dets)
-        debug_strm << " " << d;
-    debug_strm << "\n";
-#endif
+    if (GL_DEBUG_DECODER)
+    {
+        debug_strm << "promatch: unmatched detectors:";
+        for (auto d : unmatched_dets)
+            debug_strm << " " << d;
+        debug_strm << "\n";
+    }
     
     if (unmatched_dets.empty())
     {
@@ -161,12 +161,13 @@ TEMPL_CLASS::promatch_step(std::vector<PROMATCH_INFO>& pm, syndrome_ref flipped_
 
                 any_deletion = true;
 
-#if defined (DEBUG_DECODER)
-                debug_strm << "\tpromatch: matched " << pi.vertex->id << " and " << pj.vertex->id << ", obs flips:";
-                for (auto obs_id : e->data.flipped_observables)
-                    debug_strm << " " << obs_id;
-                debug_strm << "\n";
-#endif
+                if (GL_DEBUG_DECODER)
+                {
+                    debug_strm << "\tpromatch: matched " << pi.vertex->id << " and " << pj.vertex->id << ", obs flips:";
+                    for (auto obs_id : e->data.flipped_observables)
+                        debug_strm << " " << obs_id;
+                    debug_strm << "\n";
+                }
 
                 break;
             }

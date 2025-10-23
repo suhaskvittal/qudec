@@ -19,6 +19,9 @@
 
 #include <iosfwd>
 
+// Global debug configuration variable
+extern bool GL_DEBUG_DECODER;
+
 /*
  * This file contains all decoders for the surface code.
  * The simple-to-implement decoders are implemented in `surface_code.cpp`
