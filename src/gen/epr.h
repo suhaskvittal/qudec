@@ -80,11 +80,20 @@ util::check_meas_map sc_epr_create_hw1_only_circuit(stim::Circuit&,
                                                         double e_g2q,
                                                         double e_idle);
 
-void sc_epr_create_detection_events(stim::Circuit&, 
-                                        const std::vector<stim_qubit_type>&,
-                                        const util::check_meas_map& super_check_meas_map,
-                                        size_t measurements_until_last_round,
-                                        bool is_first_round);
+void sc_epr_create_detection_events_super_round(stim::Circuit&,
+                                                    const util::stim_qubit_array&,
+                                                    const util::check_meas_map& cm_super_round,
+                                                    const util::check_meas_map& cm_hw1_only_round,
+                                                    size_t hw1_rounds_per_super_round,
+                                                    bool is_first_round,
+                                                    const SC_EPR_SCHEDULE_INFO&);
+
+void sc_epr_create_detection_events_adjacent_rounds(stim::Circuit&, 
+                                                    const util::stim_qubit_array&,
+                                                    const util::check_meas_map& cm_this_round,
+                                                    const util::check_meas_map& cm_prev_round,
+                                                    const SC_EPR_SCHEDULE_INFO&,
+                                                    bool only_use_hw1_no_epr=true);
 
 //////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////
