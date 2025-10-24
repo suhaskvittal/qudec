@@ -43,6 +43,7 @@ set(QUDEC_FILES
     src/decoder/surface_code.cpp
     src/io/dem.cpp
     src/gen.cpp
+    src/gen/epr.cpp
     src/gen/scheduling.cpp
     src/gen/utils.cpp
 )
@@ -63,4 +64,8 @@ target_link_libraries(qudeclib PUBLIC libstim blossom5 libpymatching)
 add_executable(qudec main/qudec.cpp)
 target_compile_options(qudec PRIVATE ${COMPILE_OPTIONS})
 target_link_libraries(qudec PRIVATE qudeclib)
+
+add_executable(qudec_sc_epr main/qudec_sc_epr.cpp)
+target_compile_options(qudec_sc_epr PRIVATE ${COMPILE_OPTIONS})
+target_link_libraries(qudec_sc_epr PRIVATE qudeclib)
 

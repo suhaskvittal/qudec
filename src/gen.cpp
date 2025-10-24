@@ -181,7 +181,7 @@ sc_stability(const CIRCUIT_CONFIG& config, size_t rounds, size_t distance, bool 
     // initialize prolog -- error free (note we initialize in opposite basis of boundary)
     util::init_data_qubits_in_basis(prolog, sc.data_qubits, !is_boundary_x);
 
-    // error free first round:
+    // first round:
     util::inject_timing_errors(first_round, sc.data_qubits, config);
     util::initialize_parity_qubits(first_round, sc.z_check_qubits, sc.x_check_qubits, config, true);
     util::do_cx_gates(first_round, sc.check_cx_order, sc.x_check_set, config, true);

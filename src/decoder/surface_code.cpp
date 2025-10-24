@@ -121,14 +121,13 @@ BLOSSOM5::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_strm)
             }
         }
 
-        if (GL_DEBUG_DECODER)
-        {
-            debug_strm << "match between " << src_id << " and " << dst_id << ", flipped observables:";
-            for (const auto& [x, flips] : path_flips)
-                if (flips & 1)
-                    debug_strm << " " << x;
-            debug_strm << "\n";
-        }
+#if defined (DEBUG_DECODER)
+        debug_strm << "match between " << src_id << " and " << dst_id << ", flipped observables:";
+        for (const auto& [x, flips] : path_flips)
+            if (flips & 1)
+                debug_strm << " " << x;
+        debug_strm << "\n";
+#endif
     }
 
     return result;
