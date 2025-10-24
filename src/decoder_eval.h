@@ -59,7 +59,8 @@ template <class IMPL> DECODER_STATS benchmark_decoder(const stim::Circuit&,
                                                         uint64_t num_trials,
                                                         uint64_t batch_size=8192,
                                                         bool do_not_clock=false,
-                                                        uint64_t seed=0);
+                                                        uint64_t seed=0,
+                                                        uint64_t stop_at_k_errors=100);
 
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////

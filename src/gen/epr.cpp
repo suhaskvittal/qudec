@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 
 namespace gen
 {
@@ -160,7 +161,13 @@ sc_epr_generation(const EPR_GEN_CONFIG& config, size_t rounds, size_t distance, 
     double prob_any_attenuation = (epr.epr_checks.size() * config.attenuation_rate);
     double expected_rounds_with_photon_loss = rounds * prob_any_attenuation;
     size_t num_super_rounds = rounds + static_cast<size_t>(std::round(expected_rounds_with_photon_loss));
+#if defined(EPR_ONLY_ONE_HW1_ROUND)
+    size_t num_hw1_rounds_per_super_round = 1;
+#else
     size_t num_hw1_rounds_per_super_round = static_cast<size_t>(std::ceil(latency_diff)) - 1;
+#endif
+
+    std::cout << "num hw1 rounds = " << num_hw1_rounds_per_super_round << "\n";
      
     // now that have completed initializing all data structures: create the circuit
     // note stability experiment will not use error free rounds
@@ -221,7 +228,7 @@ sc_epr_generation(const EPR_GEN_CONFIG& config, size_t rounds, size_t distance, 
                                                                     e_g1q, 
                                                                     e_g2q, 
                                                                     e_idle);
-    hw_only_main_round = hw1_only_first_round;
+    hw1_only_main_round = hw1_only_first_round;
 
     // create detection events:
     const auto& det_checks = do_memory_experiment ? epr.sc.x_check_qubits : epr.sc.z_check_qubits;
@@ -273,17 +280,35 @@ sc_epr_generation(const EPR_GEN_CONFIG& config, size_t rounds, size_t distance, 
 
     const size_t n_data_meas = epr.sc.data_qubits.size();
     const size_t n_check_meas = super_check_meas_map.size();
+    std::unordered_map<stim_qubit_type, uint32_t> dq_meas_order;
+    for (size_t i = 0; i < n_data_meas; i++)
+        dq_meas_order[epr.sc.data_qubits[i]] = i;
+    std::vector<uint32_t> obs_meas_id;
     if (do_memory_experiment)
     {
         // observable is already defined in `epr.sc.x_obs`
+        std::transform(epr.sc.x_obs.begin(), epr.sc.x_obs.end(), std::back_inserter(obs_meas_id),
+                        [n_data_meas, &dq_meas_order] (stim_qubit_type q) 
+                        {
+                            return (n_data_meas - dq_meas_order.at(q)) | stim::TARGET_RECORD_BIT;
+                        });
     }
     else
     {
         // observable is the Z measurements in the last round:
+        std::transform(anc_z_checks.begin(), anc_z_checks.end(), std::back_inserter(obs_meas_id),
+                        [n_data_meas, n_check_meas, &super_check_meas_map] (stim_qubit_type q) 
+                        {
+                            return (n_data_meas+n_check_meas - super_check_meas_map.at(q)) | stim::TARGET_RECORD_BIT;
+                        });
     }
+    epilog.safe_append_ua("OBSERVABLE_INCLUDE", obs_meas_id, 0);
 
     stim::Circuit composite_round;
-    composite_round += hw1_only_round * num_hw1_rounds_per_super_round;
+    composite_round += hw1_only_first_round;
+#if !defined(EPR_ONLY_ONE_HW1_ROUND)
+    composite_round += hw1_only_main_round * (num_hw1_rounds_per_super_round-1);
+#endif
     composite_round += super_round;
 
     stim::Circuit fin;
@@ -367,6 +392,7 @@ sc_epr_create_super_round(stim::Circuit& circuit,
     }
 
     
+    circuit.safe_append_u("R", epr_cx_targets);
     circuit.safe_append_u("H", epr_h_pre_targets);
     circuit.safe_append_u("CX", epr_cx_targets);
     circuit.safe_append_ua("DEPOLARIZE2", epr_cx_targets, e_photonic_link);
@@ -413,6 +439,8 @@ sc_epr_create_super_round(stim::Circuit& circuit,
         std::copy_if(all_qubits.begin(), all_qubits.end(), std::back_inserter(idle_qubits),
                         [&cx_target_set] (auto q) { return !cx_target_set.count(q); });
         circuit.safe_append_ua("DEPOLARIZE1", idle_qubits, e_idle);
+
+        circuit.safe_append_u("TICK", {});
     }
 
     // measure qubits:
@@ -633,7 +661,7 @@ sc_epr_create_detection_events_last_round(stim::Circuit& circuit,
                                             const util::check_meas_map& cm_super_round,
                                             const SC_EPR_SCHEDULE_INFO& epr)
 {
-    const uint32_t n_check_meas = cm_super_round.size(),
+    const uint32_t n_check_meas = cm_super_round.size();
     for (size_t i = 0; i < checks.size(); i++)
     {
         auto q = checks.at(i);
@@ -649,16 +677,16 @@ sc_epr_create_detection_events_last_round(stim::Circuit& circuit,
             for (auto x : {q,e})
             {
                 size_t meas_idx = cm_super_round.at(x);
-                uint32_t base_meas_id = (n_check_meas_s - meas_idx) | stim::TARGET_RECORD_BIT,
-                         prev_meas_id = (2*n_check_meas_s - meas_idx) | stim::TARGET_RECORD_BIT;
+                uint32_t base_meas_id = (n_check_meas - meas_idx) | stim::TARGET_RECORD_BIT,
+                         prev_meas_id = (2*n_check_meas - meas_idx) | stim::TARGET_RECORD_BIT;
                 targets.push_back(base_meas_id);
                 targets.push_back(prev_meas_id);
             }
         }
         else
         {
-            uint32_t base_meas_id = (n_check_meas_s - cm_super_round.at(q)) | stim::TARGET_RECORD_BIT,
-                     prev_meas_id = (2*n_check_meas_s - cm_super_round.at(q)) | stim::TARGET_RECORD_BIT;
+            uint32_t base_meas_id = (n_check_meas - cm_super_round.at(q)) | stim::TARGET_RECORD_BIT,
+                     prev_meas_id = (2*n_check_meas - cm_super_round.at(q)) | stim::TARGET_RECORD_BIT;
             targets.push_back(base_meas_id);
             targets.push_back(prev_meas_id);
         }

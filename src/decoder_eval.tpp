@@ -105,7 +105,8 @@ benchmark_decoder(const stim::Circuit& circuit,
                     uint64_t num_trials,
                     uint64_t batch_size,
                     bool do_not_clock,
-                    uint64_t seed)
+                    uint64_t seed,
+                    uint64_t stop_limit)
 {
     using frame_sim_type = stim::FrameSimulator<stim::MAX_BITWORD_WIDTH>;
 
@@ -114,7 +115,7 @@ benchmark_decoder(const stim::Circuit& circuit,
     [[ maybe_unused ]] size_t num_batches{0};
 
     DECODER_STATS stats;
-    while (num_trials)
+    while (num_trials && stats.errors < stop_limit)
     {
         if (!GL_DEBUG_DECODER)
         {
@@ -140,7 +141,7 @@ benchmark_decoder(const stim::Circuit& circuit,
         detector_table = detector_table.transposed();
         observable_table = observable_table.transposed();
 
-        for (uint64_t s = 0; s < trials_this_batch; s++)
+        for (uint64_t s = 0; s < trials_this_batch && stats.errors < stop_limit; s++)
             decode(impl, stats, std::move(detector_table[s]), std::move(observable_table[s]), do_not_clock);
 
         rng = std::move(sim.rng);

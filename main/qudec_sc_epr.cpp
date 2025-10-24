@@ -6,12 +6,16 @@
  * */
 
 #include "argparse.h"
+#include "decoder/surface_code.h"
+#include "decoder_eval.h"
 #include "gen/epr.h"
 
 #include <cstdio>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+
+bool GL_DEBUG_DECODER{false};
 
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
@@ -37,11 +41,38 @@ print_stat(std::ostream& out, std::string name, T value)
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
 
+template <class T> double
+fpdiv(T a, T b)
+{
+    return static_cast<double>(a) / static_cast<double>(b);
+}
+
+template <class IMPL> void
+print_decoder_stats(std::ostream& out, const IMPL& dec)
+{
+    // Add any decoder-specific statistics here if needed
+}
+
+template <class IMPL, class... IMPL_ARGS> DECODER_STATS
+eval_decoder(const stim::Circuit& circuit, uint64_t num_trials, IMPL_ARGS... args)
+{
+    IMPL decoder(circuit, std::forward<IMPL_ARGS>(args)...);
+    auto out = benchmark_decoder(circuit, decoder, num_trials);
+
+    print_decoder_stats(std::cout, decoder);
+
+    return out;
+}
+
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
 int
 main(int argc, char* argv[])
 {
     int64_t     code_distance;
     int64_t     num_rounds;
+    int64_t     num_trials;
     bool        do_memory_experiment;
     
     // EPR-specific parameters
@@ -56,6 +87,7 @@ main(int argc, char* argv[])
     ARGPARSE()
         .optional("-d", "--code-distance", "code distance", code_distance, 3)
         .optional("-r", "--rounds", "number of rounds", num_rounds, 9)
+        .optional("-t", "--trials", "number of trials to run", num_trials, 1000000)
         .optional("-m", "--memory-experiment", "do memory experiment (vs stability)", do_memory_experiment, true)
         
         // EPR-specific parameters:
@@ -67,6 +99,9 @@ main(int argc, char* argv[])
         
         // output file:
         .optional("-o", "--output", "output file for generated stim circuit", generated_stim_output_file, "generated.stim.out")
+        // decoding:
+        .optional("-dd", "--debug-decoder", "set flag debug decoder flag", GL_DEBUG_DECODER, false)
+    
         .parse(argc, argv);
 
     // Create EPR generation configuration
@@ -76,6 +111,20 @@ main(int argc, char* argv[])
     config.hw1_round_ns = static_cast<uint64_t>(hw1_round_ns);
     config.hw2_round_ns = static_cast<uint64_t>(hw2_round_ns);
     config.phys_error = phys_error;
+
+    // Print configuration
+    std::cout << "======================== EPR GENERATION CONFIG ==========================\n";
+    print_stat(std::cout, "CODE_DISTANCE", code_distance);
+    print_stat(std::cout, "NUM_ROUNDS", num_rounds);
+    print_stat(std::cout, "NUM_TRIALS", num_trials);
+    print_stat(std::cout, "MEMORY_EXPERIMENT", do_memory_experiment ? "true" : "false");
+    print_stat(std::cout, "ATTENUATION_RATE", config.attenuation_rate);
+    print_stat(std::cout, "PHOTONIC_LINK_ERROR", config.photonic_link_error);
+    print_stat(std::cout, "HW1_ROUND_NS", config.hw1_round_ns);
+    print_stat(std::cout, "HW2_ROUND_NS", config.hw2_round_ns);
+    print_stat(std::cout, "PHYS_ERROR", config.phys_error);
+    print_stat(std::cout, "OUTPUT_FILE", generated_stim_output_file);
+    std::cout << "======================================================================\n";
 
     // Generate the EPR-based surface code circuit
     stim::Circuit circuit = gen::sc_epr_generation(config, num_rounds, code_distance, do_memory_experiment);
@@ -102,6 +151,28 @@ main(int argc, char* argv[])
 
     // Print circuit statistics
     std::cout << "EPR circuit generation completed successfully!\n";
+
+    // Run PyMatching decoder on the generated circuit
+    std::cout << "\n======================== RUNNING PYMATCHING DECODER ==========================\n";
+    print_stat(std::cout, "NUM_TRIALS", num_trials);
+    std::cout << "Running decoder...\n";
+
+    DECODER_STATS stats = eval_decoder<PYMATCHING>(circuit, num_trials);
+
+    // Calculate and print results
+    double ler = fpdiv(stats.errors, stats.trials);
+    double mean_time_us = fpdiv(stats.total_time_us, stats.trials);
+    double mean_time_us_nontrivial = fpdiv(stats.total_time_us, stats.trials - stats.trivial_trials);
+
+    std::cout << "======================== DECODER RESULTS ==========================\n";
+    print_stat(std::cout, "LOGICAL_ERRORS", stats.errors);
+    print_stat(std::cout, "TRIALS", stats.trials);
+    print_stat(std::cout, "TRIVIAL_TRIALS", stats.trivial_trials);
+    print_stat(std::cout, "LOGICAL_ERROR_RATE", ler);
+    print_stat(std::cout, "MEAN_TIME_US", mean_time_us);
+    print_stat(std::cout, "MEAN_TIME_US_NONTRIVIAL", mean_time_us_nontrivial);
+    std::cout << "===============================================================\n";
+
     return 0;
 }
 

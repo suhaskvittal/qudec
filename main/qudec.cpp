@@ -173,12 +173,8 @@ main(int argc, char* argv[])
     fpd_conf.cache_chain_limit = code_distance >> 2;
 
     DECODER_STATS stats;
-    if (decoder == "promatch_pymatching")
-        stats = eval_decoder<PROMATCH_SW<PYMATCHING>>(circuit, num_trials, PYMATCHING(circuit));
-    else if (decoder == "pymatching")
+    if (decoder == "pymatching")
         stats = eval_decoder<PYMATCHING>(circuit, num_trials);
-    else if (decoder == "fpd_pymatching")
-        stats = eval_decoder<FPD<PYMATCHING>>(circuit, num_trials, PYMATCHING(circuit), FPD_CONFIG{});
     else if (decoder == "blossom5")
         stats = eval_decoder<BLOSSOM5>(circuit, num_trials);
     else
