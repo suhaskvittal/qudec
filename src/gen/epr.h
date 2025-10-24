@@ -92,8 +92,12 @@ void sc_epr_create_detection_events_adjacent_rounds(stim::Circuit&,
                                                     const util::stim_qubit_array&,
                                                     const util::check_meas_map& cm_this_round,
                                                     const util::check_meas_map& cm_prev_round,
-                                                    const SC_EPR_SCHEDULE_INFO&,
-                                                    bool only_use_hw1_no_epr=true);
+                                                    const SC_EPR_SCHEDULE_INFO&);
+
+void sc_epr_create_detection_events_last_round(stim::Circuit&, 
+                                                const util::stim_qubit_array&,
+                                                const util::check_meas_map& cm_super_round,
+                                                const SC_EPR_SCHEDULE_INFO&);
 
 //////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////

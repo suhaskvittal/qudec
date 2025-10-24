@@ -263,7 +263,13 @@ sc_epr_generation(const EPR_GEN_CONFIG& config, size_t rounds, size_t distance, 
 
     // create epilog:
     epilog.safe_append_u("TICK", {});
-    epilog.safe_append_u("MX", epr.sc.data_qubits);
+
+    // measure out data qubits:
+    if (do_memory_experiment)
+        epilog.safe_append_u("H", epr.sc.data_qubits);
+    else
+        epilog.safe_append_u("H", anc_data_qubits);
+    epilog.safe_append_u("M", epr.sc.data_qubits);
 
     const size_t n_data_meas = epr.sc.data_qubits.size();
     const size_t n_check_meas = super_check_meas_map.size();
