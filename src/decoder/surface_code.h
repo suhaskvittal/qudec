@@ -16,6 +16,7 @@
 #include <pymatching/sparse_blossom/driver/user_graph.h>
 #include <pymatching/sparse_blossom/driver/mwpm_decoding.h>
 #include <pymatching/sparse_blossom/matcher/mwpm.h>
+#include <pymatching/sparse_blossom/flooder_matcher_interop/compressed_edge.h>
 
 #include <iosfwd>
 
@@ -70,8 +71,13 @@ private:
     mutable pm::Mwpm mwpm;
     size_t num_observables;
 public:
+    using compressed_edge_result = std::vector<pm::CompressedEdge>;
+
     PYMATCHING(const stim::Circuit&);
     DECODER_RESULT decode(std::vector<GRAPH_COMPONENT_ID>, std::ostream& debug_strm) const;
+    compressed_edge_result decode_and_get_compressed_edges(std::vector<GRAPH_COMPONENT_ID>, std::ostream& debug_strm) const;
+
+    const pm::UserGraph& get_user_graph() const { return user_graph; }
 };
 
 /////////////////////////////////////////////////////

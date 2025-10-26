@@ -12,6 +12,8 @@
 
 #include <PerfectMatching.h>
 
+extern bool GL_DEBUG_DECODER;
+
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
 
@@ -152,10 +154,8 @@ DECODER_RESULT
 PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_strm) const
 {
     // Convert detector IDs to PyMatching format (uint64_t vector)
-    std::vector<uint64_t> detection_events;
-    detection_events.reserve(dets.size());
-    for (auto det_id : dets)
-        detection_events.push_back(static_cast<uint64_t>(det_id));
+    std::vector<uint64_t> detection_events(dets.size());
+    std::copy(dets.begin(), dets.end(), detection_events.begin());
 
     // Create observables array
     std::vector<uint8_t> observables(num_observables, 0);
@@ -169,6 +169,27 @@ PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_str
     DECODER_RESULT result;
     memmove(result.flipped_observables.u8, observables.data(), observables.size());
     return result;
+}
+
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
+PYMATCHING::compressed_edge_result
+PYMATCHING::decode_and_get_compressed_edges(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_strm) const
+{
+    std::vector<uint64_t> detection_events(dets.size());
+    std::copy(dets.begin(), dets.end(), detection_events.begin());
+
+    pm::decode_detection_events_to_match_edges(const_cast<pm::Mwpm&>(mwpm), detection_events);
+
+    compressed_edge_result match_edges;
+    const_cast<pm::Mwpm&>(mwpm).shatter_blossom_and_extract_match_edges(
+        const_cast<pm::Mwpm&>(mwpm).flooder.graph.nodes[0].region, match_edges);
+
+    if (GL_DEBUG_DECODER)
+        debug_strm << "PyMatching found " << match_edges.size() << " compressed edges\n";
+
+    return match_edges;
 }
 
 /////////////////////////////////////////////////////
