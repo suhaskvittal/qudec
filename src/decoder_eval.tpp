@@ -16,11 +16,12 @@
 template<typename T>
 constexpr bool is_pymatching_v = std::is_same_v<T, PYMATCHING>;
 
-template <class IMPL> void
+template <class IMPL, class ERROR_CALLBACK> void
 decode(IMPL& impl, 
         DECODER_STATS& stats,
         syndrome_type detector_flips,
         syndrome_type observable_flips,
+        const ERROR_CALLBACK& error_callback,
         bool do_not_clock)
 {
     // create detector list from `detector_flips`
@@ -68,41 +69,69 @@ decode(IMPL& impl,
 
     if (GL_DEBUG_DECODER && any_mismatch)
     {
-        std::cerr << "TRIAL " << stats.trials << " ==================================== \n";
-        std::cerr << "detectors =";
-        for (auto d : detector_list)
-            std::cerr << " " << d;
-
-        std::cerr << "\ndecoder debug out:";
-        std::string line;
-        while (std::getline(debug_strm, line))
-            std::cerr << "\n\t" << line;
-        std::cerr << "\n";
-
-        std::cerr << "\nprediction:";
-        for (size_t i = 0; i < result.flipped_observables.num_bits_padded(); i++)
+        std::stringstream callback_strm;
+        bool print_debug = error_callback(detector_flips, observable_flips, result.flipped_observables, callback_strm);
+        if (print_debug)
         {
-            if (result.flipped_observables[i])
-                std::cerr << " " << i;
-        }
+            std::cerr << "TRIAL " << stats.trials << " ==================================== \n";
+            std::cerr << "detectors =";
+            for (auto d : detector_list)
+                std::cerr << " " << d;
 
-        std::cerr << "\ntrue flipped observables:";
-        for (size_t i = 0; i < observable_flips.num_bits_padded(); i++)
-        {
-            if (observable_flips[i])
-                std::cerr << " " << i;
+            std::cerr << "\ndecoder debug out:";
+            std::string line;
+            while (std::getline(debug_strm, line))
+                std::cerr << "\n\t" << line;
+
+            std::cerr << "\nerror callback debug out:";
+            while (std::getline(callback_strm, line))
+                std::cerr << "\n\t" << line;
+
+            std::cerr << "\nprediction:";
+            for (size_t i = 0; i < result.flipped_observables.num_bits_padded(); i++)
+            {
+                if (result.flipped_observables[i])
+                    std::cerr << " " << i;
+            }
+
+            std::cerr << "\ntrue flipped observables:";
+            for (size_t i = 0; i < observable_flips.num_bits_padded(); i++)
+            {
+                if (observable_flips[i])
+                    std::cerr << " " << i;
+            }
+            std::cerr << "\n\n";
         }
-        std::cerr << "\n\n";
     }
 }
 
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
 
-template <class IMPL> DECODER_STATS
+template <class IMPL> DECODER_STATS 
+benchmark_decoder(const stim::Circuit& circuit,
+                    IMPL& impl, 
+                    uint64_t num_trials,
+                    uint64_t batch_size,
+                    bool do_not_clock,
+                    uint64_t seed,
+                    uint64_t stop_limit)
+{
+    return benchmark_decoder(circuit,
+                                impl,
+                                num_trials,
+                                [] (auto, auto, auto, auto&) { return true; },
+                                batch_size,
+                                do_not_clock,
+                                seed,
+                                stop_limit);
+}
+
+template <class IMPL, class ERROR_CALLBACK> DECODER_STATS
 benchmark_decoder(const stim::Circuit& circuit,     
                     IMPL& impl, 
                     uint64_t num_trials,
+                    const ERROR_CALLBACK& error_callback,
                     uint64_t batch_size,
                     bool do_not_clock,
                     uint64_t seed,
@@ -142,10 +171,16 @@ benchmark_decoder(const stim::Circuit& circuit,
         observable_table = observable_table.transposed();
 
         for (uint64_t s = 0; s < trials_this_batch && stats.errors < stop_limit; s++)
-            decode(impl, stats, std::move(detector_table[s]), std::move(observable_table[s]), do_not_clock);
+        {
+            decode(impl, 
+                    stats, 
+                    std::move(detector_table[s]), 
+                    std::move(observable_table[s]), 
+                    error_callback, 
+                    do_not_clock);
+        }
 
         rng = std::move(sim.rng);
-
         num_batches++;
     }
     std::cout << "\n";

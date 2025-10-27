@@ -142,16 +142,8 @@ BLOSSOM5::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_strm)
  * PyMatching Implementation:
  * */
 
-pm::Mwpm 
-_init_pymatching(const stim::Circuit& circuit)
-{
-    auto dem = stim::circuit_to_dem(circuit, {true, true, false, 0.0, false, false});
-    auto user_graph = pm::detector_error_model_to_user_graph(dem, false, pm::NUM_DISTINCT_WEIGHTS);
-    return user_graph.to_mwpm(pm::NUM_DISTINCT_WEIGHTS, false);
-}
-
 PYMATCHING::PYMATCHING(const stim::Circuit& circuit)
-    :mwpm{_init_pymatching(circuit)},
+    :mwpm{pymatching_create_mwpm_from_circuit(circuit)},
     num_observables{circuit.count_observables()}
 {}
 
@@ -173,6 +165,13 @@ PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_str
     DECODER_RESULT result;
     memmove(result.flipped_observables.u8, observables.data(), observables.size());
     return result;
+}
+
+pm::Mwpm 
+pymatching_create_mwpm_from_circuit(const stim::Circuit& circuit, bool enable_search_flooder)
+{
+    auto dem = stim::circuit_to_dem(circuit, {true, true, false, 0.0, false, false});
+    return pm::detector_error_model_to_mwpm(dem, pm::NUM_DISTINCT_WEIGHTS, enable_search_flooder, false);
 }
 
 /////////////////////////////////////////////////////

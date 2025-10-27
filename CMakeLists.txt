@@ -41,6 +41,7 @@ set(QUDEC_FILES
     src/argparse.cpp
     src/decoding_graph.cpp
     src/decoder/surface_code.cpp
+    src/decoder/sliding_pym.cpp
     src/io/dem.cpp
     src/gen.cpp
     src/gen/epr.cpp
@@ -68,4 +69,8 @@ target_link_libraries(qudec PRIVATE qudeclib)
 add_executable(qudec_sc_epr main/qudec_sc_epr.cpp)
 target_compile_options(qudec_sc_epr PRIVATE ${COMPILE_OPTIONS})
 target_link_libraries(qudec_sc_epr PRIVATE qudeclib)
+
+add_executable(qudec_sw main/qudec_sliding_window.cpp)
+target_compile_options(qudec_sw PRIVATE ${COMPILE_OPTIONS})
+target_link_libraries(qudec_sw PRIVATE qudeclib)
 
