@@ -45,7 +45,7 @@ SC_DECODING_GRAPH* read_surface_code_decoding_graph(const stim::Circuit&);
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
 
-struct BLOSSOM5
+class BLOSSOM5
 {
 public:
     using weight_type = DECODER_ERROR_DATA::quantized_weight_type;
@@ -61,16 +61,13 @@ public:
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
 
-struct PYMATCHING
+class PYMATCHING
 {
 public:
-    using weight_type = double;
 private:
     pm::Mwpm mwpm;
     const size_t num_observables;
 public:
-    using compressed_edge_result = std::vector<uint64_t>;
-
     PYMATCHING(const stim::Circuit&);
     DECODER_RESULT decode(std::vector<GRAPH_COMPONENT_ID>, std::ostream& debug_strm);
 };

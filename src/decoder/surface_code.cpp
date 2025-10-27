@@ -4,6 +4,7 @@
  */
 
 #include "decoder/surface_code.h"
+#include "decoder/sliding_pym.h"
 #include "graph/distance.h"
 
 #include <iostream>
@@ -143,7 +144,7 @@ BLOSSOM5::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_strm)
  * */
 
 PYMATCHING::PYMATCHING(const stim::Circuit& circuit)
-    :mwpm{pymatching_create_mwpm_from_circuit(circuit)},
+    :mwpm{pymatching_create_mwpm_from_circuit(circuit, GL_DEBUG_DECODER)},
     num_observables{circuit.count_observables()}
 {}
 
@@ -155,15 +156,24 @@ PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_str
     std::copy(dets.begin(), dets.end(), detection_events.begin());
 
     // Create observables array
-    std::vector<uint8_t> observables(num_observables, 0);
+    DECODER_RESULT result;
 
     // Perform matching using PyMatching's decode function
-    pm::total_weight_int weight = 0;
-    pm::decode_detection_events(mwpm, detection_events, observables.data(), weight, false);
+    if (GL_DEBUG_DECODER)
+    {
+        debug_strm << "pymatching verbose (not performant):\n";
+        pm_ext::decode_detection_events_in_commit_region(mwpm, 
+                                                        detection_events,
+                                                        std::numeric_limits<uint64_t>::max(),
+                                                        result.flipped_observables,
+                                                        debug_strm);
+    }
+    else
+    {
+        pm::total_weight_int weight{0};
+        pm::decode_detection_events(mwpm, detection_events, result.flipped_observables.u8, weight, false);
+    }
 
-    // Convert observables to result format
-    DECODER_RESULT result;
-    memmove(result.flipped_observables.u8, observables.data(), observables.size());
     return result;
 }
 

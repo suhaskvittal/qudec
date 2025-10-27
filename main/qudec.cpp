@@ -62,7 +62,8 @@ main(int argc, char* argv[])
 
         // experiment name:
         .optional("", "--experiment", "experiment name -- do not set if stim-file is used", experiment, "sc_memory_z")
-        .optional("", "--generated-stim-output-file", "output file for generated stim circuit", generated_stim_output_file, "generated.stim.out")
+        .optional("", "--generated-stim-output-file", "output file for generated stim circuit", generated_stim_output_file, 
+                        "generated.stim.out")
 
         // decoder:
         .optional("", "--decoder", "decoder to use", decoder, "pymatching")

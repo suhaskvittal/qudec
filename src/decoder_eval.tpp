@@ -142,16 +142,25 @@ benchmark_decoder(const stim::Circuit& circuit,
     std::mt19937_64 rng(seed);
 
     [[ maybe_unused ]] size_t num_batches{0};
+    [[ maybe_unused ]] size_t errors_in_last_epoch{0};
 
     DECODER_STATS stats;
     while (num_trials && stats.errors < stop_limit)
     {
         if (!GL_DEBUG_DECODER)
         {
-            if (num_batches % 100 == 0)
+            if (num_batches % 5000 == 0)
                 std::cout << "\n[ trials remaining = " << std::setw(12) << std::right << num_trials << " ]\t";
-            if (num_batches % 10 == 0)
-                (std::cout << ".").flush();
+            if (num_batches % 100 == 0)
+            {
+                if (errors_in_last_epoch)
+                    std::cout << errors_in_last_epoch;
+                else
+                    std::cout << ".";
+                std::cout.flush();
+
+                errors_in_last_epoch = 0;
+            }
         }
 
         uint64_t trials_this_batch = std::min(num_trials, batch_size);
@@ -170,6 +179,7 @@ benchmark_decoder(const stim::Circuit& circuit,
         detector_table = detector_table.transposed();
         observable_table = observable_table.transposed();
 
+        size_t errors_before{stats.errors};
         for (uint64_t s = 0; s < trials_this_batch && stats.errors < stop_limit; s++)
         {
             decode(impl, 
@@ -179,10 +189,13 @@ benchmark_decoder(const stim::Circuit& circuit,
                     error_callback, 
                     do_not_clock);
         }
+        errors_in_last_epoch += stats.errors - errors_before;
 
         rng = std::move(sim.rng);
         num_batches++;
     }
+    if (!GL_DEBUG_DECODER)
+        std::cout << errors_in_last_epoch;
     std::cout << "\n";
 
     return stats;

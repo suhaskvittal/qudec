@@ -38,6 +38,7 @@ SLIDING_PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& d
                                  max_detector = max_detector_id(r),
                                  max_commit_detector = max_commit_detector_id(r),
                                  det_offset = detector_offset(r);
+        const GRAPH_COMPONENT_ID total_offset{min_detector-det_offset};
 
         if (dets.front() < min_detector)
         {
@@ -55,19 +56,19 @@ SLIDING_PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& d
         std::vector<uint64_t> pm_dets;
         pm_dets.reserve(std::distance(d_begin, d_end));
         std::transform(d_begin, d_end, std::back_inserter(pm_dets),
-                [min_detector, det_offset] (GRAPH_COMPONENT_ID d) 
+                [total_offset] (GRAPH_COMPONENT_ID d) 
                 { 
-                    return static_cast<uint64_t>(d-min_detector+det_offset);
+                    return static_cast<uint64_t>(d-total_offset);
                 });
 
-        const uint64_t commit_end = static_cast<uint64_t>(max_commit_detector-min_detector+det_offset);
+        const uint64_t commit_end = static_cast<uint64_t>(max_commit_detector-total_offset);
 
         if (GL_DEBUG_DECODER)
         {
             debug_strm << "round " << r << ":\n\tdets =";
             for (auto d : pm_dets)
-                debug_strm << " " << d << " (" << (d+min_detector) << ")";
-            debug_strm << "\ncommit region is until " << commit_end << " (i.e. " << (commit_end+min_detector) << ")";
+                debug_strm << " " << d << " (" << (d+total_offset) << ")";
+            debug_strm << "\ncommit region is until " << commit_end << " (i.e. " << (commit_end+total_offset) << ")";
             debug_strm << "\n";
         }
 
@@ -78,9 +79,9 @@ SLIDING_PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& d
                                                                     debug_strm);
 
         auto it = std::remove_if(dets.begin(), dets.end(),
-                [&done, min_detector, det_offset] (GRAPH_COMPONENT_ID d) 
+                [&done, total_offset] (GRAPH_COMPONENT_ID d) 
                 { 
-                    return done.count(d-min_detector+det_offset);
+                    return done.count(d-total_offset);
                 });
         dets.erase(it, dets.end());
     }
@@ -141,9 +142,13 @@ decode_detection_events_in_commit_region(pm::Mwpm& mwpm,
     // track visited indices so we don't double count:
     std::unordered_set<size_t> visited_idx;
 
-    // Process edges in pairs: [node1, node2, node1, node2, ...] -- make two passes as the edges are not in order
-    for (size_t pass = 0; pass < 2; pass++)
+    // Process edges in pairs: [node1, node2, node1, node2, ...] -- make multiple passes if necessary
+    size_t pass{0};
+    bool any_commits;
+    do
     {
+        any_commits = false;
+
         debug_strm << "\tpass " << pass << ":\n";
         for (size_t i = 0; i < edges.size(); i += 2) 
         {
@@ -160,9 +165,11 @@ decode_detection_events_in_commit_region(pm::Mwpm& mwpm,
             if (!node1_in_commit && !node2_in_commit)
             {
                 if (GL_DEBUG_DECODER)
+                {
                     debug_strm << "\t\tskipping edge between " 
                         << node1 << " and " << node2 
                         << " (both outside commit region)\n";
+                }
                 continue;  // Skip edges entirely outside commit region
             }
 
@@ -184,7 +191,7 @@ decode_detection_events_in_commit_region(pm::Mwpm& mwpm,
                 debug_strm << "\t\tedge between " << node1 << " and " << node2 << ", flipped observables:";
                 for (const size_t obs_idx : obs_indices)
                     debug_strm << " " << obs_idx;
-                debug_strm << "\n";
+                debug_strm << ", weight = " << detector_node.neighbor_weights[neighbor_idx] << "\n";
             }
 
             committed_detectors.insert(static_cast<GRAPH_COMPONENT_ID>(node1));
@@ -195,8 +202,12 @@ decode_detection_events_in_commit_region(pm::Mwpm& mwpm,
                 committed_detectors.insert(static_cast<GRAPH_COMPONENT_ID>(node2));
                 ok_to_commit_outside.insert(static_cast<GRAPH_COMPONENT_ID>(node2));
             }
+
+            any_commits = true;
         }
+        pass++;
     }
+    while (any_commits);
 
     return committed_detectors;
 }

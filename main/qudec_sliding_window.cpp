@@ -22,6 +22,21 @@ bool GL_DEBUG_DECODER{false};
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
 
+int64_t
+_safe_compute_detectors_per_round(int64_t total_detectors, int64_t rounds)
+{
+    if (total_detectors % rounds != 0)
+    {
+        std::cerr << "total_detectors = " << total_detectors << ", rounds = " << rounds << "\n";
+        throw std::runtime_error("total_detectors % rounds != 0");
+    }
+
+    return total_detectors / rounds;
+}
+
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
 int
 main(int argc, char* argv[])
 {
@@ -29,6 +44,7 @@ main(int argc, char* argv[])
     int64_t     num_rounds;
     int64_t     num_trials;
     int64_t     num_errors;
+    int64_t     commit_size;
     
     double phys_error;
     int64_t round_time;
@@ -47,6 +63,7 @@ main(int argc, char* argv[])
         .optional("-d", "--distance", "code distance", distance, 3)
         .optional("-r", "--rounds", "number of rounds", num_rounds, 9)
         .optional("-t", "--trials", "number of trials to run", num_trials, 1'000'000)
+        .optional("-c", "--commit-size", "commit size (-1 defaults to `distance`)", commit_size, -1)
         .optional("-k", "--stop-after-errors", "stop after this many errors", num_errors, 10)
 
         // circuit timing:
@@ -66,6 +83,9 @@ main(int argc, char* argv[])
         .optional("-dd", "--debug-decoder", "enable decoder debug output", GL_DEBUG_DECODER, false)
         .parse(argc, argv);
 
+    if (commit_size < 0)
+        commit_size = distance;
+
     // update error and timing based on value of p
     double scale_factor = phys_error / 1e-3;
     t1 *= 1.0/scale_factor;
@@ -79,8 +99,6 @@ main(int argc, char* argv[])
     size_t qubit_count;
     if (experiment == "sc_memory_x" || experiment == "sc_memory_z")
         qubit_count = gen::sc_memory_get_qubit_count(distance);
-    else if (experiment == "sc_stability_x" || experiment == "sc_stability_z")
-        qubit_count = gen::sc_stability_get_qubit_count(distance);
     else
         throw std::runtime_error("invalid experiment: " + experiment);
 
@@ -95,23 +113,17 @@ main(int argc, char* argv[])
                                 .set_e_idle(e_idle);
 
     // Generate the full circuit (r rounds) for syndrome generation
-    const int64_t commit_size{distance};
     const int64_t window_size{2*commit_size};
+    int64_t detectors_per_round;
 
     stim::Circuit full_circuit, decoder_circuit;
     if (experiment == "sc_memory_x" || experiment == "sc_memory_z")
     {
         full_circuit = gen::sc_memory(conf, num_rounds, distance, experiment == "sc_memory_x"); 
         decoder_circuit = gen::sc_memory(conf, window_size+1, distance, experiment == "sc_memory_x");
-    }
-    else if (experiment == "sc_stability_x" || experiment == "sc_stability_z")
-    {
-        full_circuit = gen::sc_stability(conf, num_rounds, distance, experiment == "sc_stability_x");
-        decoder_circuit = gen::sc_stability(conf, window_size+1, distance, experiment == "sc_stability_x");
-    }
 
-    // Run sliding window decoder
-    const int64_t detectors_per_round = decoder_circuit.count_detectors() / (window_size+2);
+        detectors_per_round = _safe_compute_detectors_per_round(decoder_circuit.count_detectors(), window_size+2);
+    }
 
     PYMATCHING reference_decoder(full_circuit);
     SLIDING_PYMATCHING decoder(decoder_circuit, commit_size, window_size, detectors_per_round, num_rounds);

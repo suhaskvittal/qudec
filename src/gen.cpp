@@ -219,7 +219,7 @@ sc_stability(const CIRCUIT_CONFIG& config, size_t rounds, size_t distance, bool 
     stim::Circuit fin;
     fin += prolog;
     fin += first_round;
-    fin += main_circuit * (rounds-1);
+    fin += main_circuit * rounds;
     fin += epilog;
 
     return fin;
