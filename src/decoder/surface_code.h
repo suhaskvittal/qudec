@@ -66,18 +66,13 @@ struct PYMATCHING
 public:
     using weight_type = double;
 private:
-    stim::DetectorErrorModel dem;
-    mutable pm::UserGraph user_graph;
-    mutable pm::Mwpm mwpm;
-    size_t num_observables;
+    pm::Mwpm mwpm;
+    const size_t num_observables;
 public:
-    using compressed_edge_result = std::vector<pm::CompressedEdge>;
+    using compressed_edge_result = std::vector<uint64_t>;
 
     PYMATCHING(const stim::Circuit&);
-    DECODER_RESULT decode(std::vector<GRAPH_COMPONENT_ID>, std::ostream& debug_strm) const;
-    compressed_edge_result decode_and_get_compressed_edges(std::vector<GRAPH_COMPONENT_ID>, std::ostream& debug_strm) const;
-
-    const pm::UserGraph& get_user_graph() const { return user_graph; }
+    DECODER_RESULT decode(std::vector<GRAPH_COMPONENT_ID>, std::ostream& debug_strm);
 };
 
 /////////////////////////////////////////////////////

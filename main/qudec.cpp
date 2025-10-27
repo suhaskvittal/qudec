@@ -169,9 +169,6 @@ main(int argc, char* argv[])
         fclose(fin);
     }
 
-    FPD_CONFIG fpd_conf;
-    fpd_conf.cache_chain_limit = code_distance >> 2;
-
     DECODER_STATS stats;
     if (decoder == "pymatching")
         stats = eval_decoder<PYMATCHING>(circuit, num_trials);

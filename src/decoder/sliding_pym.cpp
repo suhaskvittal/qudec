@@ -35,67 +35,36 @@ DECODER_RESULT
 SLIDING_PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_strm) const
 {
     DECODER_RESULT result;
-    auto d_begin = dets.begin();
-
-    for (size_t r = 0; r < total_rounds; r += commit_size)
+    for (size_t r = 0; r < total_rounds && !dets.empty(); r += commit_size)
     {
         const GRAPH_COMPONENT_ID max_detector{(r + window_size) * detectors_per_round},
                                  max_commit_detector{(r + commit_size) * detectors_per_round};
 
-        if (d_begin == dets.end() || *d_begin > max_detector)
+        if (dets.front() > max_commit_detector)
             continue;
 
+        auto d_begin = dets.begin();
         auto d_end = std::find_if(d_begin, dets.end(),
                 [max_detector] (GRAPH_COMPONENT_ID d) { return d > max_detector; });
-
-        std::vector<GRAPH_COMPONENT_ID> window_dets(d_begin, d_end);
-
         auto d_commit_end = std::find_if(d_begin, d_end,
                 [max_commit_detector] (GRAPH_COMPONENT_ID d) { return d > max_commit_detector; });
+
         std::unordered_set<GRAPH_COMPONENT_ID> commit_region(d_begin, d_commit_end);
+        auto done = pm_ext::decode_detection_events_in_commit_region(mwpm, 
+                                                                    d_begin, 
+                                                                    d_end, 
+                                                                    commit_region,
+                                                                    result.flipped_observables);
 
-        auto compressed_edges = pym->decode_and_get_compressed_edges(window_dets, debug_strm);
-
-        for (const auto& edge : compressed_edges)
-            apply_compressed_edge_observables(edge, commit_region, result, debug_strm);
-
-        d_begin = d_end;
+        dets.erase(d_begin, d_commit_end);  // can bulk delete these
+        auto it = std::remove_if(dets.begin(), dets.end(),
+                [&done] (GRAPH_COMPONENT_ID d) { return done.count(d); });
+        dets.erase(it, dets.end());
     }
 
     return result;
 }
 
-/////////////////////////////////////////////////////
-/////////////////////////////////////////////////////
-
-void
-SLIDING_PYMATCHING::apply_compressed_edge_observables(const pm::CompressedEdge& edge,
-                                                      const std::unordered_set<GRAPH_COMPONENT_ID>& commit_region,
-                                                      DECODER_RESULT& result,
-                                                      std::ostream& debug_strm) const
-{
-    // Check if this edge has at least one endpoint in commit region
-    GRAPH_COMPONENT_ID det1 = static_cast<GRAPH_COMPONENT_ID>(edge.detector_node1->id_in_graph),
-                       det2 = static_cast<GRAPH_COMPONENT_ID>(edge.detector_node2->id_in_graph);
-
-    if (commit_region.count(det1) || commit_region.count(det2))
-    {
-        // Extract observables from compressed edge and apply them
-        pm::total_weight_int weight = 0;
-        std::vector<uint8_t> observables(pym->get_user_graph().get_num_observables(), 0);
-
-        const_cast<pm::Mwpm&>(pym->mwpm).extract_paths_from_match_edges({edge}, observables.data(), weight);
-
-        for (size_t i = 0; i < observables.size(); i++)
-        {
-            if (observables[i] & 1)
-                result.flipped_observables.insert(static_cast<int64_t>(i));
-        }
-
-        if (GL_DEBUG_DECODER)
-            debug_strm << "committing compressed edge (" << det1 << ", " << det2 << ")\n";
-    }
-}
 
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////

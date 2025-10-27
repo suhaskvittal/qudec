@@ -142,16 +142,21 @@ BLOSSOM5::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_strm)
  * PyMatching Implementation:
  * */
 
-PYMATCHING::PYMATCHING(const stim::Circuit& circuit)
-    :dem{stim::circuit_to_dem(circuit, {true, true, false, 0.0, false, false})},
-    user_graph{pm::detector_error_model_to_user_graph(dem, false, pm::NUM_DISTINCT_WEIGHTS)},
-    mwpm{user_graph.to_mwpm(pm::NUM_DISTINCT_WEIGHTS, false)},
-    num_observables{user_graph.get_num_observables()}
+pm::Mwpm 
+_init_pymatching(const stim::Circuit& circuit)
 {
+    auto dem = stim::circuit_to_dem(circuit, {true, true, false, 0.0, false, false});
+    auto user_graph = pm::detector_error_model_to_user_graph(dem, false, pm::NUM_DISTINCT_WEIGHTS);
+    return user_graph.to_mwpm(pm::NUM_DISTINCT_WEIGHTS, false);
 }
 
+PYMATCHING::PYMATCHING(const stim::Circuit& circuit)
+    :mwpm{_init_pymatching(circuit)},
+    num_observables{circuit.count_observables()}
+{}
+
 DECODER_RESULT
-PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_strm) const
+PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_strm)
 {
     // Convert detector IDs to PyMatching format (uint64_t vector)
     std::vector<uint64_t> detection_events(dets.size());
@@ -162,34 +167,12 @@ PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_str
 
     // Perform matching using PyMatching's decode function
     pm::total_weight_int weight = 0;
-    pm::decode_detection_events(const_cast<pm::Mwpm&>(mwpm), detection_events,
-                                observables.data(), weight, false);
+    pm::decode_detection_events(mwpm, detection_events, observables.data(), weight, false);
 
     // Convert observables to result format
     DECODER_RESULT result;
     memmove(result.flipped_observables.u8, observables.data(), observables.size());
     return result;
-}
-
-/////////////////////////////////////////////////////
-/////////////////////////////////////////////////////
-
-PYMATCHING::compressed_edge_result
-PYMATCHING::decode_and_get_compressed_edges(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_strm) const
-{
-    std::vector<uint64_t> detection_events(dets.size());
-    std::copy(dets.begin(), dets.end(), detection_events.begin());
-
-    pm::decode_detection_events_to_match_edges(const_cast<pm::Mwpm&>(mwpm), detection_events);
-
-    compressed_edge_result match_edges;
-    const_cast<pm::Mwpm&>(mwpm).shatter_blossom_and_extract_match_edges(
-        const_cast<pm::Mwpm&>(mwpm).flooder.graph.nodes[0].region, match_edges);
-
-    if (GL_DEBUG_DECODER)
-        debug_strm << "PyMatching found " << match_edges.size() << " compressed edges\n";
-
-    return match_edges;
 }
 
 /////////////////////////////////////////////////////
