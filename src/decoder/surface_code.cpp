@@ -161,12 +161,7 @@ PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_str
     // Perform matching using PyMatching's decode function
     if (GL_DEBUG_DECODER)
     {
-        debug_strm << "pymatching verbose (not performant):\n";
-        pm_ext::decode_detection_events_in_commit_region(mwpm, 
-                                                        detection_events,
-                                                        std::numeric_limits<uint64_t>::max(),
-                                                        result.flipped_observables,
-                                                        debug_strm);
+        decode_with_debug_info(std::move(detection_events), result.flipped_observables, debug_strm);
     }
     else
     {
@@ -176,6 +171,40 @@ PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug_str
 
     return result;
 }
+
+void
+PYMATCHING::decode_with_debug_info(std::vector<uint64_t>&& detection_events, syndrome_ref obs, std::ostream& debug_strm)
+{
+    debug_strm << "pymatching verbose (enabled because GL_DEBUG_DECODER is set):\n";
+
+    std::vector<int64_t> edges;
+    pm::decode_detection_events_to_edges(mwpm, detection_events, edges);
+
+    for (size_t i = 0; i < edges.size(); i += 2) 
+    {
+        const int64_t node1 = edges[i];
+        const int64_t node2 = edges[i+1];
+
+        const auto& detector_node = mwpm.search_flooder.graph.nodes[node1];
+        auto* neighbor_ptr = node2 >= 0 ? &mwpm.search_flooder.graph.nodes[node2] : nullptr;
+
+        const size_t neighbor_idx = detector_node.index_of_neighbor(neighbor_ptr);
+        const auto& obs_indices = detector_node.neighbor_observable_indices[neighbor_idx];
+
+        // Apply observable flips
+        for (const size_t obs_idx : obs_indices)
+            obs[obs_idx] ^= 1;
+
+        debug_strm << "\tedge between " << node1 << " and " << node2 
+            << ", flipped observables:";
+        for (const size_t obs_idx : obs_indices)
+            debug_strm << " " << obs_idx;
+        debug_strm << ", weight = " << detector_node.neighbor_weights[neighbor_idx] << "\n";
+    }
+}
+
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
 
 pm::Mwpm 
 pymatching_create_mwpm_from_circuit(const stim::Circuit& circuit, bool enable_search_flooder)

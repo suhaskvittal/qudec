@@ -27,7 +27,8 @@ main(int argc, char* argv[])
     int64_t     code_distance;
     int64_t     num_rounds;
     int64_t     num_trials;
-    bool        do_memory_experiment;
+    int64_t     num_errors;
+    std::string experiment_type;
     
     // EPR-specific parameters
     double      attenuation_rate;
@@ -42,7 +43,8 @@ main(int argc, char* argv[])
         .optional("-d", "--code-distance", "code distance", code_distance, 3)
         .optional("-r", "--rounds", "number of rounds", num_rounds, 9)
         .optional("-t", "--trials", "number of trials to run", num_trials, 1000000)
-        .optional("-m", "--memory-experiment", "do memory experiment (vs stability)", do_memory_experiment, true)
+        .optional("-k", "--stop-after-errors", "stop after this many errors", num_errors, 25)
+        .optional("", "--experiment", "experiment type", experiment_type, "memory")
         
         // EPR-specific parameters:
         .optional("-a", "--attenuation-rate", "photon attenuation rate", attenuation_rate, 1e-2)
@@ -58,41 +60,20 @@ main(int argc, char* argv[])
     
         .parse(argc, argv);
 
-    // Create EPR generation configuration
-    gen::EPR_GEN_CONFIG config;
-    config.attenuation_rate = attenuation_rate;
-    config.photonic_link_error = photonic_link_error;
-    config.hw1_round_ns = static_cast<uint64_t>(hw1_round_ns);
-    config.hw2_round_ns = static_cast<uint64_t>(hw2_round_ns);
-    config.phys_error = phys_error;
+    bool do_memory_experiment = (experiment_type == "memory");
 
-    // Print configuration
-    std::cout << "======================== EPR GENERATION CONFIG ==========================\n";
-    print_stat(std::cout, "CODE_DISTANCE", code_distance);
-    print_stat(std::cout, "NUM_ROUNDS", num_rounds);
-    print_stat(std::cout, "NUM_TRIALS", num_trials);
-    print_stat(std::cout, "MEMORY_EXPERIMENT", do_memory_experiment ? "true" : "false");
-    print_stat(std::cout, "ATTENUATION_RATE", config.attenuation_rate);
-    print_stat(std::cout, "PHOTONIC_LINK_ERROR", config.photonic_link_error);
-    print_stat(std::cout, "HW1_ROUND_NS", config.hw1_round_ns);
-    print_stat(std::cout, "HW2_ROUND_NS", config.hw2_round_ns);
-    print_stat(std::cout, "PHYS_ERROR", config.phys_error);
-    print_stat(std::cout, "OUTPUT_FILE", generated_stim_output_file);
-    std::cout << "======================================================================\n";
+    // Create EPR generation configuration
+    gen::EPR_GEN_CONFIG circuit_config;
+    circuit_config.attenuation_rate = attenuation_rate;
+    circuit_config.photonic_link_error = photonic_link_error;
+    circuit_config.hw1_round_ns = static_cast<uint64_t>(hw1_round_ns);
+    circuit_config.hw2_round_ns = static_cast<uint64_t>(hw2_round_ns);
+    circuit_config.phys_error = phys_error;
 
     // Generate the EPR-based surface code circuit
-    stim::Circuit circuit = gen::sc_epr_generation(config, num_rounds, code_distance, do_memory_experiment);
-
-    // Print circuit if small enough
-    if (code_distance <= 3)
-    {
-        std::cout << "======================== GENERATED CIRCUIT ==========================\n";
-        std::cout << circuit << "\n";
-        std::cout << "=====================================================================\n";
-    }
+    stim::Circuit circuit = gen::sc_epr_generation(circuit_config, num_rounds, code_distance, do_memory_experiment);
 
     // Write circuit to output file
-    std::cout << "Writing circuit to " << generated_stim_output_file << "...\n";
     std::ofstream out(generated_stim_output_file);
     if (!out.is_open())
     {
@@ -103,15 +84,8 @@ main(int argc, char* argv[])
     out << circuit.str() << "\n";
     out.close();
 
-    // Print circuit statistics
-    std::cout << "EPR circuit generation completed successfully!\n";
-
-    // Run PyMatching decoder on the generated circuit
-    std::cout << "\n======================== RUNNING PYMATCHING DECODER ==========================\n";
-    print_stat(std::cout, "NUM_TRIALS", num_trials);
-    std::cout << "Running decoder...\n";
-
-    DECODER_STATS stats = eval_decoder<PYMATCHING>(circuit, num_trials);
+    DECODER_EVAL_CONFIG eval_config{.stop_at_k_errors = static_cast<uint64_t>(num_errors)};
+    DECODER_STATS stats = eval_decoder<PYMATCHING>(circuit, num_trials, eval_config, circuit);
 
     // Calculate and print results
     double ler = fpdiv(stats.errors, stats.trials);

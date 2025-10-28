@@ -30,6 +30,7 @@ main(int argc, char* argv[])
     int64_t     code_distance;
     int64_t     num_rounds;
     int64_t     num_trials;
+    int64_t     num_errors;
 
     double phys_error;
     int64_t round_time;
@@ -49,6 +50,7 @@ main(int argc, char* argv[])
         .optional("-d", "--code-distance", "code distance", code_distance, 3)
         .optional("-r", "--rounds", "number of rounds", num_rounds, 9)
         .optional("-t", "--trials", "number of trials to run", num_trials, 1'000'000)
+        .optional("-k", "--stop-after-errors", "stop after this many errors", num_errors, 25)
 
         // circuit timing:
         .optional("-p", "--phys-error", "physical error rate", phys_error, 1e-3)
@@ -90,20 +92,20 @@ main(int argc, char* argv[])
         else
             throw std::runtime_error("invalid experiment: " + experiment);
 
-        gen::CIRCUIT_CONFIG conf = gen::CIRCUIT_CONFIG()
-                                    .set_qubit_count(qubit_count)
-                                    .set_round_ns(round_time)
-                                    .set_t1_ns(t1*1000)
-                                    .set_t2_ns(t2*1000)
-                                    .set_e_g1q(e_g1q)
-                                    .set_e_g2q(e_g2q)
-                                    .set_e_readout(e_readout)
-                                    .set_e_idle(e_idle);
+        gen::CIRCUIT_CONFIG circuit_conf = gen::CIRCUIT_CONFIG()
+                                                .set_qubit_count(qubit_count)
+                                                .set_round_ns(round_time)
+                                                .set_t1_ns(t1*1000)
+                                                .set_t2_ns(t2*1000)
+                                                .set_e_g1q(e_g1q)
+                                                .set_e_g2q(e_g2q)
+                                                .set_e_readout(e_readout)
+                                                .set_e_idle(e_idle);
 
         if (experiment == "sc_memory_x" || experiment == "sc_memory_z")
-            circuit = gen::sc_memory(conf, num_rounds, code_distance, experiment == "sc_memory_x"); 
+            circuit = gen::sc_memory(circuit_conf, num_rounds, code_distance, experiment == "sc_memory_x"); 
         else if (experiment == "sc_stability_x" || experiment == "sc_stability_z")
-            circuit = gen::sc_stability(conf, num_rounds, code_distance, experiment == "sc_stability_x");
+            circuit = gen::sc_stability(circuit_conf, num_rounds, code_distance, experiment == "sc_stability_x");
 
         if (code_distance <= 3)
         {
@@ -124,11 +126,13 @@ main(int argc, char* argv[])
         fclose(fin);
     }
 
+    DECODER_EVAL_CONFIG eval_conf{.stop_at_k_errors = static_cast<uint64_t>(num_errors)};
+
     DECODER_STATS stats;
     if (decoder == "pymatching")
-        stats = eval_decoder<PYMATCHING>(circuit, num_trials);
+        stats = eval_decoder<PYMATCHING>(circuit, num_trials, eval_conf, circuit);
     else if (decoder == "blossom5")
-        stats = eval_decoder<BLOSSOM5>(circuit, num_trials);
+        stats = eval_decoder<BLOSSOM5>(circuit, num_trials, eval_conf, circuit);
     else
         throw std::runtime_error("invalid decoder: " + decoder);
 

@@ -70,6 +70,8 @@ private:
 public:
     PYMATCHING(const stim::Circuit&);
     DECODER_RESULT decode(std::vector<GRAPH_COMPONENT_ID>, std::ostream& debug_strm);
+private:
+    void decode_with_debug_info(std::vector<uint64_t>&&, syndrome_ref, std::ostream&);
 };
 
 pm::Mwpm pymatching_create_mwpm_from_circuit(const stim::Circuit&, bool enable_search_flooder=false);

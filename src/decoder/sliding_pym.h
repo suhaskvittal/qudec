@@ -42,30 +42,13 @@ public:
 
     DECODER_RESULT decode(std::vector<GRAPH_COMPONENT_ID>, std::ostream& debug_strm);
 private:
-    GRAPH_COMPONENT_ID min_detector_id(size_t round) const;
-    GRAPH_COMPONENT_ID max_detector_id(size_t round) const;
-    GRAPH_COMPONENT_ID max_commit_detector_id(size_t round) const;
-    GRAPH_COMPONENT_ID detector_offset(size_t round) const;
+    void decode_window(syndrome_ref syndrome, 
+                        syndrome_ref obs,
+                        GRAPH_COMPONENT_ID min, 
+                        GRAPH_COMPONENT_ID window_max,
+                        GRAPH_COMPONENT_ID commit_max,
+                        std::ostream&);
 };
-
-/////////////////////////////////////////////////////
-/////////////////////////////////////////////////////
-
-namespace pm_ext  // "pymatching extension"
-{
-
-// for decoding syndromes with a sliding window decoder: only detection events in the commit region are committed
-// to `syndrome_ref`
-//
-// returns a set of detector IDs that were committed -- these should not be passed in future calls
-std::unordered_set<GRAPH_COMPONENT_ID> 
-    decode_detection_events_in_commit_region(pm::Mwpm&,
-                                                std::vector<uint64_t> detectors,
-                                                uint64_t commit_region_end_id,
-                                                syndrome_ref obs,
-                                                std::ostream& debug_strm);
-
-} // namespace pm_ext
 
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////

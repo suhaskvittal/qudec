@@ -40,7 +40,7 @@ _safe_compute_detectors_per_round(int64_t total_detectors, int64_t rounds)
 int
 main(int argc, char* argv[])
 {
-    int64_t     distance;
+    int64_t     code_distance;
     int64_t     num_rounds;
     int64_t     num_trials;
     int64_t     num_errors;
@@ -60,10 +60,10 @@ main(int argc, char* argv[])
     std::string decoder_circuit_output_file;
 
     ARGPARSE()
-        .optional("-d", "--distance", "code distance", distance, 3)
+        .optional("-d", "--code-distance", "code distance", code_distance, 3)
         .optional("-r", "--rounds", "number of rounds", num_rounds, 9)
         .optional("-t", "--trials", "number of trials to run", num_trials, 1'000'000)
-        .optional("-c", "--commit-size", "commit size (-1 defaults to `distance`)", commit_size, -1)
+        .optional("-c", "--commit-size", "commit size (-1 defaults to `code_distance`)", commit_size, -1)
         .optional("-k", "--stop-after-errors", "stop after this many errors", num_errors, 10)
 
         // circuit timing:
@@ -84,7 +84,7 @@ main(int argc, char* argv[])
         .parse(argc, argv);
 
     if (commit_size < 0)
-        commit_size = distance;
+        commit_size = code_distance;
 
     // update error and timing based on value of p
     double scale_factor = phys_error / 1e-3;
@@ -98,11 +98,11 @@ main(int argc, char* argv[])
     // Generate circuit configuration
     size_t qubit_count;
     if (experiment == "sc_memory_x" || experiment == "sc_memory_z")
-        qubit_count = gen::sc_memory_get_qubit_count(distance);
+        qubit_count = gen::sc_memory_get_qubit_count(code_distance);
     else
         throw std::runtime_error("invalid experiment: " + experiment);
 
-    gen::CIRCUIT_CONFIG conf = gen::CIRCUIT_CONFIG()
+    gen::CIRCUIT_CONFIG circuit_conf = gen::CIRCUIT_CONFIG()
                                 .set_qubit_count(qubit_count)
                                 .set_round_ns(round_time)
                                 .set_t1_ns(t1*1000)
@@ -119,8 +119,8 @@ main(int argc, char* argv[])
     stim::Circuit full_circuit, decoder_circuit;
     if (experiment == "sc_memory_x" || experiment == "sc_memory_z")
     {
-        full_circuit = gen::sc_memory(conf, num_rounds, distance, experiment == "sc_memory_x"); 
-        decoder_circuit = gen::sc_memory(conf, window_size+1, distance, experiment == "sc_memory_x");
+        full_circuit = gen::sc_memory(circuit_conf, num_rounds, code_distance, experiment == "sc_memory_x");
+        decoder_circuit = gen::sc_memory(circuit_conf, window_size+1, code_distance, experiment == "sc_memory_x");
 
         detectors_per_round = _safe_compute_detectors_per_round(decoder_circuit.count_detectors(), window_size+2);
     }
@@ -128,6 +128,13 @@ main(int argc, char* argv[])
     PYMATCHING reference_decoder(full_circuit);
     SLIDING_PYMATCHING decoder(decoder_circuit, commit_size, window_size, detectors_per_round, num_rounds);
 
+    DECODER_EVAL_CONFIG eval_conf
+    {
+        .batch_size = 8192,
+        .enable_clock = true,
+        .seed = 0,
+        .stop_at_k_errors = num_errors
+    };
     auto stats = benchmark_decoder(full_circuit, decoder, num_trials,
                                 [&reference_decoder] 
                                 (syndrome_ref dets, syndrome_ref, syndrome_ref pred, std::ostream& debug_strm)
@@ -153,7 +160,7 @@ main(int argc, char* argv[])
                                     debug_strm << "\n";
 
                                     return mismatch;
-                                }, 8192, false, 0, num_errors);
+                                }, eval_conf);
 
     double ler = fpdiv(stats.errors, stats.trials);
     double mean_time_us = fpdiv(stats.total_time_us, stats.trials);

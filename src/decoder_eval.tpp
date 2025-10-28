@@ -22,7 +22,7 @@ decode(IMPL& impl,
         syndrome_type detector_flips,
         syndrome_type observable_flips,
         const ERROR_CALLBACK& error_callback,
-        bool do_not_clock)
+        const DECODER_EVAL_CONFIG& conf)
 {
     // create detector list from `detector_flips`
     std::vector<GRAPH_COMPONENT_ID> detector_list;
@@ -46,7 +46,7 @@ decode(IMPL& impl,
 
     // start clock:
     std::chrono::steady_clock::time_point start_time, end_time;
-    if (!do_not_clock)
+    if (conf.enable_clock)
         start_time = std::chrono::steady_clock::now();
 
     std::stringstream debug_strm;
@@ -54,8 +54,9 @@ decode(IMPL& impl,
 
     result = impl.decode(detector_list, debug_strm);
 
-    if (!do_not_clock)
+    if (conf.enable_clock)
         end_time = std::chrono::steady_clock::now();
+
     uint64_t time_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
     stats.total_time_us += time_us;
     stats.time_us_by_hamming_weight[hw] += time_us;
@@ -109,22 +110,10 @@ decode(IMPL& impl,
 /////////////////////////////////////////////////////
 
 template <class IMPL> DECODER_STATS 
-benchmark_decoder(const stim::Circuit& circuit,
-                    IMPL& impl, 
-                    uint64_t num_trials,
-                    uint64_t batch_size,
-                    bool do_not_clock,
-                    uint64_t seed,
-                    uint64_t stop_limit)
+benchmark_decoder(const stim::Circuit& circuit, IMPL& impl, uint64_t num_trials, DECODER_EVAL_CONFIG conf)
 {
-    return benchmark_decoder(circuit,
-                                impl,
-                                num_trials,
-                                [] (auto, auto, auto, auto&) { return true; },
-                                batch_size,
-                                do_not_clock,
-                                seed,
-                                stop_limit);
+    constexpr auto dummy_callback = [] (auto, auto, auto, auto&) { return true; };
+    return benchmark_decoder(circuit, impl, num_trials, dummy_callback, std::move(conf));
 }
 
 template <class IMPL, class ERROR_CALLBACK> DECODER_STATS
@@ -132,20 +121,17 @@ benchmark_decoder(const stim::Circuit& circuit,
                     IMPL& impl, 
                     uint64_t num_trials,
                     const ERROR_CALLBACK& error_callback,
-                    uint64_t batch_size,
-                    bool do_not_clock,
-                    uint64_t seed,
-                    uint64_t stop_limit)
+                    DECODER_EVAL_CONFIG conf)
 {
     using frame_sim_type = stim::FrameSimulator<stim::MAX_BITWORD_WIDTH>;
 
-    std::mt19937_64 rng(seed);
+    std::mt19937_64 rng(conf.seed);
 
     [[ maybe_unused ]] size_t num_batches{0};
     [[ maybe_unused ]] size_t errors_in_last_epoch{0};
 
     DECODER_STATS stats;
-    while (num_trials && stats.errors < stop_limit)
+    while (num_trials && stats.errors < conf.stop_at_k_errors)
     {
         if (!GL_DEBUG_DECODER)
         {
@@ -154,16 +140,16 @@ benchmark_decoder(const stim::Circuit& circuit,
             if (num_batches % 100 == 0)
             {
                 if (errors_in_last_epoch)
-                    std::cout << errors_in_last_epoch;
+                    std::cout << " " << errors_in_last_epoch;
                 else
-                    std::cout << ".";
+                    std::cout << " .";
                 std::cout.flush();
 
                 errors_in_last_epoch = 0;
             }
         }
 
-        uint64_t trials_this_batch = std::min(num_trials, batch_size);
+        uint64_t trials_this_batch = std::min(num_trials, conf.batch_size);
         num_trials -= trials_this_batch;
 
         frame_sim_type sim(circuit.compute_stats(), 
@@ -180,22 +166,16 @@ benchmark_decoder(const stim::Circuit& circuit,
         observable_table = observable_table.transposed();
 
         size_t errors_before{stats.errors};
-        for (uint64_t s = 0; s < trials_this_batch && stats.errors < stop_limit; s++)
-        {
-            decode(impl, 
-                    stats, 
-                    std::move(detector_table[s]), 
-                    std::move(observable_table[s]), 
-                    error_callback, 
-                    do_not_clock);
-        }
+        for (uint64_t s = 0; s < trials_this_batch && stats.errors < conf.stop_at_k_errors; s++)
+            decode(impl, stats, std::move(detector_table[s]), std::move(observable_table[s]), error_callback, conf);
         errors_in_last_epoch += stats.errors - errors_before;
 
         rng = std::move(sim.rng);
         num_batches++;
     }
+
     if (!GL_DEBUG_DECODER)
-        std::cout << errors_in_last_epoch;
+        std::cout << " " << errors_in_last_epoch;
     std::cout << "\n";
 
     return stats;

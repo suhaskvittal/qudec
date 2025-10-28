@@ -35,6 +35,17 @@ struct DECODER_STATS
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
 
+struct DECODER_EVAL_CONFIG
+{
+    uint64_t batch_size{8192};
+    bool     enable_clock{true};
+    uint64_t seed{0};
+    uint64_t stop_at_k_errors{25};
+};
+
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
 /*
  * Calls `IMPL::decode` which should take in a `std::vector<GRAPH_COMPONENT_ID>` of
  * detector indices that are flipped, and return a `DECODER_RESULT`
@@ -63,23 +74,21 @@ struct DECODER_STATS
  * */
 
 template <class IMPL, class ERROR_CALLBACK> 
-void decode(IMPL&,
-            DECODER_STATS&,
-            syndrome_type detector_flips,
-            syndrome_type observable_flips,
-            const ERROR_CALLBACK&,
-            bool do_not_clock=false);
+void decode(IMPL&, 
+            DECODER_STATS&, 
+            syndrome_type dets, 
+            syndrome_type obs, 
+            const ERROR_CALLBACK&, 
+            const DECODER_EVAL_CONFIG&);
 
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
 
-template <class IMPL> DECODER_STATS benchmark_decoder(const stim::Circuit&,
-                                                        IMPL&,
-                                                        uint64_t num_trials,
-                                                        uint64_t batch_size=8192,
-                                                        bool do_not_clock=false,
-                                                        uint64_t seed=0,
-                                                        uint64_t stop_at_k_errors=10);
+template <class IMPL> 
+DECODER_STATS benchmark_decoder(const stim::Circuit&, 
+                                IMPL&, 
+                                uint64_t num_trials, 
+                                DECODER_EVAL_CONFIG={});
 
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
@@ -91,14 +100,11 @@ template <class IMPL> DECODER_STATS benchmark_decoder(const stim::Circuit&,
  * */ 
 
 template <class IMPL, class ERROR_CALLBACK> 
-DECODER_STATS benchmark_decoder(const stim::Circuit&,
-                                IMPL&,
-                                uint64_t num_trials,
-                                const ERROR_CALLBACK&,
-                                uint64_t batch_size=8192,
-                                bool do_not_clock=false,
-                                uint64_t seed=0,
-                                uint64_t stop_at_k_errors=10);
+DECODER_STATS benchmark_decoder(const stim::Circuit&, 
+                                IMPL&, 
+                                uint64_t num_trials, 
+                                const ERROR_CALLBACK&, 
+                                DECODER_EVAL_CONFIG={});
 
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////

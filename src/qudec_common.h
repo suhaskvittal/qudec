@@ -46,10 +46,10 @@ print_decoder_stats(std::ostream& out, const IMPL& dec)
 }
 
 template <class IMPL, class... IMPL_ARGS> DECODER_STATS
-eval_decoder(const stim::Circuit& circuit, uint64_t num_trials, IMPL_ARGS... args)
+eval_decoder(const stim::Circuit& circuit, uint64_t num_trials, DECODER_EVAL_CONFIG conf, IMPL_ARGS... args)
 {
-    IMPL decoder(circuit, std::forward<IMPL_ARGS>(args)...);
-    auto out = benchmark_decoder(circuit, decoder, num_trials);
+    IMPL decoder(std::forward<IMPL_ARGS>(args)...);
+    auto out = benchmark_decoder(circuit, decoder, num_trials, conf);
 
     print_decoder_stats(std::cout, decoder);
 

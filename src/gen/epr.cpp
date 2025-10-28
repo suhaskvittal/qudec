@@ -125,9 +125,6 @@ SC_EPR_SCHEDULE_INFO::SC_EPR_SCHEDULE_INFO(size_t d, bool dual)
 stim::Circuit
 sc_epr_generation(const EPR_GEN_CONFIG& config, size_t rounds, size_t distance, bool do_memory_experiment)
 {
-    if (!do_memory_experiment && (distance % 2 == 1))
-        throw std::runtime_error("epr_generation: distance must be even for stability experiment");
-
     // merged surface code has asymmetric distance for ZZ measurement
     SC_EPR_SCHEDULE_INFO epr(distance);
 
@@ -139,9 +136,9 @@ sc_epr_generation(const EPR_GEN_CONFIG& config, size_t rounds, size_t distance, 
 
     const size_t mr1{distance},
                  mr2{distance+1};
-    for (size_t c = 0; c < distance; c++)
+    for (size_t c = 0; c < distance; c += 2)
         anc_z_checks.push_back(epr.sc.check_matrix[mr1][c]);
-    for (size_t c = 1; c <= distance; c++)
+    for (size_t c = 1; c <= distance; c += 2)
         anc_z_checks.push_back(epr.sc.check_matrix[mr2][c]);
 
     // create hardware error and timing setup:
@@ -232,18 +229,25 @@ sc_epr_generation(const EPR_GEN_CONFIG& config, size_t rounds, size_t distance, 
 
     // create detection events:
     const auto& det_checks = do_memory_experiment ? epr.sc.x_check_qubits : epr.sc.z_check_qubits;
+    std::vector<stim_qubit_type> first_round_det_checks(det_checks);
+    if (!do_memory_experiment)
+    {
+        auto it = std::remove_if(first_round_det_checks.begin(), first_round_det_checks.end(),
+                                [&anc_z_checks] (auto q) 
+                                { 
+                                    return std::find(anc_z_checks.begin(), anc_z_checks.end(), q) != anc_z_checks.end();
+                                });
+        first_round_det_checks.erase(it, first_round_det_checks.end());
+    }
     
     // only have first round detection events if doing memory experiment:
-    if (do_memory_experiment)
-    {
-        sc_epr_create_detection_events_super_round(first_round, 
-                                                    det_checks, 
-                                                    super_check_meas_map, 
-                                                    super_check_meas_map,
-                                                    num_hw1_rounds_per_super_round, 
-                                                    true,
-                                                    epr);
-    }
+    sc_epr_create_detection_events_super_round(first_round, 
+                                                first_round_det_checks, 
+                                                super_check_meas_map, 
+                                                super_check_meas_map,
+                                                num_hw1_rounds_per_super_round, 
+                                                true,
+                                                epr);
 
     sc_epr_create_detection_events_adjacent_rounds(hw1_only_first_round, 
                                                     det_checks, 
@@ -296,11 +300,18 @@ sc_epr_generation(const EPR_GEN_CONFIG& config, size_t rounds, size_t distance, 
     else
     {
         // observable is the Z measurements in the last round:
-        std::transform(anc_z_checks.begin(), anc_z_checks.end(), std::back_inserter(obs_meas_id),
-                        [n_data_meas, n_check_meas, &super_check_meas_map] (stim_qubit_type q) 
-                        {
-                            return (n_data_meas+n_check_meas - super_check_meas_map.at(q)) | stim::TARGET_RECORD_BIT;
-                        });
+        for (auto q : anc_z_checks)
+        {
+            uint32_t base_meas_id = (n_data_meas+n_check_meas - super_check_meas_map.at(q)) | stim::TARGET_RECORD_BIT;
+            obs_meas_id.push_back(base_meas_id);
+
+            if (epr.epr_checks.count(q))
+            {
+                auto e = epr.epr_checks.at(q);
+                uint32_t e_meas_id = (n_data_meas+n_check_meas - super_check_meas_map.at(e)) | stim::TARGET_RECORD_BIT;
+                obs_meas_id.push_back(e_meas_id);
+            }
+        }
     }
     epilog.safe_append_ua("OBSERVABLE_INCLUDE", obs_meas_id, 0);
 
