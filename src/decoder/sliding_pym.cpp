@@ -6,6 +6,8 @@
 #include "decoder/sliding_pym.h"
 #include "decoder/surface_code.h"
 
+#include <utility>
+
 extern bool GL_DEBUG_DECODER;
 
 /////////////////////////////////////////////////////
@@ -40,8 +42,21 @@ SLIDING_PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& d
     for (auto d : dets)
         syndrome[d] = 1;
 
+    decode_and_update_inplace(syndrome, result.flipped_observables, debug_strm, decode_options{});
+    return result;
+}
+
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
+void
+SLIDING_PYMATCHING::decode_and_update_inplace(syndrome_ref syndrome, 
+                                                syndrome_ref obs, 
+                                                std::ostream& debug_strm, 
+                                                decode_options opts)
+{
     size_t r{0};
-    while (syndrome.popcnt() > 0)
+    while (r < total_rounds+1 && syndrome.popcnt() > 0)
     {
         if (GL_DEBUG_DECODER)
             debug_strm << "round " << r << ":\n";
@@ -49,12 +64,12 @@ SLIDING_PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& d
         const GRAPH_COMPONENT_ID min_detector = r*detectors_per_round,
                                  max_detector = (r+window_size)*detectors_per_round,
                                  max_commit_detector = (r+commit_size)*detectors_per_round;
-        decode_window(syndrome, result.flipped_observables, min_detector, max_detector, max_commit_detector, debug_strm);
+
+        window_bounds_type bounds{min_detector, max_detector, max_commit_detector};
+        decode_window(syndrome, obs, bounds, debug_strm, opts);
 
         r += commit_size;
     }
-
-    return result;
 }
 
 /////////////////////////////////////////////////////
@@ -63,29 +78,33 @@ SLIDING_PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& d
 void
 SLIDING_PYMATCHING::decode_window(syndrome_ref syndrome, 
                                 syndrome_ref obs,
-                                GRAPH_COMPONENT_ID min, 
-                                GRAPH_COMPONENT_ID window_max,
-                                GRAPH_COMPONENT_ID commit_max,
-                                std::ostream& debug_strm)
+                                window_bounds_type bounds,
+                                std::ostream& debug_strm,
+                                decode_options opts)
 {
     std::vector<uint64_t> window_dets;
 
-    const size_t offset = (min == 0) ? 0 : detectors_per_round;
-    for (size_t i = min; i < window_max && i < syndrome.num_bits_padded(); i++)
+    auto [d_min, d_max, d_commit_max] = bounds;
+    const size_t offset = (d_min == 0) ? 0 : detectors_per_round;
+
+    // use `_true_id` to make the code less verbose
+    auto _true_id = [d_min, offset] (const int64_t node) { return (node <= 0) ? node : node - offset + d_min; };
+
+    for (size_t i = d_min; i < d_max && i < syndrome.num_bits_padded(); i++)
     {
         if (syndrome[i])
-            window_dets.push_back(i - min + offset);
+            window_dets.push_back(i-d_min+offset);
     }
 
-    if (window_dets.empty() || window_dets.front() >= commit_max)
+    if (window_dets.empty() || _true_id(window_dets.front()) >= d_commit_max)
         return;
 
     if (GL_DEBUG_DECODER)
     {
-        debug_strm << "\t(min = " << min << ", max = " << window_max << ", commit_max = " << commit_max 
+        debug_strm << "\t(min = " << d_min << ", max = " << d_max << ", commit_max = " << d_commit_max 
             << ") detectors in window:";
         for (auto d : window_dets)
-            debug_strm << " " << (d-offset+min);
+            debug_strm << " " << _true_id(d);
         debug_strm << "\n";
     }
     
@@ -95,25 +114,37 @@ SLIDING_PYMATCHING::decode_window(syndrome_ref syndrome,
 
     for (size_t i = 0; i < edges.size(); i += 2) 
     {
-        const int64_t node1 = edges[i];
-        const int64_t node2 = edges[i+1];
+        int64_t node1 = edges[i];
+        int64_t node2 = edges[i+1];
 
-        const int64_t true_node1 = (node1 <= 0) ? node1 : node1 - offset + min,
-                      true_node2 = (node2 <= 0) ? node2 : node2 - offset + min;
+        if (node1 < 0)
+            std::swap(node1, node2);
+
+        const int64_t true_node1 = (node1 < 0) ? node1 : _true_id(node1),
+                      true_node2 = (node2 < 0) ? node2 : _true_id(node2);
 
         // Only commit observables if at least one detector is in commit region
-        const bool node1_in_commit = (true_node1 >= 0) && (true_node1 < commit_max);
-        const bool node2_in_commit = (true_node2 >= 0) && (true_node2 < commit_max);
+        const bool node1_in_commit = (true_node1 >= 0) && (true_node1 < d_commit_max);
+        const bool node2_in_commit = (true_node2 >= 0) && (true_node2 < d_commit_max);
 
         if (!node1_in_commit && !node2_in_commit)
         {
             if (GL_DEBUG_DECODER)
             {
-                debug_strm << "\tskipping edge between " 
-                    << true_node1 << " and " << true_node2 
+                debug_strm << "\tskipping edge between " << true_node1 << " and " << true_node2 
                     << " (both outside commit region)\n";
             }
             continue;  // Skip edges entirely outside commit region
+        }
+
+        if (opts.do_not_commit_boundary_edges_set.count(true_node1))
+        {
+            if (GL_DEBUG_DECODER)
+            {
+                debug_strm << "\tskipping edge between " << true_node1 << " and " << true_node2 
+                    << " (touches boundary)\n";
+            }
+            continue;  // Skip edges touching boundary
         }
 
         // Regular edge between two detectors

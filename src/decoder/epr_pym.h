@@ -34,29 +34,24 @@ public:
 
     const stim::Circuit& inner_circuit;
     const stim::Circuit& outer_circuit;
-
-    const size_t inner_detectors_per_round;
-    const size_t inner_commit_size;
-    const size_t inner_window_size;
-    const size_t inner_total_rounds;
 private:
-    std::unique_ptr<SLIDING_PYMATCHING> d_inner;
-    std::unique_ptr<PYMATCHING>         d_outer;
+    std::unique_ptr<SLIDING_PYMATCHING> dec_inner;
+    std::unique_ptr<PYMATCHING>         dec_outer;
 
     detector_map m_inner_to_outer;
     detector_map m_global_to_inner;
     detector_map m_global_to_outer;
+
+    std::unordered_set<GRAPH_COMPONENT_ID> do_not_commit_boundary_edges_set;
 public:
     EPR_PYMATCHING(const stim::Circuit& inner, 
                     const stim::Circuit& outer,
-                    size_t inner_detectors_per_round,
                     size_t inner_commit_size,
-                    size_t inner_window_size);
+                    size_t inner_window_size,
+                    size_t inner_detectors_per_round,
+                    size_t inner_total_rounds);
 
     DECODER_RESULT decode(std::vector<GRAPH_COMPONENT_ID>, std::ostream& debug_strm);
-private:
-    std::vector<GRAPH_COMPONENT_ID> decode_inner(std::vector<GRAPH_COMPONENT_ID>, syndrome_ref, std::ostream&); 
-    void                            decode_outer(std::vector<GRAPH_COMPONENT_ID>, syndrome_ref, std::ostream&);
 };
 
 /////////////////////////////////////////////////////

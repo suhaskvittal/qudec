@@ -5,6 +5,57 @@
 
 #include "decoder/epr_pym.h"
 
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
+void
+_init_detector_map_from_circuit(EPR_PYMATCHING::detector_map& m, const stim::Circuit& circuit)
+{
+    for (size_t i = 0; i < circuit.count_detectors(); i++)
+    {
+        const auto coords = circuit.coords_of_detector(i);
+        if (EPR_PYMATCHING::GLOBAL_DETECTOR_COORD_IDX < coords.size())
+        {
+            const auto global_id = static_cast<GRAPH_COMPONENT_ID>(coords[EPR_PYMATCHING::GLOBAL_DETECTOR_COORD_IDX]);
+            m[global_id] = static_cast<GRAPH_COMPONENT_ID>(i);
+        }
+    }
+}
+
+EPR_PYMATCHING::EPR_PYMATCHING(const stim::Circuit& inner, 
+                                const stim::Circuit& outer,
+                                size_t inner_commit_size,
+                                size_t inner_window_size,
+                                size_t inner_detectors_per_round,
+                                size_t inner_total_rounds)
+    :inner_circuit(inner),
+    outer_circuit(outer),
+    dec_inner{new SLIDING_PYMATCHING(inner, inner_commit_size, inner_window_size, inner_detectors_per_round, inner_total_rounds)},
+    dec_outer{new PYMATCHING(outer)}
+{
+    // initialize detector maps:
+
+    // Get detector counts for both circuits
+    const size_t inner_detector_count = inner_circuit.count_detectors();
+    const size_t outer_detector_count = outer_circuit.count_detectors();
+
+    // Build global_to_inner map
+    _init_detector_map_from_circuit(m_global_to_inner, inner_circuit);
+    _init_detector_map_from_circuit(m_global_to_outer, outer_circuit);
+
+    // Build inner_to_outer map by matching global detector IDs
+    for (const auto& [global_id, inner_id] : m_global_to_inner) 
+    {
+        const auto outer_it = m_global_to_outer.find(global_id);
+        if (outer_it != m_global_to_outer.end()) 
+        {
+            m_inner_to_outer[inner_id] = outer_it->second;
+
+            // only add inner detectors that correspond to some outer detector to this set:
+            do_not_commit_boundary_edges_set.insert(inner_id);
+        }
+    }
+}
 
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
@@ -15,54 +66,46 @@ EPR_PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug
     DECODER_RESULT result;
 
     // split syndrome into inner and outer parts:
-    std::vector<GRAPH_COMPONENT_ID> inner_dets,
-                                    outer_dets;
-    inner_dets.reserve(dets.size());
-    outer_dets.reserve(dets.size());
+    syndrome_type inner_s(inner_circuit.count_detectors()),
+                  outer_s(outer_circuit.count_detectors());
+
+    inner_s.clear();
+    outer_s.clear();
 
     for (auto d : dets)
     {
-        auto it = m_global_to_inner.find(d);
-        if (it == m_global_to_inner.end())
-            outer_dets.push_back(m_global_to_outer.at(d));
+        const auto inner_it = m_global_to_inner.find(d);
+        if (inner_it != m_global_to_inner.end())
+            inner_s[inner_it->second] ^= 1;
         else
-            inner_dets.push_back(it->second);
+            outer_s[m_global_to_outer.at(d)] ^= 1;
     }
 
-    auto remaining_inner_dets = decode_inner(inner_dets, result.flipped_observables, debug_strm);
-    
-    // add remaining detectors to `outer_dets` and decode:
-    std::transform(remaining_inner_dets.begin(), remaining_inner_dets.end(), std::back_inserter(outer_dets),
-                    [this] (GRAPH_COMPONENT_ID d) { return this->m_inner_to_outer.at(d); });
+    // decode inner part first:
+    SLIDING_PYMATCHING::decode_options opts;
+    opts.do_not_commit_boundary_edges_set = do_not_commit_boundary_edges_set;
+    dec_inner->decode_and_update_inplace(inner_s, result.flipped_observables, debug_strm);
 
-    [[ maybe_unused ]] pm::total_weight_int w{0};
-    decode_outer(outer_dets, result.flipped_observables, debug_strm);
+    // move r=maining syndrome bits from inner to outer (also make detector list)
+    for (size_t i = 0; i < inner_s.num_bits_padded(); i++)
+    {
+        if (inner_s[i])
+            outer_s[m_inner_to_outer.at(i)] ^= 1;
+    }
+
+    // convert to detector list:
+    std::vector<GRAPH_COMPONENT_ID> outer_dets;
+    for (size_t i = 0; i < outer_s.num_bits_padded(); i++)
+    {
+        if (outer_s[i])
+            outer_dets.push_back(i);
+    }
+
+    // decode outer part:
+    auto outer_result = dec_outer->decode(outer_dets, debug_strm);
+    result.flipped_observables ^= outer_result.flipped_observables;
 
     return result;
-}
-
-/////////////////////////////////////////////////////
-/////////////////////////////////////////////////////
-
-std::vector<GRAPH_COMPONENT_ID>
-EPR_PYMATCHING::decode_inner(std::vector<GRAPH_COMPONENT_ID> dets, syndrome_ref obs, std::ostream& debug_strm)
-{
-    std::vector<GRAPH_COMPONENT_ID> remaining_dets;
-    for (size_t r = 0; !dets.empty(); r += inner_commit_size)
-    {
-    }
-}
-
-/////////////////////////////////////////////////////
-/////////////////////////////////////////////////////
-
-void
-EPR_PYMATCHING::decode_outer(std::vector<GRAPH_COMPONENT_ID> dets, syndrome_ref obs, std::ostream& debug_strm)
-{
-    std::vector<uint64_t> detection_events(dets.size());
-    std::copy(dets.begin(), dets.end(), detection_events.begin());
-
-    pm::decode_detection_events(outer_mwpm, detection_events, obs.u8, w, false);
 }
 
 /////////////////////////////////////////////////////
