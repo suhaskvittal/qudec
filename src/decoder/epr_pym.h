@@ -28,31 +28,69 @@
 class EPR_PYMATCHING
 {
 public:
-    constexpr size_t GLOBAL_DETECTOR_COORD_IDX{2};
+    constexpr static size_t BASE_DETECTOR_IDX{2};
+    constexpr static size_t SUPER_ROUND_IDX{3};
+    constexpr static size_t SUB_ROUND_IDX{4};
 
-    using detector_map = std::unordered_map<GRAPH_COMPONENT_ID, GRAPH_COMPONENT_ID>;
+    struct detector_info
+    {
+        GRAPH_COMPONENT_ID inner_id;
+        GRAPH_COMPONENT_ID outer_id;
+    };
 
+    using detector_info_map_type = std::unordered_map<GRAPH_COMPONENT_ID, detector_info>;
+
+    const stim::Circuit& global_circuit;
     const stim::Circuit& inner_circuit;
     const stim::Circuit& outer_circuit;
 private:
+    size_t num_super_rounds;
+    size_t num_sub_rounds_per_super_round;
+    
+    size_t outer_detectors_per_round;
+    size_t inner_detectors_per_round;
+    size_t total_detectors_per_super_round;
+
     std::unique_ptr<SLIDING_PYMATCHING> dec_inner;
     std::unique_ptr<PYMATCHING>         dec_outer;
 
-    detector_map m_inner_to_outer;
-    detector_map m_global_to_inner;
-    detector_map m_global_to_outer;
+    detector_info_map_type m_detector_info;
 
     std::unordered_set<GRAPH_COMPONENT_ID> do_not_commit_boundary_edges_set;
 public:
-    EPR_PYMATCHING(const stim::Circuit& inner, 
+    EPR_PYMATCHING(const stim::Circuit& global,
+                    const stim::Circuit& inner, 
                     const stim::Circuit& outer,
-                    size_t inner_commit_size,
-                    size_t inner_window_size,
-                    size_t inner_detectors_per_round,
-                    size_t inner_total_rounds);
+                    size_t num_super_rounds.
+                    size_t num_sub_rounds_per_super_round);
 
     DECODER_RESULT decode(std::vector<GRAPH_COMPONENT_ID>, std::ostream& debug_strm);
+private:
+    std::optional<size_t> get_inner_syndrome_detector_idx(size_t global_detector_idx);
 };
+
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
+// helper function for initializing `m_detector_info`:
+template <class UPDATE_CALLBACK> void
+read_first_round_of_detectors(const stim::Circuit& circ, const UPDATE_CALLBACK& cb)
+{
+    // only need first round of syndromes from each circuit:
+    for (size_t i = 0; i < circ.count_detectors(); i++)
+    {
+        const auto coords = circ.coords_of_detector(i);
+        size_t overall_round = static_cast<size_t>(coords[1]),
+               base = static_cast<size_t>(coords[EPR_PYMATCHING::BASE_DETECTOR_IDX]),
+               super_round_idx = static_cast<size_t>(coords[EPR_PYMATCHING::SUPER_ROUND_IDX]),
+               sub_round_idx = static_cast<size_t>(coords[EPR_PYMATCHING::SUB_ROUND_IDX]);
+        
+        if (overall_round > 0)
+            continue;
+
+        cb(i, base, super_round_idx, sub_round_idx);
+    }
+}
 
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////

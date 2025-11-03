@@ -109,6 +109,7 @@ SLIDING_PYMATCHING::decode_window(syndrome_ref syndrome,
     }
     
     // run pymatching and get matched edges
+    mwpm.reset();
     std::vector<int64_t> edges;
     pm::decode_detection_events_to_edges(mwpm, window_dets, edges);
 

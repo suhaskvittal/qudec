@@ -53,6 +53,8 @@ main(int argc, char* argv[])
     int64_t     hw2_round_ns;
     double      phys_error;
 
+    bool same_hw_epr;
+
     ARGPARSE()
         .optional("-d", "--code-distance", "code distance", code_distance, 3)
         .optional("-r", "--rounds", "number of rounds", num_rounds, 9)
@@ -69,6 +71,9 @@ main(int argc, char* argv[])
         
         // decoding:
         .optional("-dd", "--debug-decoder", "set flag debug decoder flag", GL_DEBUG_DECODER, false)
+
+        // other:
+        .optional("", "--same-hw-epr", "use same hardware for EPR generation", same_hw_epr, false)
     
         .parse(argc, argv);
 
@@ -92,7 +97,15 @@ main(int argc, char* argv[])
     write_stim_circuit_to_file("second_pass.stim.out", second_pass);
 
     DECODER_EVAL_CONFIG eval_config{.stop_at_k_errors = static_cast<uint64_t>(num_errors)};
-    DECODER_STATS stats = eval_decoder<PYMATCHING>(circuit, num_trials, eval_config, circuit);
+    DECODER_STATS stats;
+    if (same_hw_epr)
+    {
+        stats = eval_decoder<PYMATCHING>(second_pass, num_trials, eval_config, second_pass);
+    }
+    else
+    {
+        stats = eval_decoder<PYMATCHING>(circuit, num_trials, eval_config, circuit);
+    }
 
     // Calculate and print results
     double ler = fpdiv(stats.errors, stats.trials);

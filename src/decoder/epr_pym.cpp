@@ -8,53 +8,53 @@
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
 
-void
-_init_detector_map_from_circuit(EPR_PYMATCHING::detector_map& m, const stim::Circuit& circuit)
-{
-    for (size_t i = 0; i < circuit.count_detectors(); i++)
-    {
-        const auto coords = circuit.coords_of_detector(i);
-        if (EPR_PYMATCHING::GLOBAL_DETECTOR_COORD_IDX < coords.size())
-        {
-            const auto global_id = static_cast<GRAPH_COMPONENT_ID>(coords[EPR_PYMATCHING::GLOBAL_DETECTOR_COORD_IDX]);
-            m[global_id] = static_cast<GRAPH_COMPONENT_ID>(i);
-        }
-    }
-}
-
-EPR_PYMATCHING::EPR_PYMATCHING(const stim::Circuit& inner, 
+EPR_PYMATCHING::EPR_PYMATCHING(const stim::Circuit& global,
+                                const stim::Circuit& inner, 
                                 const stim::Circuit& outer,
-                                size_t inner_commit_size,
-                                size_t inner_window_size,
-                                size_t inner_detectors_per_round,
-                                size_t inner_total_rounds)
-    :inner_circuit(inner),
+                                size_t code_distance,
+                                size_t _num_super_rounds,
+                                size_t _num_sub_rounds_per_super_round)
+    :global_circuit(global),
+    inner_circuit(inner),
     outer_circuit(outer),
-    dec_inner{new SLIDING_PYMATCHING(inner, inner_commit_size, inner_window_size, inner_detectors_per_round, inner_total_rounds)},
-    dec_outer{new PYMATCHING(outer)}
+    num_super_rounds(_num_super_rounds),
+    num_sub_rounds_per_super_round(_num_sub_rounds_per_super_round)
 {
-    // initialize detector maps:
+    // initialize detector map:
 
-    // Get detector counts for both circuits
-    const size_t inner_detector_count = inner_circuit.count_detectors();
-    const size_t outer_detector_count = outer_circuit.count_detectors();
+    read_first_round_of_detectors(outer,
+            [this] (auto d, auto base, auto super_round, auto sub_round) 
+            {
+                if (this->m_detector_info.count(base))
+                {
+                    throw std::runtime_error("EPR_PYMATCHING: duplicate base detector: " + std::to_string(base));
+                }
+                this->m_detector_info[base].outer_id = d;
+                this->outer_detectors_per_round++;
+            });
 
-    // Build global_to_inner map
-    _init_detector_map_from_circuit(m_global_to_inner, inner_circuit);
-    _init_detector_map_from_circuit(m_global_to_outer, outer_circuit);
+    read_first_round_of_detectors(inner,
+            [this] (auto d, auto base, auto super_round, auto sub_round) 
+            {
+                if (!this->m_detector_info.count(base))
+                {
+                    throw std::runtime_error("EPR_PYMATCHING: no detector in outer circuit for base: " 
+                                                + std::to_string(base));
+                }
+                this->m_detector_info[base].inner_id = d;
+                this->inner_detectors_per_round++;
+            });
 
-    // Build inner_to_outer map by matching global detector IDs
-    for (const auto& [global_id, inner_id] : m_global_to_inner) 
-    {
-        const auto outer_it = m_global_to_outer.find(global_id);
-        if (outer_it != m_global_to_outer.end()) 
-        {
-            m_inner_to_outer[inner_id] = outer_it->second;
+    // initialize remaining fields:
+    total_detectors_per_super_round = inner_detectors_per_round*num_sub_rounds_per_super_round
+                                        + outer_detectors_per_round;
 
-            // only add inner detectors that correspond to some outer detector to this set:
-            do_not_commit_boundary_edges_set.insert(inner_id);
-        }
-    }
+    dec_inner = std::make_unique<SLIDING_PYMATCHING>(inner, 
+                                                    code_distance,
+                                                    2*code_distance,
+                                                    inner_detectors_per_round,
+                                                    num_sub_rounds_per_super_round+1);
+    dec_outer = std::make_unique<PYMATCHING>(outer);
 }
 
 /////////////////////////////////////////////////////
@@ -65,37 +65,53 @@ EPR_PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug
 {
     DECODER_RESULT result;
 
-    // split syndrome into inner and outer parts:
-    syndrome_type inner_s(inner_circuit.count_detectors()),
-                  outer_s(outer_circuit.count_detectors());
+    syndrome_type s_outer(outer_detectors_per_round * (num_super_rounds+1));
+    s_outer.clear();
 
-    inner_s.clear();
-    outer_s.clear();
-
-    for (auto d : dets)
+    // decode the sub rounds of each super round in a first pass:
+    // note that there are `num_super_rounds-1` epochs of sub-rounds:
+    for (size_t sr = 0; sr < num_super_rounds-1; sr++)
     {
-        const auto inner_it = m_global_to_inner.find(d);
-        if (inner_it != m_global_to_inner.end())
-            inner_s[inner_it->second] ^= 1;
-        else
-            outer_s[m_global_to_outer.at(d)] ^= 1;
-    }
+        syndrome_type s_inner(inner_detectors_per_round * (num_sub_rounds_per_super_round+1));
+        s_inner.clear();
 
-    // decode inner part first:
-    SLIDING_PYMATCHING::decode_options opts;
-    opts.do_not_commit_boundary_edges_set = do_not_commit_boundary_edges_set;
-    dec_inner->decode_and_update_inplace(inner_s, result.flipped_observables, debug_strm);
+        size_t d_min = total_detectors_per_super_round * sr,
+               d_max = total_detectors_per_super_round * (sr+1);
 
-    // move r=maining syndrome bits from inner to outer (also make detector list)
-    for (size_t i = 0; i < inner_s.num_bits_padded(); i++)
-    {
-        if (inner_s[i])
-            outer_s[m_inner_to_outer.at(i)] ^= 1;
+        auto d_begin = std::find_if(dets.begin(), dets.end(), [d_min] (auto d) { return d >= d_min; });
+        auto d_end = std::find_if(d_begin, dets.end(), [d_max] (auto d) { return d >= d_max; });
+
+        std::for_each(d_begin, d_end,
+                [this, &s_inner] (auto d)
+                {
+                    auto idx = this->get_inner_syndrome_detector_idx(d);
+                    if (idx.has_value())
+                        s_inner[*idx] ^= 1;
+                });
+        
+        SLIDING_PYMATCHING::decode_options opts;
+        opts.do_not_commit_boundary_edges_set = do_not_commit_boundary_edges_set;
+        dec_inner->decode_and_update_inplace(s_inner, result.flipped_observables, debug_strm, opts);
+
+        // move remaining bits from inner to outer:
+        size_t nonzero_bits = s_inner.popcount();
+        for (auto it = d_begin; it != d_end && nonzero_bits > 0; ++it)
+        {
+            auto idx = get_inner_syndrome_detector_idx(*it);
+            if (idx.has_value() && s_inner[*idx])
+            {
+                nonzero_bits--;
+
+                // update `s_outer`:
+                size_t outer_idx = m_detector_info.at(*it).outer_id + outer_detectors_per_round*sr;
+                s_outer[outer_idx] ^= 1;
+            }
+        }
     }
 
     // convert to detector list:
     std::vector<GRAPH_COMPONENT_ID> outer_dets;
-    for (size_t i = 0; i < outer_s.num_bits_padded(); i++)
+    for (size_t i = 0; i < s_outer.num_bits_padded(); i++)
     {
         if (outer_s[i])
             outer_dets.push_back(i);
@@ -106,6 +122,23 @@ EPR_PYMATCHING::decode(std::vector<GRAPH_COMPONENT_ID> dets, std::ostream& debug
     result.flipped_observables ^= outer_result.flipped_observables;
 
     return result;
+}
+
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
+std::optional<size_t>
+EPR_PYMATCHING::get_inner_syndrome_detector_idx(size_t global_detector_idx)
+{
+    const auto coords = this->global_circuit.coords_of_detector(global_detector_idx);
+    size_t base = static_cast<size_t>(coords[BASE_DETECTOR_IDX]),
+           sub_round_idx = static_cast<size_t>(coords[SUB_ROUND_IDX]);
+
+    if (m_detector_info.at(base).inner_id < 0)
+        return std::nullopt;
+
+    size_t idx = m_detector_info.at(base).inner_id + inner_detectors_per_round*sub_round_idx;
+    return std::make_optional(idx);
 }
 
 /////////////////////////////////////////////////////

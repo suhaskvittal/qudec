@@ -212,7 +212,7 @@ sc_epr_generation(const EPR_GEN_CONFIG& config, size_t rounds, size_t distance, 
                                                             e_g1q, 
                                                             e_g2q, 
                                                             e_idle, 
-                                                            config.attenuation_rate);
+                                                            config.photonic_link_error);
     // note `super_round` has the same operations as `first_round`
     super_round = first_round;
     last_round = first_round.without_noise();
@@ -373,6 +373,8 @@ sc_epr_generation(const EPR_GEN_CONFIG& config, size_t rounds, size_t distance, 
 #if !defined(EPR_ONLY_ONE_HW1_ROUND)
     composite_round += hw1_only_main_round * (num_hw1_rounds_per_super_round-1);
 #endif
+    // shift super-round idx and super-round idx back
+    composite_round.safe_append_u("SHIFT_COORDS", {}, {0,1,0,1,-static_cast<int>(num_hw1_rounds_per_super_round)});
     composite_round += super_round;
 
     stim::Circuit fin;
@@ -692,9 +694,9 @@ sc_epr_create_detection_events_super_round(stim::Circuit& circuit,
             }
         }
 
-        circuit.safe_append_u("DETECTOR", targets, {i,0});
+        circuit.safe_append_u("DETECTOR", targets, {i,0,q});
     }
-    circuit.safe_append_u("SHIFT_COORDS", {}, {0,1});
+    circuit.safe_append_u("SHIFT_COORDS", {}, {0,1,0,0,1});  // shift sub-round idx
     circuit.safe_append_u("TICK", {});
 }
 
@@ -721,7 +723,7 @@ sc_epr_create_detection_events_adjacent_hw1_rounds(stim::Circuit& circuit,
         uint32_t base_meas_id = (n_check_meas_this_round - meas_idx_this_round) 
                                     | stim::TARGET_RECORD_BIT;
 
-        std::vector<uint32_t> targets;
+        std::vector<uint32_t> targets{base_meas_id};
 
         if (cm_prev_round.count(q))
         {
@@ -731,9 +733,9 @@ sc_epr_create_detection_events_adjacent_hw1_rounds(stim::Circuit& circuit,
             targets.push_back(prev_meas_id);
         }
 
-        circuit.safe_append_u("DETECTOR", targets, {i,0});
+        circuit.safe_append_u("DETECTOR", targets, {i,0,q});
     }
-    circuit.safe_append_u("SHIFT_COORDS", {}, {0,1});
+    circuit.safe_append_u("SHIFT_COORDS", {}, {0,1,0,0,1});  // shift sub-round idx
     circuit.safe_append_u("TICK", {});
 }
 
@@ -785,7 +787,7 @@ sc_epr_create_detection_events_generic(stim::Circuit& circuit,
                 targets.push_back(prev_meas_id);
         }
 
-        circuit.safe_append_u("DETECTOR", targets, {i,0});
+        circuit.safe_append_u("DETECTOR", targets, {i,0,q});
     }
     circuit.safe_append_u("SHIFT_COORDS", {}, {0,1});
     circuit.safe_append_u("TICK", {});
