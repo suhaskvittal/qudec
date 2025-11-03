@@ -122,7 +122,7 @@ SC_EPR_SCHEDULE_INFO::SC_EPR_SCHEDULE_INFO(size_t d, bool dual)
 //////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////
 
-sc_epr_gen_output_type
+SC_EPR_GEN_OUTPUT
 sc_epr_generation(const EPR_GEN_CONFIG& config, size_t rounds, size_t distance, bool do_memory_experiment)
 {
     // merged surface code has asymmetric distance for ZZ measurement
@@ -399,7 +399,7 @@ sc_epr_generation(const EPR_GEN_CONFIG& config, size_t rounds, size_t distance, 
     second_pass += sp_last_round;
     second_pass += epilog;
 
-    return sc_epr_gen_output_type{fin, first_pass, second_pass};
+    return {fin, first_pass, second_pass, num_super_rounds, num_hw1_rounds_per_super_round};
 }
 
 //////////////////////////////////////////////////////////////////
@@ -694,7 +694,7 @@ sc_epr_create_detection_events_super_round(stim::Circuit& circuit,
             }
         }
 
-        circuit.safe_append_u("DETECTOR", targets, {i,0,q});
+        circuit.safe_append_u("DETECTOR", targets, {i,0,q,0,0});
     }
     circuit.safe_append_u("SHIFT_COORDS", {}, {0,1,0,0,1});  // shift sub-round idx
     circuit.safe_append_u("TICK", {});
@@ -733,7 +733,7 @@ sc_epr_create_detection_events_adjacent_hw1_rounds(stim::Circuit& circuit,
             targets.push_back(prev_meas_id);
         }
 
-        circuit.safe_append_u("DETECTOR", targets, {i,0,q});
+        circuit.safe_append_u("DETECTOR", targets, {i,0,q,0,0});
     }
     circuit.safe_append_u("SHIFT_COORDS", {}, {0,1,0,0,1});  // shift sub-round idx
     circuit.safe_append_u("TICK", {});
@@ -787,7 +787,7 @@ sc_epr_create_detection_events_generic(stim::Circuit& circuit,
                 targets.push_back(prev_meas_id);
         }
 
-        circuit.safe_append_u("DETECTOR", targets, {i,0,q});
+        circuit.safe_append_u("DETECTOR", targets, {i,0,q,1,0});
     }
     circuit.safe_append_u("SHIFT_COORDS", {}, {0,1});
     circuit.safe_append_u("TICK", {});

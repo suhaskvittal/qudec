@@ -31,6 +31,8 @@ public:
     {
         // do not commit any boundary edges for detectors in this set:
         std::unordered_set<GRAPH_COMPONENT_ID> do_not_commit_boundary_edges_set{};
+
+        bool do_not_commit_any_boundary_edges{false};
     };
 
     using window_bounds_type = std::tuple<GRAPH_COMPONENT_ID, GRAPH_COMPONENT_ID, GRAPH_COMPONENT_ID>;

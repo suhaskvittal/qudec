@@ -138,7 +138,8 @@ SLIDING_PYMATCHING::decode_window(syndrome_ref syndrome,
             continue;  // Skip edges entirely outside commit region
         }
 
-        if (opts.do_not_commit_boundary_edges_set.count(true_node1))
+        if ((opts.do_not_commit_any_boundary_edges || opts.do_not_commit_boundary_edges_set.count(true_node1))
+            && node2 < 0)
         {
             if (GL_DEBUG_DECODER)
             {

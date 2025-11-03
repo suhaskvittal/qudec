@@ -52,9 +52,17 @@ struct SC_EPR_SCHEDULE_INFO
 //////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////
 
-using sc_epr_gen_output_type = std::tuple<stim::Circuit, stim::Circuit, stim::Circuit>;
+struct SC_EPR_GEN_OUTPUT
+{
+    stim::Circuit circuit;
+    stim::Circuit first_pass;
+    stim::Circuit second_pass;
 
-sc_epr_gen_output_type sc_epr_generation(const EPR_GEN_CONFIG&, size_t rounds, size_t distance, bool do_memory_experiment);
+    size_t num_super_rounds;
+    size_t num_hw1_rounds_per_super_round;
+};
+
+SC_EPR_GEN_OUTPUT sc_epr_generation(const EPR_GEN_CONFIG&, size_t rounds, size_t distance, bool do_memory_experiment);
 
 //////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////

@@ -42,11 +42,13 @@ set(QUDEC_FILES
     src/decoding_graph.cpp
     src/decoder/surface_code.cpp
     src/decoder/sliding_pym.cpp
+    src/decoder/epr_pym.cpp
     src/io/dem.cpp
     src/gen.cpp
     src/gen/epr.cpp
     src/gen/scheduling.cpp
     src/gen/utils.cpp
+    src/globals.cpp
 )
 
 ###################################################

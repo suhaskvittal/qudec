@@ -6,6 +6,7 @@
  * */
 
 #include "argparse.h"
+#include "decoder/epr_pym.h"
 #include "decoder/surface_code.h"
 #include "decoder_eval.h"
 #include "gen/epr.h"
@@ -15,8 +16,6 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-
-bool GL_DEBUG_DECODER{false};
 
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
@@ -53,7 +52,9 @@ main(int argc, char* argv[])
     int64_t     hw2_round_ns;
     double      phys_error;
 
-    bool same_hw_epr;
+    int64_t eval_mode;  // 0 = use pymatching on global,
+                        // 1 = use dual pass
+                        // -1 = evaluate single hardware EPR only.
 
     ARGPARSE()
         .optional("-d", "--code-distance", "code distance", code_distance, 3)
@@ -71,9 +72,10 @@ main(int argc, char* argv[])
         
         // decoding:
         .optional("-dd", "--debug-decoder", "set flag debug decoder flag", GL_DEBUG_DECODER, false)
+        .optional("-v", "--verbose", "set flag for verbose EPR_PYMATCHING", GL_EPR_PYMATCHING_VERBOSE, false)
 
         // other:
-        .optional("", "--same-hw-epr", "use same hardware for EPR generation", same_hw_epr, false)
+        .optional("-m", "--mode", "0 = global, 1 = dual pass, -1 = single hardware EPR", eval_mode, 0)
     
         .parse(argc, argv);
 
@@ -88,23 +90,62 @@ main(int argc, char* argv[])
     circuit_config.phys_error = phys_error;
 
     // Generate the EPR-based surface code circuit
-    auto [circuit, first_pass, second_pass] = 
-            gen::sc_epr_generation(circuit_config, num_rounds, code_distance, do_memory_experiment);
+    auto gen_out = gen::sc_epr_generation(circuit_config, num_rounds, code_distance, do_memory_experiment);
+
+    std::cout << "super rounds per round = " << gen_out.num_super_rounds 
+            << ", hw1 rounds per super round = " << gen_out.num_hw1_rounds_per_super_round << "\n";
 
     // Write circuit to output file
-    write_stim_circuit_to_file("generated.stim.out", circuit);
-    write_stim_circuit_to_file("first_pass.stim.out", first_pass);
-    write_stim_circuit_to_file("second_pass.stim.out", second_pass);
+    write_stim_circuit_to_file("generated.stim.out", gen_out.circuit);
+    write_stim_circuit_to_file("first_pass.stim.out", gen_out.first_pass);
+    write_stim_circuit_to_file("second_pass.stim.out", gen_out.second_pass);
 
     DECODER_EVAL_CONFIG eval_config{.stop_at_k_errors = static_cast<uint64_t>(num_errors)};
     DECODER_STATS stats;
-    if (same_hw_epr)
+    if (eval_mode == 0)
     {
-        stats = eval_decoder<PYMATCHING>(second_pass, num_trials, eval_config, second_pass);
+        stats = eval_decoder<PYMATCHING>(gen_out.circuit, num_trials, eval_config, gen_out.circuit);
     }
-    else
+    else if (eval_mode == -1)
     {
-        stats = eval_decoder<PYMATCHING>(circuit, num_trials, eval_config, circuit);
+        stats = eval_decoder<PYMATCHING>(gen_out.second_pass, num_trials, eval_config, gen_out.second_pass);
+    }
+    else if (eval_mode == 1)
+    {
+        PYMATCHING reference_decoder(gen_out.circuit);
+        EPR_PYMATCHING decoder(gen_out.circuit,
+                                gen_out.first_pass,
+                                gen_out.second_pass,
+                                code_distance,
+                                gen_out.num_super_rounds,
+                                gen_out.num_hw1_rounds_per_super_round);
+                                
+        stats = benchmark_decoder(gen_out.circuit, decoder, num_trials,
+                                [&reference_decoder] 
+                                (syndrome_ref dets, syndrome_ref, syndrome_ref pred, std::ostream& debug_strm)
+                                {
+                                    std::vector<GRAPH_COMPONENT_ID> detectors;
+                                    for (size_t i = 0; i < dets.num_bits_padded(); i++)
+                                    {
+                                        if (dets[i])
+                                            detectors.push_back(static_cast<GRAPH_COMPONENT_ID>(i));
+                                    }
+
+                                    auto result = reference_decoder.decode(detectors, debug_strm);
+
+                                    bool mismatch{false};
+                                    debug_strm << "reference prediction:";
+                                    for (size_t i = 0; i < result.flipped_observables.num_bits_padded(); i++)
+                                    {
+                                        if (result.flipped_observables[i])
+                                            debug_strm << " " << i;
+                                        
+                                        mismatch |= (result.flipped_observables[i] != pred[i]);
+                                    }
+                                    debug_strm << "\n";
+
+                                    return mismatch;
+                                }, eval_config);
     }
 
     // Calculate and print results

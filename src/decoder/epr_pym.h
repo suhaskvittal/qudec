@@ -6,6 +6,14 @@
 #ifndef DECODER_EPR_PYM_h
 #define DECODER_EPR_PYM_h
 
+#include "decoder/sliding_pym.h"
+#include "decoder/surface_code.h"
+
+#include <memory>
+#include <optional>
+
+extern bool GL_EPR_PYMATCHING_VERBOSE;
+
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
 
@@ -34,7 +42,7 @@ public:
 
     struct detector_info
     {
-        GRAPH_COMPONENT_ID inner_id;
+        GRAPH_COMPONENT_ID inner_id{-1};
         GRAPH_COMPONENT_ID outer_id;
     };
 
@@ -47,8 +55,8 @@ private:
     size_t num_super_rounds;
     size_t num_sub_rounds_per_super_round;
     
-    size_t outer_detectors_per_round;
-    size_t inner_detectors_per_round;
+    size_t outer_detectors_per_round{};
+    size_t inner_detectors_per_round{};
     size_t total_detectors_per_super_round;
 
     std::unique_ptr<SLIDING_PYMATCHING> dec_inner;
@@ -61,13 +69,20 @@ public:
     EPR_PYMATCHING(const stim::Circuit& global,
                     const stim::Circuit& inner, 
                     const stim::Circuit& outer,
-                    size_t num_super_rounds.
+                    size_t code_distance,
+                    size_t num_super_rounds,
                     size_t num_sub_rounds_per_super_round);
 
     DECODER_RESULT decode(std::vector<GRAPH_COMPONENT_ID>, std::ostream& debug_strm);
 private:
     std::optional<size_t> get_inner_syndrome_detector_idx(size_t global_detector_idx);
+    size_t get_outer_syndrome_detector_idx(size_t global_detector_idx);
 };
+
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
+void concat_debug_strm(std::ostream& target, std::stringstream& source, size_t tab_count);
 
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
