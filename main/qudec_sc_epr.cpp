@@ -21,6 +21,22 @@ bool GL_DEBUG_DECODER{false};
 /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////
 
+void
+write_stim_circuit_to_file(std::string_view filename, const stim::Circuit& circuit)
+{
+    std::ofstream out(std::string{filename});
+    if (!out.is_open())
+    {
+        std::cerr << "Error: Could not open output file " << filename << std::endl;
+        return;
+    }
+    out << circuit.str() << "\n";
+    out.close();
+}
+
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
 int
 main(int argc, char* argv[])
 {
@@ -36,8 +52,6 @@ main(int argc, char* argv[])
     int64_t     hw1_round_ns;
     int64_t     hw2_round_ns;
     double      phys_error;
-    
-    std::string generated_stim_output_file;
 
     ARGPARSE()
         .optional("-d", "--code-distance", "code distance", code_distance, 3)
@@ -53,8 +67,6 @@ main(int argc, char* argv[])
         .optional("-hw2", "--hw2-round-ns", "HW2 round time in ns", hw2_round_ns, 1'200'000)
         .optional("-p", "--phys-error", "physical error rate", phys_error, 1e-3)
         
-        // output file:
-        .optional("-o", "--output", "output file for generated stim circuit", generated_stim_output_file, "generated.stim.out")
         // decoding:
         .optional("-dd", "--debug-decoder", "set flag debug decoder flag", GL_DEBUG_DECODER, false)
     
@@ -71,18 +83,13 @@ main(int argc, char* argv[])
     circuit_config.phys_error = phys_error;
 
     // Generate the EPR-based surface code circuit
-    stim::Circuit circuit = gen::sc_epr_generation(circuit_config, num_rounds, code_distance, do_memory_experiment);
+    auto [circuit, first_pass, second_pass] = 
+            gen::sc_epr_generation(circuit_config, num_rounds, code_distance, do_memory_experiment);
 
     // Write circuit to output file
-    std::ofstream out(generated_stim_output_file);
-    if (!out.is_open())
-    {
-        std::cerr << "Error: Could not open output file " << generated_stim_output_file << std::endl;
-        return 1;
-    }
-    
-    out << circuit.str() << "\n";
-    out.close();
+    write_stim_circuit_to_file("generated.stim.out", circuit);
+    write_stim_circuit_to_file("first_pass.stim.out", first_pass);
+    write_stim_circuit_to_file("second_pass.stim.out", second_pass);
 
     DECODER_EVAL_CONFIG eval_config{.stop_at_k_errors = static_cast<uint64_t>(num_errors)};
     DECODER_STATS stats = eval_decoder<PYMATCHING>(circuit, num_trials, eval_config, circuit);

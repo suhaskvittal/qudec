@@ -52,9 +52,12 @@ struct SC_EPR_SCHEDULE_INFO
 //////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////
 
-constexpr size_t epr_get_qubit_count(size_t d) { return 2*(d+1)*d - 1 + d + (d+1) + d; }
+using sc_epr_gen_output_type = std::tuple<stim::Circuit, stim::Circuit, stim::Circuit>;
 
-stim::Circuit sc_epr_generation(const EPR_GEN_CONFIG&, size_t rounds, size_t distance, bool do_memory_experiment);
+sc_epr_gen_output_type sc_epr_generation(const EPR_GEN_CONFIG&, size_t rounds, size_t distance, bool do_memory_experiment);
+
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
 
 util::check_meas_map sc_epr_create_super_round(stim::Circuit&, 
                                                 const SC_EPR_SCHEDULE_INFO&,
@@ -68,7 +71,8 @@ util::check_meas_map sc_epr_create_super_round(stim::Circuit&,
                                                 double e_g1q,
                                                 double e_g2q,
                                                 double e_idle,
-                                                double e_photonic_link);
+                                                double e_photonic_link,
+                                                double hw1_error_scale_factor=1.0);
 
 util::check_meas_map sc_epr_create_hw1_only_circuit(stim::Circuit&, 
                                                         const SC_EPR_SCHEDULE_INFO&,
@@ -80,6 +84,13 @@ util::check_meas_map sc_epr_create_hw1_only_circuit(stim::Circuit&,
                                                         double e_g2q,
                                                         double e_idle);
 
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+
+/*
+ * These are specialized functions for creating detection events for the EPR generation circuit.
+ * */
+
 void sc_epr_create_detection_events_super_round(stim::Circuit&,
                                                     const util::stim_qubit_array&,
                                                     const util::check_meas_map& cm_super_round,
@@ -88,15 +99,27 @@ void sc_epr_create_detection_events_super_round(stim::Circuit&,
                                                     bool is_first_round,
                                                     const SC_EPR_SCHEDULE_INFO&);
 
-void sc_epr_create_detection_events_adjacent_rounds(stim::Circuit&, 
+void sc_epr_create_detection_events_adjacent_hw1_rounds(stim::Circuit&, 
                                                     const util::stim_qubit_array&,
                                                     const util::check_meas_map& cm_this_round,
                                                     const util::check_meas_map& cm_prev_round,
                                                     const SC_EPR_SCHEDULE_INFO&);
 
-void sc_epr_create_detection_events_last_round(stim::Circuit&, 
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+
+/*
+ * `sc_epr_create_detection_events_generic` is a generic function that only creates detection events
+ * for checks in `cm` and `checks`. The previous round is assumed to measure the same checks.
+ *
+ * This is considered "generic" as this is usually how detection events are created (outside of this
+ * EPR generation circuit).
+ * */
+
+void sc_epr_create_detection_events_generic(stim::Circuit&, 
                                                 const util::stim_qubit_array&,
-                                                const util::check_meas_map& cm_super_round,
+                                                const util::check_meas_map& cm,
+                                                bool is_first_round,
                                                 const SC_EPR_SCHEDULE_INFO&);
 
 //////////////////////////////////////////////////////////////////

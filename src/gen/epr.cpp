@@ -122,7 +122,7 @@ SC_EPR_SCHEDULE_INFO::SC_EPR_SCHEDULE_INFO(size_t d, bool dual)
 //////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////
 
-stim::Circuit
+sc_epr_gen_output_type
 sc_epr_generation(const EPR_GEN_CONFIG& config, size_t rounds, size_t distance, bool do_memory_experiment)
 {
     // merged surface code has asymmetric distance for ZZ measurement
@@ -163,8 +163,6 @@ sc_epr_generation(const EPR_GEN_CONFIG& config, size_t rounds, size_t distance, 
 #else
     size_t num_hw1_rounds_per_super_round = static_cast<size_t>(std::ceil(latency_diff)) - 1;
 #endif
-
-    std::cout << "num hw1 rounds = " << num_hw1_rounds_per_super_round << "\n";
      
     // now that have completed initializing all data structures: create the circuit
     // note stability experiment will not use error free rounds
@@ -175,6 +173,10 @@ sc_epr_generation(const EPR_GEN_CONFIG& config, size_t rounds, size_t distance, 
                     last_round, 
                     super_round, 
                     epilog;
+
+    // decoder circuits:
+    stim::Circuit fp_first_round, fp_main_round, fp_last_round;
+    stim::Circuit sp_first_round, sp_main_round, sp_last_round;
 
     // prolog: add coordinates:
     for (const auto& [q, coord] : epr.qubit_coords)
@@ -227,6 +229,27 @@ sc_epr_generation(const EPR_GEN_CONFIG& config, size_t rounds, size_t distance, 
                                                                     e_idle);
     hw1_only_main_round = hw1_only_first_round;
 
+    // decoder first pass circuit is like hw1 only
+    fp_first_round = hw1_only_first_round;
+    fp_main_round = hw1_only_main_round;
+
+    // decoder second pass circuit only has super rounds, but error of hw1 needs to be reduced
+    sc_epr_create_super_round(sp_first_round,
+                                epr, 
+                                config.hw1_round_ns,
+                                config.hw2_round_ns,
+                                t1_ns_hw1, 
+                                t2_ns_hw1, 
+                                t1_ns_hw2, 
+                                t2_ns_hw2, 
+                                e_readout, 
+                                e_g1q, 
+                                e_g2q, 
+                                e_idle, 
+                                config.attenuation_rate,
+                                1.0 / latency_diff);
+    sp_main_round = sp_first_round;
+
     // create detection events:
     const auto& det_checks = do_memory_experiment ? epr.sc.x_check_qubits : epr.sc.z_check_qubits;
     std::vector<stim_qubit_type> first_round_det_checks(det_checks);
@@ -239,8 +262,9 @@ sc_epr_generation(const EPR_GEN_CONFIG& config, size_t rounds, size_t distance, 
                                 });
         first_round_det_checks.erase(it, first_round_det_checks.end());
     }
+
+    // epr circuit detection events:
     
-    // only have first round detection events if doing memory experiment:
     sc_epr_create_detection_events_super_round(first_round, 
                                                 first_round_det_checks, 
                                                 super_check_meas_map, 
@@ -249,12 +273,12 @@ sc_epr_generation(const EPR_GEN_CONFIG& config, size_t rounds, size_t distance, 
                                                 true,
                                                 epr);
 
-    sc_epr_create_detection_events_adjacent_rounds(hw1_only_first_round, 
+    sc_epr_create_detection_events_adjacent_hw1_rounds(hw1_only_first_round, 
                                                     det_checks, 
                                                     hw1_only_check_meas_map, 
                                                     super_check_meas_map,
                                                     epr);
-    sc_epr_create_detection_events_adjacent_rounds(hw1_only_main_round, 
+    sc_epr_create_detection_events_adjacent_hw1_rounds(hw1_only_main_round, 
                                                     det_checks, 
                                                     hw1_only_check_meas_map, 
                                                     hw1_only_check_meas_map,
@@ -266,11 +290,40 @@ sc_epr_generation(const EPR_GEN_CONFIG& config, size_t rounds, size_t distance, 
                                                 num_hw1_rounds_per_super_round, 
                                                 false,
                                                 epr);
-
-    sc_epr_create_detection_events_last_round(last_round, 
+    sc_epr_create_detection_events_generic(last_round, 
                                                 det_checks, 
                                                 super_check_meas_map,
+                                                false,
                                                 epr);
+
+    // decoder pass circuit detection events:
+    //
+    // first pass is only hw1:
+    util::check_meas_map empty_meas_map{};
+    sc_epr_create_detection_events_generic(fp_first_round, 
+                                                det_checks, 
+                                                hw1_only_check_meas_map,
+                                                true,
+                                                epr);
+    sc_epr_create_detection_events_generic(fp_main_round, 
+                                                det_checks, 
+                                                hw1_only_check_meas_map,
+                                                false,
+                                                epr);
+    fp_last_round = fp_main_round.without_noise();
+
+    // second pass is only super rounds:
+    sc_epr_create_detection_events_generic(sp_first_round, 
+                                                det_checks, 
+                                                super_check_meas_map,
+                                                true,
+                                                epr);
+    sc_epr_create_detection_events_generic(sp_main_round, 
+                                                det_checks, 
+                                                super_check_meas_map,
+                                                false,
+                                                epr);
+    sp_last_round = sp_main_round.without_noise();
 
     // create epilog:
     epilog.safe_append_u("TICK", {});
@@ -330,7 +383,21 @@ sc_epr_generation(const EPR_GEN_CONFIG& config, size_t rounds, size_t distance, 
         fin += last_round;
     fin += epilog;
 
-    return fin;
+    stim::Circuit first_pass, second_pass;
+
+    first_pass += prolog;
+    first_pass += fp_first_round;
+    first_pass += fp_main_round * (2*distance);
+    first_pass += fp_last_round;
+    first_pass += epilog;
+
+    second_pass += prolog;
+    second_pass += sp_first_round;
+    second_pass += sp_main_round * (num_super_rounds-1);
+    second_pass += sp_last_round;
+    second_pass += epilog;
+
+    return sc_epr_gen_output_type{fin, first_pass, second_pass};
 }
 
 //////////////////////////////////////////////////////////////////
@@ -349,7 +416,8 @@ sc_epr_create_super_round(stim::Circuit& circuit,
                           double e_g1q,
                           double e_g2q,
                           double e_idle,
-                          double e_photonic_link)
+                          double e_photonic_link,
+                          double hw1_error_scale_factor)
 {
     std::vector<stim_qubit_type> all_qubits(epr.hw1_qubit_set.begin(), epr.hw1_qubit_set.end());
     all_qubits.insert(all_qubits.end(), epr.hw2_qubit_set.begin(), epr.hw2_qubit_set.end());
@@ -634,7 +702,7 @@ sc_epr_create_detection_events_super_round(stim::Circuit& circuit,
 //////////////////////////////////////////////////////////////////
 
 void
-sc_epr_create_detection_events_adjacent_rounds(stim::Circuit& circuit, 
+sc_epr_create_detection_events_adjacent_hw1_rounds(stim::Circuit& circuit, 
                                                 const util::stim_qubit_array& checks,
                                                 const util::check_meas_map& cm_this_round,
                                                 const util::check_meas_map& cm_prev_round,
@@ -649,15 +717,21 @@ sc_epr_create_detection_events_adjacent_rounds(stim::Circuit& circuit,
         if (epr.epr_checks.count(q) || !epr.hw1_qubit_set.count(q))
             continue;
 
-        uint32_t meas_idx_this_round = cm_this_round.at(q),
-                 meas_idx_prev_round = cm_prev_round.at(q);
-    
+        uint32_t meas_idx_this_round = cm_this_round.at(q);
         uint32_t base_meas_id = (n_check_meas_this_round - meas_idx_this_round) 
-                                    | stim::TARGET_RECORD_BIT,
-                 prev_meas_id = (n_check_meas_this_round+n_check_meas_prev_round - meas_idx_prev_round) 
                                     | stim::TARGET_RECORD_BIT;
 
-        circuit.safe_append_u("DETECTOR", {prev_meas_id, base_meas_id}, {i,0});
+        std::vector<uint32_t> targets;
+
+        if (cm_prev_round.count(q))
+        {
+            uint32_t meas_idx_prev_round = cm_prev_round.at(q);
+            uint32_t prev_meas_id = (n_check_meas_this_round+n_check_meas_prev_round - meas_idx_prev_round) 
+                                | stim::TARGET_RECORD_BIT;
+            targets.push_back(prev_meas_id);
+        }
+
+        circuit.safe_append_u("DETECTOR", targets, {i,0});
     }
     circuit.safe_append_u("SHIFT_COORDS", {}, {0,1});
     circuit.safe_append_u("TICK", {});
@@ -667,15 +741,19 @@ sc_epr_create_detection_events_adjacent_rounds(stim::Circuit& circuit,
 //////////////////////////////////////////////////////////////////
 
 void
-sc_epr_create_detection_events_last_round(stim::Circuit& circuit,
+sc_epr_create_detection_events_generic(stim::Circuit& circuit,
                                             const util::stim_qubit_array& checks,
-                                            const util::check_meas_map& cm_super_round,
+                                            const util::check_meas_map& cm,
+                                            bool is_first_round,
                                             const SC_EPR_SCHEDULE_INFO& epr)
 {
-    const uint32_t n_check_meas = cm_super_round.size();
+    const uint32_t n_check_meas = cm.size();
     for (size_t i = 0; i < checks.size(); i++)
     {
         auto q = checks.at(i);
+
+        if (!cm.count(q))
+            continue;
 
         std::vector<uint32_t> targets;
 
@@ -684,22 +762,27 @@ sc_epr_create_detection_events_last_round(stim::Circuit& circuit,
         {
             auto e = epr_it->second;
 
+            if (!cm.count(e))
+                continue;
+
             // detection event is the XOR of meausrements on `q` and `e`
             for (auto x : {q,e})
             {
-                size_t meas_idx = cm_super_round.at(x);
+                size_t meas_idx = cm.at(x);
                 uint32_t base_meas_id = (n_check_meas - meas_idx) | stim::TARGET_RECORD_BIT,
                          prev_meas_id = (2*n_check_meas - meas_idx) | stim::TARGET_RECORD_BIT;
                 targets.push_back(base_meas_id);
-                targets.push_back(prev_meas_id);
+                if (!is_first_round)
+                    targets.push_back(prev_meas_id);
             }
         }
         else
         {
-            uint32_t base_meas_id = (n_check_meas - cm_super_round.at(q)) | stim::TARGET_RECORD_BIT,
-                     prev_meas_id = (2*n_check_meas - cm_super_round.at(q)) | stim::TARGET_RECORD_BIT;
+            uint32_t base_meas_id = (n_check_meas - cm.at(q)) | stim::TARGET_RECORD_BIT,
+                     prev_meas_id = (2*n_check_meas - cm.at(q)) | stim::TARGET_RECORD_BIT;
             targets.push_back(base_meas_id);
-            targets.push_back(prev_meas_id);
+            if (!is_first_round)
+                targets.push_back(prev_meas_id);
         }
 
         circuit.safe_append_u("DETECTOR", targets, {i,0});
