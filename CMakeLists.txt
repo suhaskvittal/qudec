@@ -42,10 +42,8 @@ set(QUDEC_FILES
     src/decoding_graph.cpp
     src/decoder/surface_code.cpp
     src/decoder/sliding_pym.cpp
-    src/decoder/epr_pym.cpp
     src/io/dem.cpp
     src/gen.cpp
-    src/gen/epr.cpp
     src/gen/scheduling.cpp
     src/gen/utils.cpp
     src/globals.cpp
@@ -67,10 +65,6 @@ target_link_libraries(qudeclib PUBLIC libstim blossom5 libpymatching)
 add_executable(qudec main/qudec.cpp)
 target_compile_options(qudec PRIVATE ${COMPILE_OPTIONS})
 target_link_libraries(qudec PRIVATE qudeclib)
-
-add_executable(qudec_sc_epr main/qudec_sc_epr.cpp)
-target_compile_options(qudec_sc_epr PRIVATE ${COMPILE_OPTIONS})
-target_link_libraries(qudec_sc_epr PRIVATE qudeclib)
 
 add_executable(qudec_sw main/qudec_sliding_window.cpp)
 target_compile_options(qudec_sw PRIVATE ${COMPILE_OPTIONS})
