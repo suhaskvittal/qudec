@@ -29,24 +29,23 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 ###################################################
 
 # Add subdirectories for dependencies
-add_subdirectory(stim)
-add_subdirectory(blossom5)
-add_subdirectory(PyMatching)
+add_subdirectory(deps/stim)
+#add_subdirectory(blossom5)
+add_subdirectory(deps/PyMatching)
+
+option(ENABLE_MPI "Enable MPI parallelization" OFF)
+if(ENABLE_MPI)
+    find_package(MPI REQUIRED)
+endif()
 
 ###################################################
 # Source files
 ###################################################
 
 set(QUDEC_FILES
-    src/argparse.cpp
-    src/decoding_graph.cpp
+    src/sampler.cpp
+    src/decoder/logger.cpp
     src/decoder/surface_code.cpp
-    src/decoder/sliding_pym.cpp
-    src/io/dem.cpp
-    src/gen.cpp
-    src/gen/scheduling.cpp
-    src/gen/utils.cpp
-    src/globals.cpp
 )
 
 ###################################################
@@ -56,7 +55,11 @@ set(QUDEC_FILES
 add_library(qudeclib SHARED ${QUDEC_FILES})
 target_include_directories(qudeclib PUBLIC "src")
 target_compile_options(qudeclib PUBLIC ${COMPILE_OPTIONS})
-target_link_libraries(qudeclib PUBLIC libstim blossom5 libpymatching)
+target_link_libraries(qudeclib PUBLIC libstim libpymatching)
+if(ENABLE_MPI)
+    target_compile_definitions(qudeclib PUBLIC ENABLE_MPI)
+    target_link_libraries(qudeclib PUBLIC MPI::MPI_CXX)
+endif()
 
 ###################################################
 # Main executable
@@ -66,7 +69,4 @@ add_executable(qudec main/qudec.cpp)
 target_compile_options(qudec PRIVATE ${COMPILE_OPTIONS})
 target_link_libraries(qudec PRIVATE qudeclib)
 
-add_executable(qudec_sw main/qudec_sliding_window.cpp)
-target_compile_options(qudec_sw PRIVATE ${COMPILE_OPTIONS})
-target_link_libraries(qudec_sw PRIVATE qudeclib)
 
