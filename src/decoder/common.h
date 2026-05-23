@@ -17,6 +17,7 @@ namespace decoder
 using syndrome_type = stim::simd_bits<64>;
 using syndrome_ref = stim::simd_bits_range_ref<64>;
 using obs_type = syndrome_type;
+using obs_ref = syndrome_ref;
 
 /*
  * `result_type` is a generic result output that must

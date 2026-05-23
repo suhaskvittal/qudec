@@ -30,7 +30,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Add subdirectories for dependencies
 add_subdirectory(deps/stim)
-#add_subdirectory(blossom5)
+add_subdirectory(deps/blossom5)
 add_subdirectory(deps/PyMatching)
 
 option(ENABLE_MPI "Enable MPI parallelization" OFF)
@@ -46,6 +46,7 @@ set(QUDEC_FILES
     src/sampler.cpp
     src/decoder/logger.cpp
     src/decoder/surface_code.cpp
+    src/decoder/surface_code/cluster_match.cpp
 )
 
 ###################################################
@@ -55,7 +56,7 @@ set(QUDEC_FILES
 add_library(qudeclib SHARED ${QUDEC_FILES})
 target_include_directories(qudeclib PUBLIC "src")
 target_compile_options(qudeclib PUBLIC ${COMPILE_OPTIONS})
-target_link_libraries(qudeclib PUBLIC libstim libpymatching)
+target_link_libraries(qudeclib PUBLIC libstim libpymatching blossom5)
 if(ENABLE_MPI)
     target_compile_definitions(qudeclib PUBLIC ENABLE_MPI)
     target_link_libraries(qudeclib PUBLIC MPI::MPI_CXX)

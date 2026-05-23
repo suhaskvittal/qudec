@@ -32,7 +32,8 @@ main(int argc, char* argv[])
     auto dem = stim::circuit_to_dem(gen.circuit, {.decompose_errors = true});
 
     // Build decoder and run estimation
-    decoder::PYMATCHING dec(dem);
+//  decoder::PYMATCHING dec(dem);
+    decoder::CLUSTER_MATCH dec(dem, d, 6, decoder::CLUSTER_MATCH::quantization_level::b32);
 
     EXPERIMENT_CONFIG conf{.samples_per_level=1'000'000, .start_level=(d+1)/2};
     conf.print_progress = true;
