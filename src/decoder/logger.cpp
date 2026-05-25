@@ -54,8 +54,13 @@ void
 LOGGER::reset()
 {
     for (auto& strm : info_strm_array_)
+    {
+        strm.clear();
         strm.str("");
+    }
+    error_strm_.clear();
     error_strm_.str("");
+    tab_level = 0;
 }
 
 ////////////////////////////////////////////////////////////////

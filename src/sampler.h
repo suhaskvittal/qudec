@@ -27,7 +27,7 @@ struct EXPERIMENT_CONFIG
 
     bool print_progress{false};
 
-    int64_t skip_levels_after_no_errors_found{3};
+    int64_t skip_levels_after_no_errors_found{0};
 };
 
 /*

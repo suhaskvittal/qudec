@@ -49,8 +49,12 @@ generate_syndromes_with_k_errors(const dem_type& dem, size_t k, size_t count, RN
 
     pq_type sampled_errors;
     for (size_t i = 0; i < count; i++)
-        for (size_t e : _generate_k_random_numbers_without_replacement(k, dem.count_errors(), rng))
+    {
+        auto errors =  _generate_k_random_numbers_without_replacement(k, dem.count_errors(), rng);
+        assert(errors.size() == k);
+        for (size_t e : errors)
             sampled_errors.push({e, i});
+    }
 
     // go through the DEM to initialize `dets` and `obs`
 

@@ -81,7 +81,7 @@ public:
     {
         det_id_type d1;
         det_id_type d2;
-        int64_t  w_qu;
+        uint64_t  w_qu;
         obs_type frame_flips;
     };
 

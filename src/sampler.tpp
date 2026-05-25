@@ -44,9 +44,13 @@ estimate_logical_error_rate(const stim::DetectorErrorModel& dem, D& decoder, EXP
 #endif
         auto [syndromes, obs_array] = generate_syndromes_with_k_errors(dem, k, local_samples, rng);
 
-        if (can_print_progress)
-            (std::cout << "[ sampling " << k << " errors ]: ").flush();
-
+        if (world_rank == 0)
+        {
+            if (can_print_progress)
+                (std::cout << "[ sampling " << k << " errors ]: ").flush();
+            else
+                std::cout << "[ ERROR COUNT = " << k << " ] ==========================\n";
+        }
 
         // decode the given syndromes and estimate the LER for `k` errors
         uint64_t error_count{0};

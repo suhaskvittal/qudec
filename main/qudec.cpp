@@ -33,9 +33,12 @@ main(int argc, char* argv[])
 
     // Build decoder and run estimation
 //  decoder::PYMATCHING dec(dem);
-    decoder::CLUSTER_MATCH dec(dem, d, 6, decoder::CLUSTER_MATCH::quantization_level::b32);
+    decoder::CLUSTER_MATCH dec(dem, d, 8, decoder::CLUSTER_MATCH::quantization_level::b8);
 
-    EXPERIMENT_CONFIG conf{.samples_per_level=1'000'000, .start_level=(d+1)/2};
+    EXPERIMENT_CONFIG conf{.samples_per_level=10000 };
+    conf.start_level = (d-1)/2 - 1;
+    conf.max_level = 128;
+    conf.verbosity = 0;
     conf.print_progress = true;
     double ler = estimate_logical_error_rate(dem, dec, conf);
 

@@ -10,8 +10,11 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <limits>
 #include <numeric>
 #include <type_traits>
+
+#define ENABLE_LOGGER
 
 namespace decoder
 {
@@ -38,7 +41,7 @@ constexpr det_id_type BOUNDARY_ID{-1};
 /*
  * Quantizes a weight according to the given `quantization_level`
  * */
-int64_t _quantize(double, quantization_level);
+uint64_t _quantize(double, quantization_level);
 
 /*
  * Safe adjacency list update that also handles the case where the given
@@ -75,6 +78,11 @@ public:
      * */
     std::vector<det_id_type> all_detectors;
     std::vector<det_id_type> flipped_detectors;
+
+    /*
+     * Boundary can have multiplicity, so we need to track it separately.
+     * */
+    bool has_boundary{false};
 public:
     uf_type(det_id_type);
 
@@ -111,7 +119,7 @@ struct uf_growth_type
 
 struct fw_data_type
 {
-    int64_t w;
+    uint64_t w =std::numeric_limits<uint64_t>::max();
     obs_type frame_flips;
 };
 
@@ -167,42 +175,76 @@ CLUSTER_MATCH::CLUSTER_MATCH(const stim::DetectorErrorModel& dem,
 result_type
 CLUSTER_MATCH::decode(syndrome_ref syndrome, LOGGER& logger)
 {
+#if defined(ENABLE_LOGGER)
+    logger.error() << "Syndrome:";
+    for (size_t i = 0; i < num_detectors; i++)
+        if (syndrome[i])
+            logger.error() << " " << i;
+    logger.error() << "\n";
+#endif
+
     // 1. compute clusters:
-    logger.info(1) << "uf_compute_clusters ------------------------------\n";
+#if defined(ENABLE_LOGGER)
+    logger.error() << "uf_compute_clusters ------------------------------\n";
     logger.tab_level++;
+#endif
     auto clusters = uf_compute_clusters(syndrome, logger);
+#if defined(ENABLE_LOGGER)
     logger.tab_level--;
+#endif
 
     // 2. synthesize and decode matching problems (one per cluster)
     result_type out{.flipped_obs=obs_type(num_observables)};
-    logger.info(1) << "performing matching on clusters (count = " << clusters.size() << ") ---------\n";
+#if defined(ENABLE_LOGGER)
+    logger.error() << "performing matching on clusters (count = " << clusters.size() << ") ---------\n";
+#endif
     for (size_t i = 0; i < clusters.size(); i++)
     {
         auto& cl = clusters[i];
 
-        logger.info(1) << "cluster " << i 
+#if defined(ENABLE_LOGGER)
+        logger.error() << "cluster " << i 
                         << ", size = " << cl.all.size() 
                         << ", hw = " << cl.flipped.size() 
                         << ", detectors =";
         for (det_id_type d : cl.flipped)
-            logger.info(1) << " " << d;
-        logger.info(1) << "\n";
+            logger.error() << " " << d;
+        logger.error() << "\n";
         logger.tab_level++;
+#endif
 
-        logger.info(1) << "synthesize_matching_problem:" << "\n";
+#if defined(ENABLE_LOGGER)
+        logger.error() << "synthesize_matching_problem:" << "\n";
         logger.tab_level++;
+#endif
         auto mp = synthesize_matching_problem(std::move(cl), logger);
+#if defined(ENABLE_LOGGER)
         logger.tab_level--;
+#endif
 
-        logger.info(1) << "solve_matching_problem:" << "\n";
+#if defined(ENABLE_LOGGER)
+        logger.error() << "solve_matching_problem:" << "\n";
         logger.tab_level++;
+#endif
         auto mp_result = solve_matching_problem(std::move(mp), logger);
+#if defined(ENABLE_LOGGER)
         logger.tab_level--;
+#endif
 
         // merge `mp_result` with `out`
         out.flipped_obs ^= mp_result.flipped_obs;
+#if defined(ENABLE_LOGGER)
+        logger.tab_level--;
+#endif
     }
-    logger.tab_level--;
+
+#if defined(ENABLE_LOGGER)
+    logger.error() << "final solution =";
+    for (size_t i = 0; i < num_observables; i++)
+        if (out.flipped_obs[i])
+            logger.error() << i;
+    logger.error() << "\n";
+#endif
 
     return out;
 }
@@ -231,8 +273,8 @@ CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome, LOGGER& logger)
     }
 
     const size_t max_steps = _max_growth_steps(code_distance);
-    size_t unique_clusters{uf_pool.size()};
-    while (growth_fifo.size() > 0 && unique_clusters > 1)
+    int unique_clusters{uf_pool.size()};
+    while (growth_fifo.size() > 0)
     {
         auto g = std::move(growth_fifo.front());
         growth_fifo.pop_front();
@@ -241,15 +283,12 @@ CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome, LOGGER& logger)
         // has grown to an amount proportional to the code distance.
         if (g.step >= max_steps)
             continue;
-
         const det_id_type d1 = g.d;
         assert(d1 != BOUNDARY_ID);
-        
-        // run find on `uf_lookup[d1].owner` now so we have the updated
-        // owner:
+
+        // run find on `uf_lookup[d1].owner` now so we have the updated owner:
         uf_lookup[d1] = uf_lookup[d1]->find();
         auto* uf1 = uf_lookup[d1];
-
         // no need to traverse if `uf1->active_size()` is large enough
         if (uf1->active_size() >= astrea_hw_max)
             continue;
@@ -262,9 +301,7 @@ CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome, LOGGER& logger)
             // handle `d2 == BOUNDARY_ID` specially:
             if (d2 == BOUNDARY_ID)
             {
-                uf1->all_detectors.push_back(d2);
-                uf1->flipped_detectors.push_back(d2);
-                // do not traverse for `BOUNDARY_ID`
+                uf1->has_boundary = true;
                 continue;
             }
 
@@ -279,17 +316,19 @@ CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome, LOGGER& logger)
 
             if (uf2 == nullptr)
             {
-                // add `d2` to `uf` and push `d2` onto the `growth_fifo`
                 uf1->all_detectors.push_back(d2);
                 uf_lookup[d2] = uf1;
                 growth_fifo.push_back(uf_growth_type{.d=d2, .step=g.step+1});
             }
             // only merge `uf1` and `uf2` if they are beneath the HW threshold
-            else if (uf1->active_size() + uf2->active_size() <= astrea_hw_max)
+            else
             {
-                uf1->merge(uf2);
-                uf_lookup[d2] = uf1;
-                unique_clusters--;
+                if (uf1->active_size() + uf2->active_size() <= astrea_hw_max)
+                {
+                    uf1->merge(uf2);
+                    uf_lookup[d2] = uf1;
+                    unique_clusters--;
+                }
             }
         }
     }
@@ -303,6 +342,11 @@ CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome, LOGGER& logger)
             continue;
         cluster_type cl{ std::move(uf.all_detectors), 
                          std::move(uf.flipped_detectors) };
+        if (uf.has_boundary)
+        {
+            cl.all.push_back(BOUNDARY_ID);
+            cl.flipped.push_back(BOUNDARY_ID);
+        }
         clusters.push_back(cl);
     }
     return clusters;
@@ -321,9 +365,14 @@ CLUSTER_MATCH::synthesize_matching_problem(cluster_type&& cl, LOGGER& logger)
         // If it already exists, remove it. Otherwise add it.
         auto d_it = std::find(cl.flipped.begin(), cl.flipped.end(), BOUNDARY_ID);
         if (d_it == cl.flipped.end())
+        {
             cl.flipped.push_back(BOUNDARY_ID);
+            cl.all.push_back(BOUNDARY_ID);
+        }
         else
+        {
             cl.flipped.erase(d_it);
+        }
     }
     assert((cl.flipped.size() & 1) == 0);
 
@@ -351,15 +400,14 @@ CLUSTER_MATCH::synthesize_matching_problem(cluster_type&& cl, LOGGER& logger)
             if (idx_it == idx_map.end())
                 continue;
             const size_t j = idx_it->second;
-            // if the weight is already nonzero, then this entry has already
-            // been allocated:
-            if (dist[i*n+j].w > 0.0)
-                continue;
-            dist[i*n+j].w = _quantize(-std::log(e.pr), astrea_weight_quantization);
+            double w_fp = -std::log(e.pr);
+            assert(w_fp > 0);
+            dist[i*n+j].w = _quantize(w_fp, astrea_weight_quantization);
             dist[i*n+j].frame_flips ^= e.frame_flips;
             // copy the data over to `j,i`
             dist[j*n+i] = dist[i*n+j];
         }
+        dist[i*n+i].w = 0;
     }
 
     // run `floyd_warshall`:
@@ -369,10 +417,30 @@ CLUSTER_MATCH::synthesize_matching_problem(cluster_type&& cl, LOGGER& logger)
         {
             for (size_t j = 0; j < n; j++)
             {
-                if (dist[i*n+j].w > dist[i*n+k].w + dist[j*n+k].w)
+                if (dist[i*n+k].w == std::numeric_limits<uint64_t>::max()
+                    || dist[k*n+j].w == std::numeric_limits<uint64_t>::max())
                 {
-                    dist[i*n+j].w = dist[i*n+k].w + dist[j*n+k].w;
-                    dist[i*n+j].frame_flips = dist[i*n+k].frame_flips ^ dist[j*n+k].frame_flips;
+                    continue;
+                }
+
+                if (dist[i*n+j].w > dist[i*n+k].w + dist[k*n+j].w)
+                {
+                    const auto d1 = cl.all[i],
+                               d2 = cl.all[j],
+                               d3 = cl.all[k];
+
+                    double pw = dist[i*n+j].w;
+                    dist[i*n+j].w = dist[i*n+k].w + dist[k*n+j].w;
+                    dist[i*n+j].frame_flips = dist[i*n+k].frame_flips ^ dist[k*n+j].frame_flips;
+
+#if defined(ENABLE_LOGGER)
+                    logger.error() << "FW update: D(" << d1 << "," << d2 << ") = "
+                                << "D(" << d1 << "," << d3 << ")"
+                                << " + D(" << d3 << "," << d2 << ")"
+                                << "\n --> " << dist[i*n+j].w << " = " << dist[i*n+k].w << " + " << dist[k*n+j].w
+                                << "\npreviously " << pw 
+                                << "\n";
+#endif
                 }
             }
         }
@@ -394,6 +462,12 @@ CLUSTER_MATCH::synthesize_matching_problem(cluster_type&& cl, LOGGER& logger)
                                 .w_qu=dist[ii*n+jj].w, 
                                 .frame_flips=std::move(dist[ii*n+jj].frame_flips) };
             mp.edges.push_back(e);
+
+#if defined(ENABLE_LOGGER)
+            logger.error() << "mwpm edge between " << d1 << " and " << d2
+                            << ", weight = " << e.w_qu
+                            << "\n";
+#endif
         }
     }
     return mp;
@@ -405,14 +479,20 @@ CLUSTER_MATCH::synthesize_matching_problem(cluster_type&& cl, LOGGER& logger)
 result_type
 CLUSTER_MATCH::solve_matching_problem(matching_problem_type&& mp, LOGGER& logger)
 {
+    assert(mp.detectors.size() <= astrea_hw_max);
     // create index map for `mp.detectors`
     std::unordered_map<det_id_type, size_t> idx_map;
     idx_map.reserve(mp.detectors.size());
     for (size_t i = 0; i < mp.detectors.size(); i++)
         idx_map[mp.detectors[i]] = i;
 
+    const size_t n = mp.detectors.size(),
+                 m = mp.edges.size();
+    assert(m == n*(n-1)/2);
+    
     b5::PerfectMatching pm(mp.detectors.size(), mp.edges.size()); 
-    for (size_t k = 0; k < mp.edges.size(); k++)
+    pm.options.verbose = false;
+    for (size_t k = 0; k < m; k++)
     {
         const auto& e = mp.edges[k];
         const size_t i = idx_map[e.d1],
@@ -425,9 +505,25 @@ CLUSTER_MATCH::solve_matching_problem(matching_problem_type&& mp, LOGGER& logger
 
     // Retrieve the solution to the MWPM problem:
     result_type out{.flipped_obs=obs_type(num_observables)};
-    for (size_t i = 0; i < mp.edges.size(); i++)
+    for (size_t i = 0; i < m; i++)
+    {
         if (pm.GetSolution(i))
-            out.flipped_obs ^= mp.edges[i].frame_flips;
+        {
+            const auto& e = mp.edges[i];
+            out.flipped_obs ^= e.frame_flips;
+
+#if defined(ENABLE_LOGGER)
+            logger.error() << "edge " << i << " between " << e.d1 << " and " << e.d2 
+                            << " in matching, frame flips =";
+            for (size_t i = 0; i < num_observables; i++)
+                if (e.frame_flips[i])
+                    logger.error() << i;
+            logger.error() << "\n";
+#endif
+        }
+    }
+    
+
     return out;
 }
 
@@ -440,32 +536,32 @@ namespace
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-int64_t
+uint64_t
 _quantize(double w, quantization_level ql)
 {
+    uint64_t q;
     if (ql == quantization_level::b4)
     {
-        int64_t q = std::round(w); 
-        q = std::min(q, int64_t{15});
+        q = std::round(w); 
+        q = std::min(q, uint64_t{15});
         return q;
     }
     else if (ql == quantization_level::b8)
     {
-        int64_t q = std::round(15*w);
-        q = std::min(q, int64_t{255});
+        q = std::round(15*w);
+        q = std::min(q, uint64_t{255});
     }
     else if (ql == quantization_level::b16)
     {
-        int64_t q = std::round(1000*w);
-        q = std::min(q, int64_t{(1ll<<16)-1});
+        q = std::round(1000*w);
+        q = std::min(q, uint64_t{(1ull<<16)-1});
     }
     else
     {
-        int64_t q = std::round(1'000'000*w);
-        q = std::min(q, int64_t{(1ll<<32)-1});
+        q = std::round(1'000'000*w);
+        q = std::min(q, uint64_t{(1ull<<32)-1});
     }
-
-    return -1;
+    return q;
 }
 
 void
@@ -534,12 +630,13 @@ void
 uf_type::merge(uf_type* other)
 {
     // update `other`
-    parent = find();
-    uf_type* old_parent = other->merge_find(parent);
+    auto* p = find();
+    uf_type* old_parent = other->merge_find(p);
     for (det_id_type d : old_parent->all_detectors)
-        all_detectors.push_back(d);
+        p->all_detectors.push_back(d);
     for (det_id_type d : old_parent->flipped_detectors)
-        flipped_detectors.push_back(d);
+        p->flipped_detectors.push_back(d);
+    p->has_boundary |= old_parent->has_boundary;
 }
 
 uf_type*
