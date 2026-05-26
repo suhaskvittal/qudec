@@ -16,7 +16,7 @@ PerfectMatching::PerfectMatching(int nodeNum, int edgeNumMax)
 	  removed_num(0),
 	  first_solve(true)
 {
-	if (node_num & 1) { printf("# of nodes is odd: perfect matching cannot exist\n"); exit(1); }
+	if (node_num & 1) { printf("# of nodes is odd: perfect matching cannot exist, got nodes: %d\n", node_num); exit(1); }
 	nodes = (Node*) malloc((node_num+1)*sizeof(Node));
 	edges_orig = (char*) malloc(edge_num_max*sizeof(Edge)+1);
 	edges = (Edge*) ( ( ((POINTER_TYPE)edges_orig) & 1 ) ? (edges_orig + 1) : edges_orig );

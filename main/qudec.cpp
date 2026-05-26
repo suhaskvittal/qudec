@@ -33,7 +33,7 @@ main(int argc, char* argv[])
 
     // Build decoder and run estimation
 //  decoder::PYMATCHING dec(dem);
-    decoder::CLUSTER_MATCH dec(dem, d, 8, decoder::CLUSTER_MATCH::quantization_level::b8);
+    decoder::CLUSTER_MATCH dec(dem, d, 10, decoder::CLUSTER_MATCH::quantization_level::b32);
 
     EXPERIMENT_CONFIG conf{.samples_per_level=10000 };
     conf.start_level = (d-1)/2 - 1;

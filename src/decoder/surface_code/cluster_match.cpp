@@ -12,6 +12,7 @@
 #include <cmath>
 #include <limits>
 #include <numeric>
+#include <queue>
 #include <type_traits>
 
 #define ENABLE_LOGGER
@@ -113,15 +114,29 @@ struct uf_growth_type
 ////////////////////////////////////////////////////////////////
 
 /*
- * Data structure used in Floyd-Warshall. We need to track both
- * frame flips and the distance (`w`).
+ * Data structure when computing distance between two detectors.
  * */
 
-struct fw_data_type
+struct distance_type
 {
     uint64_t w =std::numeric_limits<uint64_t>::max();
     obs_type frame_flips;
 };
+
+struct distance_queue_entry
+{
+    det_id_type d;
+    uint64_t w;
+};
+
+struct distance_cmp
+{
+    bool operator()(const distance_queue_entry& a, const distance_queue_entry& b) const { return a.w > b.w; }
+};
+
+using distance_queue_type = std::priority_queue<distance_queue_entry, 
+                                                std::vector<distance_queue_entry>, 
+                                                distance_cmp>;
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
@@ -163,10 +178,18 @@ CLUSTER_MATCH::CLUSTER_MATCH(const stim::DetectorErrorModel& dem,
                             det_id_type d1 = dets[0],
                                         d2 = (dets.size() == 1) ? BOUNDARY_ID : dets[1];
                             _update_adjacency_list(adj_matrix_[d1], d2, pr, frame_flips);
-                            if (d2 != BOUNDARY_ID)
+                            if (d2 == BOUNDARY_ID)
+                                _update_adjacency_list(boundary_adjacency_, d1, pr, frame_flips);
+                            else
                                 _update_adjacency_list(adj_matrix_[d2], d1, pr, frame_flips);
                         });
             });
+}
+
+const adj_list_type&
+CLUSTER_MATCH::adj_matrix(det_id_type d) const
+{
+    return (d == BOUNDARY_ID) ? boundary_adjacency_ : adj_matrix_[d];
 }
 
 ////////////////////////////////////////////////////////////////
@@ -294,7 +317,7 @@ CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome, LOGGER& logger)
             continue;
         
         // traverse:
-        for (const auto& e : adj_matrix_[g.d])
+        for (const auto& e : adj_matrix(g.d))
         {
             const det_id_type d2 = e.d;
 
@@ -342,10 +365,15 @@ CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome, LOGGER& logger)
             continue;
         cluster_type cl{ std::move(uf.all_detectors), 
                          std::move(uf.flipped_detectors) };
-        if (uf.has_boundary)
+        // only add boundary if `cl` is already odd:
+        if (cl.flipped.size() % 2 == 1)
+        {
+            cl.flipped.push_back(BOUNDARY_ID);
+            cl.all.push_back(BOUNDARY_ID);
+        }
+        else if (uf.has_boundary)
         {
             cl.all.push_back(BOUNDARY_ID);
-            cl.flipped.push_back(BOUNDARY_ID);
         }
         clusters.push_back(cl);
     }
@@ -358,28 +386,9 @@ CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome, LOGGER& logger)
 matching_problem_type
 CLUSTER_MATCH::synthesize_matching_problem(cluster_type&& cl, LOGGER& logger)
 {
-    // first, clean up `flipped` if it is odd.
-    if (cl.flipped.size() & 1)
-    {
-        // Check if `BOUNDARY_ID` is already in `cl.flipped`
-        // If it already exists, remove it. Otherwise add it.
-        auto d_it = std::find(cl.flipped.begin(), cl.flipped.end(), BOUNDARY_ID);
-        if (d_it == cl.flipped.end())
-        {
-            cl.flipped.push_back(BOUNDARY_ID);
-            cl.all.push_back(BOUNDARY_ID);
-        }
-        else
-        {
-            cl.flipped.erase(d_it);
-        }
-    }
-    assert((cl.flipped.size() & 1) == 0);
-
-    // we need to do some setup before we run floyd-warshall
+    assert((cl.flipped.size() % 2) == 0);
     const size_t n = cl.all.size();
-    const fw_data_type fw_fill_val{.frame_flips=obs_type(num_observables)};
-    std::vector<fw_data_type> dist(n*n, fw_fill_val);
+    const size_t hw = cl.flipped.size();
     
     // create a map that maps detector id to index in `cl.all`
     std::unordered_map<det_id_type, size_t> idx_map;
@@ -387,89 +396,66 @@ CLUSTER_MATCH::synthesize_matching_problem(cluster_type&& cl, LOGGER& logger)
     for (size_t i = 0; i < n; i++)
         idx_map.insert({cl.all[i], i});
 
-    // initialize `dist` using the edges in `adj_matrix_`
-    for (size_t i = 0; i < n; i++)
+    // run `dijkstra's` `n-1` times to create `matching_problem_type`
+    matching_problem_type mp;
+    mp.edges.reserve(hw*(hw-1)/2);
+
+    const distance_type fill_val{.frame_flips=obs_type(num_observables)};
+    std::vector<distance_type> dist(n, fill_val);
+    for (size_t ii = 0; ii < hw-1; ii++)
     {
-        const det_id_type d1 = cl.all[i];
-        if (d1 == BOUNDARY_ID)
-            continue;
-        for (const auto& e : adj_matrix_[d1])
+        std::fill(dist.begin(), dist.end(), fill_val);
+        const det_id_type d1 = cl.flipped[ii];
+        dist[idx_map[d1]].w = 0;
+        distance_queue_type pq;
+        pq.push({d1, 0});
+        while (pq.size() > 0)
         {
-            const det_id_type d2{e.d};
-            auto idx_it = idx_map.find(d2);
-            if (idx_it == idx_map.end())
+            auto e = std::move(pq.top());
+            pq.pop();
+            const auto z1 = e.d;
+            const auto w1 = e.w;
+            const auto i = idx_map.at(z1);
+            if (w1 != dist[i].w)
                 continue;
-            const size_t j = idx_it->second;
-            double w_fp = -std::log(e.pr);
-            assert(w_fp > 0);
-            dist[i*n+j].w = _quantize(w_fp, astrea_weight_quantization);
-            dist[i*n+j].frame_flips ^= e.frame_flips;
-            // copy the data over to `j,i`
-            dist[j*n+i] = dist[i*n+j];
-        }
-        dist[i*n+i].w = 0;
-    }
-
-    // run `floyd_warshall`:
-    for (size_t k = 0; k < n; k++)
-    {
-        for (size_t i = 0; i < n; i++)
-        {
-            for (size_t j = 0; j < n; j++)
+            for (const auto& x : adj_matrix(z1))
             {
-                if (dist[i*n+k].w == std::numeric_limits<uint64_t>::max()
-                    || dist[k*n+j].w == std::numeric_limits<uint64_t>::max())
-                {
+                const auto z2 = x.d;
+                auto idx_it = idx_map.find(z2);
+                if (idx_it == idx_map.end())
                     continue;
-                }
-
-                if (dist[i*n+j].w > dist[i*n+k].w + dist[k*n+j].w)
+                const auto j = idx_it->second;
+                const uint64_t w_qu = _quantize(-std::log(x.pr), astrea_weight_quantization);
+                const auto w2 = w1 + w_qu;
+                if (w2 < dist[j].w)
                 {
-                    const auto d1 = cl.all[i],
-                               d2 = cl.all[j],
-                               d3 = cl.all[k];
-
-                    double pw = dist[i*n+j].w;
-                    dist[i*n+j].w = dist[i*n+k].w + dist[k*n+j].w;
-                    dist[i*n+j].frame_flips = dist[i*n+k].frame_flips ^ dist[k*n+j].frame_flips;
-
-#if defined(ENABLE_LOGGER)
-                    logger.error() << "FW update: D(" << d1 << "," << d2 << ") = "
-                                << "D(" << d1 << "," << d3 << ")"
-                                << " + D(" << d3 << "," << d2 << ")"
-                                << "\n --> " << dist[i*n+j].w << " = " << dist[i*n+k].w << " + " << dist[k*n+j].w
-                                << "\npreviously " << pw 
-                                << "\n";
-#endif
+                    dist[j].w = w2;
+                    dist[j].frame_flips = dist[i].frame_flips ^ x.frame_flips;
+                    pq.push({z2, w2});
                 }
             }
         }
-    }
 
-    // create matching problem:
-    matching_problem_type mp{.detectors=std::move(cl.flipped)};
-    mp.edges.reserve(_get_mwpm_edge_count(mp.detectors.size()));
-    for (size_t i = 0; i < mp.detectors.size(); i++)
-    {
-        const det_id_type d1 = mp.detectors[i];
-        const size_t ii = idx_map.at(d1);
-        for (size_t j = i+1; j < mp.detectors.size(); j++)
+        // create mwpm edges:
+        for (size_t jj = ii+1; jj < hw; jj++)
         {
-            const det_id_type d2 = mp.detectors[j];
-            const size_t jj = idx_map.at(d2);
-            mwpm_edge_type e{ .d1=d1, 
-                                .d2=d2, 
-                                .w_qu=dist[ii*n+jj].w, 
-                                .frame_flips=std::move(dist[ii*n+jj].frame_flips) };
-            mp.edges.push_back(e);
-
+            const det_id_type d2 = cl.flipped[jj];
+            const size_t j = idx_map.at(d2);
 #if defined(ENABLE_LOGGER)
             logger.error() << "mwpm edge between " << d1 << " and " << d2
-                            << ", weight = " << e.w_qu
+                            << ", weight = " << dist[j].w
+                            << ", frame flips = " << dist[j].frame_flips[0]
                             << "\n";
+            
 #endif
+            mwpm_edge_type e{ .d1=d1,
+                                .d2=d2,
+                                .w_qu=dist[j].w,
+                                .frame_flips=std::move(dist[j].frame_flips) };
+            mp.edges.push_back(e);
         }
     }
+    mp.detectors = std::move(cl.flipped);
     return mp;
 }
 
@@ -479,18 +465,21 @@ CLUSTER_MATCH::synthesize_matching_problem(cluster_type&& cl, LOGGER& logger)
 result_type
 CLUSTER_MATCH::solve_matching_problem(matching_problem_type&& mp, LOGGER& logger)
 {
-    assert(mp.detectors.size() <= astrea_hw_max);
     // create index map for `mp.detectors`
     std::unordered_map<det_id_type, size_t> idx_map;
     idx_map.reserve(mp.detectors.size());
     for (size_t i = 0; i < mp.detectors.size(); i++)
         idx_map[mp.detectors[i]] = i;
 
-    const size_t n = mp.detectors.size(),
-                 m = mp.edges.size();
-    assert(m == n*(n-1)/2);
+    [[ maybe_unused ]]  const size_t n = mp.detectors.size(),
+                                     m = mp.edges.size();
+    if (n > astrea_hw_max)
+    {
+        std::cerr << "CLUSTER_MATCHING::solve_matching_problem: got matching problem with HW = " 
+                    << n << " > HW_MAX (" << astrea_hw_max << ")" << _die{};
+    }
     
-    b5::PerfectMatching pm(mp.detectors.size(), mp.edges.size()); 
+    b5::PerfectMatching pm(n, m); 
     pm.options.verbose = false;
     for (size_t k = 0; k < m; k++)
     {
@@ -585,7 +574,7 @@ _update_adjacency_list(adj_list_type& adj, det_id_type d, double p, obs_ref fram
 constexpr size_t
 _max_growth_steps(size_t d)
 {
-    double g = static_cast<double>(d-1) / 4.0;
+    double g = static_cast<double>(d-1) / 2.0;
     g = std::max(1.0, std::ceil(g));
     return static_cast<size_t>( std::round(g) );
 }

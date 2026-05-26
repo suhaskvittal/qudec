@@ -121,11 +121,14 @@ private:
      * Decoding graph adjacency data:
      * */
     std::vector<adj_list_type> adj_matrix_;
+    adj_list_type boundary_adjacency_;
 public:
     CLUSTER_MATCH(const stim::DetectorErrorModel&, 
                     size_t code_distance, 
                     size_t astrea_hw_max,
                     quantization_level);
+
+    const adj_list_type& adj_matrix(det_id_type) const;
 
     result_type decode(syndrome_ref, LOGGER&);
 

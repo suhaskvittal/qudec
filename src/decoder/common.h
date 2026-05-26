@@ -6,6 +6,8 @@
 #ifndef DECODER_COMMON_h
 #define DECODER_COMMON_h
 
+#include "globals.h"
+
 #include <stim.h>
 
 namespace decoder
