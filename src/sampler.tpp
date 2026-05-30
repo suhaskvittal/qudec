@@ -29,13 +29,18 @@ estimate_logical_error_rate(const stim::DetectorErrorModel& dem, D& decoder, EXP
 #endif
     const bool can_print_progress = (conf.print_progress && conf.verbosity == 0 && world_rank == 0);
 
+    // choose start level to be `k` with highest `prob_x[k]`
+    for (size_t k = conf.start_level; k < conf.max_level; k++)
+        if (prob_x[k] > prob_x[conf.start_level])
+            conf.start_level = k;
+
     decoder::LOGGER logger;
     std::mt19937_64 rng;
     rng.seed(conf.seed + world_rank);
     bool no_errors_found_yet{true};
     for (size_t k = conf.start_level; k < conf.max_level; k++)
     {
-        if (prob_x[k] < 0.005*ler)
+        if (prob_x[k] < ler)
             continue;
 
         int local_samples = conf.samples_per_level;
@@ -100,6 +105,7 @@ estimate_logical_error_rate(const stim::DetectorErrorModel& dem, D& decoder, EXP
 
         double ler_given_k_errors = static_cast<double>(error_count) / static_cast<double>(samples);
         double contrib = ler_given_k_errors * prob_x[k];
+
         ler += contrib;
 
         if (can_print_progress)
@@ -108,6 +114,7 @@ estimate_logical_error_rate(const stim::DetectorErrorModel& dem, D& decoder, EXP
                         << ", P(error | " << k << " errors) = " << ler_given_k_errors
                         << ", P(" << k << " errors) = " << prob_x[k]
                         << ", total contribution = " << contrib
+                        << ", cumulative LER = " << ler
                         << "\n";
         }
 

@@ -55,7 +55,7 @@ set(QUDEC_FILES
 ###################################################
 
 add_library(qudeclib SHARED ${QUDEC_FILES})
-target_include_directories(qudeclib PUBLIC "src")
+target_include_directories(qudeclib PUBLIC "src" "deps")
 target_compile_options(qudeclib PUBLIC ${COMPILE_OPTIONS})
 target_link_libraries(qudeclib PUBLIC libstim libpymatching blossom5)
 if(ENABLE_MPI)

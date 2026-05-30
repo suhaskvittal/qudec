@@ -198,6 +198,7 @@ CLUSTER_MATCH::adj_matrix(det_id_type d) const
 result_type
 CLUSTER_MATCH::decode(syndrome_ref syndrome, LOGGER& logger)
 {
+    result_type out{.flipped_obs=obs_type(num_observables)};
 #if defined(ENABLE_LOGGER)
     logger.error() << "Syndrome:";
     for (size_t i = 0; i < num_detectors; i++)
@@ -206,24 +207,38 @@ CLUSTER_MATCH::decode(syndrome_ref syndrome, LOGGER& logger)
     logger.error() << "\n";
 #endif
 
+    s_hamming_weight.add(syndrome.popcnt());
+
+    syndrome_type filtered_syndrome(syndrome);
+    auto filter_out = filter_isolated_errors(filtered_syndrome, logger);
+    out.flipped_obs ^= filter_out.flipped_obs;
+    s_filtered.add(syndrome.popcnt() - filtered_syndrome.popcnt());
+    s_post_filter_hamming_weight.add(filtered_syndrome.popcnt());
+
+    if (filtered_syndrome.popcnt() == 0)
+        return out;
+
     // 1. compute clusters:
 #if defined(ENABLE_LOGGER)
     logger.error() << "uf_compute_clusters ------------------------------\n";
     logger.tab_level++;
 #endif
-    auto clusters = uf_compute_clusters(syndrome, logger);
+    auto clusters = uf_compute_clusters(filtered_syndrome, logger);
 #if defined(ENABLE_LOGGER)
     logger.tab_level--;
 #endif
+    s_clusters.add(clusters.size());
 
     // 2. synthesize and decode matching problems (one per cluster)
-    result_type out{.flipped_obs=obs_type(num_observables)};
 #if defined(ENABLE_LOGGER)
     logger.error() << "performing matching on clusters (count = " << clusters.size() << ") ---------\n";
 #endif
     for (size_t i = 0; i < clusters.size(); i++)
     {
         auto& cl = clusters[i];
+
+        s_cluster_size.add(cl.all.size());
+        s_cluster_hamming_weight.add(cl.flipped.size());
 
 #if defined(ENABLE_LOGGER)
         logger.error() << "cluster " << i 
@@ -275,6 +290,84 @@ CLUSTER_MATCH::decode(syndrome_ref syndrome, LOGGER& logger)
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
+void
+CLUSTER_MATCH::print_stats(std::ostream& ostrm) const
+{
+    // report both statistics and any useful RTL data:
+    std::vector<size_t> degree_array(num_detectors);
+    std::transform(adj_matrix_.begin(), adj_matrix_.end(), degree_array.begin(),
+                    [] (const auto& al) { return al.size(); });
+
+    const size_t max_steps = _max_growth_steps(code_distance);
+    const size_t max_degree = *std::max_element(degree_array.begin(), degree_array.end());
+    const size_t boundary_degree = boundary_adjacency_.size();
+
+    ostrm << "CLUSTER_MATCH-----------------------------------\n";
+    print_stat(ostrm, "DISTANCE", code_distance);
+    print_stat(ostrm, "MAX_STEPS", max_steps);
+    print_stat(ostrm, "MAX_DEGREE", max_degree);
+    print_stat(ostrm, "BOUNDARY_DEGREE", boundary_degree);
+
+    ostrm << "\nCLUSTER_COUNT\t" << s_clusters.to_string_some()
+            << "\nFILTER_COUNT\t" << s_filtered.to_string_some()
+            << "\nHAMMING_WEIGHT\t" << s_hamming_weight.to_string_some()
+            << "\nPOST_FILTER_HAMMING_WEIGHT\t" << s_post_filter_hamming_weight.to_string_some()
+            << "\nCLUSTER_HAMMING_WEIGHT\t" << s_cluster_hamming_weight.to_string_some()
+            << "\nCLUSTER_SIZE\t" << s_cluster_size.to_string_some()
+            << "\nGROWTH_TICKS\t" << s_growth_ticks.to_string_some()
+            << "\nSYNTHESIS_TICKS\t" << s_synthesis_ticks.to_string_some()
+            << "\nSYNTHESIS_TICKS_NORMALIZED\t" << s_synthesis_ticks_norm.to_string_some()
+            << "\n";
+}
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
+result_type
+CLUSTER_MATCH::filter_isolated_errors(syndrome_ref syndrome, LOGGER& logger)
+{
+    // count active degree of all syndrome bits:
+    std::vector<size_t> active_degree(num_detectors, 0);
+    std::vector<std::pair<det_id_type, obs_type>> active_companion(num_detectors, 
+                                                                    {0,obs_type(num_observables)});
+    for (size_t i = 0; i < num_detectors; i++)
+    {
+        if (syndrome[i])
+        {
+            for (const auto& e : adj_matrix(i))
+            {
+                if (e.d == BOUNDARY_ID)
+                    continue;
+                if (syndrome[e.d])
+                {
+                    active_degree[i]++;
+                    active_companion[i] = std::make_pair(e.d, e.frame_flips);
+                }
+            }
+        }
+    }
+
+    // process the syndrome again:
+    result_type out{};
+    for (size_t i = 0; i < num_detectors; i++)
+    {
+        if (syndrome[i] && active_degree[i] == 1)
+        {
+            auto [j, frame_flips] = active_companion[i];
+            if (active_degree[j])
+            {
+                syndrome[i] ^= 1;
+                syndrome[j] ^= 1;
+                out.flipped_obs ^= frame_flips;
+            }
+        }
+    }
+    return out;
+}
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
 std::vector<cluster_type>
 CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome, LOGGER& logger)
 {
@@ -297,6 +390,7 @@ CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome, LOGGER& logger)
 
     const size_t max_steps = _max_growth_steps(code_distance);
     int unique_clusters{uf_pool.size()};
+    uint64_t tick{0};
     while (growth_fifo.size() > 0)
     {
         auto g = std::move(growth_fifo.front());
@@ -306,6 +400,7 @@ CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome, LOGGER& logger)
         // has grown to an amount proportional to the code distance.
         if (g.step >= max_steps)
             continue;
+        tick++;
         const det_id_type d1 = g.d;
         assert(d1 != BOUNDARY_ID);
 
@@ -356,6 +451,8 @@ CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome, LOGGER& logger)
         }
     }
 
+    s_growth_ticks.add(tick);
+
     // form clusters:
     std::vector<cluster_type> clusters;
     clusters.reserve(unique_clusters);
@@ -402,6 +499,7 @@ CLUSTER_MATCH::synthesize_matching_problem(cluster_type&& cl, LOGGER& logger)
 
     const distance_type fill_val{.frame_flips=obs_type(num_observables)};
     std::vector<distance_type> dist(n, fill_val);
+    uint64_t tick{0};
     for (size_t ii = 0; ii < hw-1; ii++)
     {
         std::fill(dist.begin(), dist.end(), fill_val);
@@ -418,6 +516,7 @@ CLUSTER_MATCH::synthesize_matching_problem(cluster_type&& cl, LOGGER& logger)
             const auto i = idx_map.at(z1);
             if (w1 != dist[i].w)
                 continue;
+            tick++;
             for (const auto& x : adj_matrix(z1))
             {
                 const auto z2 = x.d;
@@ -455,6 +554,9 @@ CLUSTER_MATCH::synthesize_matching_problem(cluster_type&& cl, LOGGER& logger)
             mp.edges.push_back(e);
         }
     }
+    double tick_norm = static_cast<double>(tick) / static_cast<double>(hw);
+    s_synthesis_ticks.add(tick);
+    s_synthesis_ticks_norm.add(tick_norm);
     mp.detectors = std::move(cl.flipped);
     return mp;
 }
@@ -574,7 +676,7 @@ _update_adjacency_list(adj_list_type& adj, det_id_type d, double p, obs_ref fram
 constexpr size_t
 _max_growth_steps(size_t d)
 {
-    double g = static_cast<double>(d-1) / 2.0;
+    double g = static_cast<double>(d-1) / 4.0;
     g = std::max(1.0, std::ceil(g));
     return static_cast<size_t>( std::round(g) );
 }

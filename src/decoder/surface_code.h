@@ -8,10 +8,12 @@
 
 #include "decoder/common.h"
 #include "decoder/logger.h"
+#include "stats.h"
 
 #include <stim.h>
 #include <pymatching/sparse_blossom/driver/mwpm_decoding.h>
 
+#include <iosfwd>
 #include <vector>
 
 namespace decoder
@@ -31,6 +33,8 @@ public:
     PYMATCHING(const stim::DetectorErrorModel&);
 
     result_type decode(syndrome_ref, LOGGER&);
+
+    void print_stats(std::ostream&) const {}
 };
 
 ////////////////////////////////////////////////////////////////
@@ -116,6 +120,20 @@ public:
      * Weight quantization for Astrea.
      * */
     const quantization_level astrea_weight_quantization;
+
+    /*
+     * Statistics:
+     * */
+    STATS_HISTOGRAM<uint64_t> s_clusters{0,32,4};
+    STATS_HISTOGRAM<uint64_t> s_filtered{0,128,16};
+    STATS_HISTOGRAM<uint64_t> s_hamming_weight{0,512,16};
+    STATS_HISTOGRAM<uint64_t> s_post_filter_hamming_weight{0,512,16};
+    STATS_HISTOGRAM<uint64_t> s_cluster_hamming_weight{0,12,2};
+    STATS_HISTOGRAM<uint64_t> s_cluster_size{0,128,16};
+
+    STATS_HISTOGRAM<uint64_t> s_growth_ticks{0,256,16};
+    STATS_HISTOGRAM<uint64_t> s_synthesis_ticks{0,256,16};
+    STATS_HISTOGRAM<double> s_synthesis_ticks_norm{0,256,16};
 private:
     /*
      * Decoding graph adjacency data:
@@ -132,11 +150,9 @@ public:
 
     result_type decode(syndrome_ref, LOGGER&);
 
-    /*
-     * These are some useful values that can inform RTL implementation.
-     * */
-    size_t max_degree() const;
+    void print_stats(std::ostream&) const;
 private:
+    result_type filter_isolated_errors(syndrome_ref, LOGGER&);
     std::vector<cluster_type> uf_compute_clusters(syndrome_ref, LOGGER&);
     matching_problem_type synthesize_matching_problem(cluster_type&&, LOGGER&);
     result_type solve_matching_problem(matching_problem_type&&, LOGGER&);
