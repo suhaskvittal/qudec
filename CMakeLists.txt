@@ -43,7 +43,6 @@ endif()
 ###################################################
 
 set(QUDEC_FILES
-    src/decoder/logger.cpp
     src/decoder/surface_code.cpp
     src/decoder/surface_code/cluster_match.cpp
     src/globals.cpp

@@ -120,14 +120,32 @@ public:
 
     const adj_list_type& adj_matrix(det_id_type) const;
 
-    result_type decode(syndrome_ref, LOGGER&);
+    result_type decode(syndrome_ref);
 
     void print_stats(std::ostream&) const;
 private:
-    result_type filter_isolated_errors(syndrome_ref, LOGGER&);
-    std::vector<cluster_type> uf_compute_clusters(syndrome_ref, LOGGER&);
-    matching_problem_type synthesize_matching_problem(cluster_type&&, LOGGER&);
-    result_type solve_matching_problem(matching_problem_type&&, LOGGER&);
+    /*
+     * `filter_isolated_errors()` removes any isolated weight-1 errors from the syndrome.
+     * */
+    result_type filter_isolated_errors(syndrome_ref);
+
+    /*
+     * `uf_compute_clusters()` computes sub-clusters within the syndrome that correspond
+     * to different matching problems. The size of a cluster is limited by `astrea_hw_max`,
+     * and its width is limited by `code_distance`.
+     * */
+    std::vector<cluster_type> uf_compute_clusters(syndrome_ref);
+
+    /*
+     * `synthesize_matching_problem()` computes the pairwise distances for all detection
+     * events within a cluster.
+     * */
+    matching_problem_type synthesize_matching_problem(cluster_type&&);
+
+    /*
+     * `solve_matching_problem()` computes the min-weight error for the given matching problem.
+     * */
+    result_type solve_matching_problem(matching_problem_type&&);
 };
 
 ////////////////////////////////////////////////////////////////

@@ -7,7 +7,6 @@
 #define DECODER_SURFACE_CODE_h
 
 #include "decoder/common.h"
-#include "decoder/logger.h"
 #include "stats.h"
 
 #include <stim.h>
@@ -32,7 +31,7 @@ private:
 public:
     PYMATCHING(const stim::DetectorErrorModel&);
 
-    result_type decode(syndrome_ref, LOGGER&);
+    result_type decode(syndrome_ref);
 
     void print_stats(std::ostream&) const {}
 };

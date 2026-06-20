@@ -20,7 +20,7 @@ PYMATCHING::PYMATCHING(const stim::DetectorErrorModel& dem)
 {}
 
 result_type
-PYMATCHING::decode(syndrome_ref syn, LOGGER& logger)
+PYMATCHING::decode(syndrome_ref syn)
 {
     // Collect indices of fired detectors.
     std::vector<uint64_t> det_events;

@@ -15,8 +15,6 @@
 #include <queue>
 #include <type_traits>
 
-#define ENABLE_LOGGER
-
 namespace decoder
 {
 
@@ -196,21 +194,14 @@ CLUSTER_MATCH::adj_matrix(det_id_type d) const
 ////////////////////////////////////////////////////////////////
 
 result_type
-CLUSTER_MATCH::decode(syndrome_ref syndrome, LOGGER& logger)
+CLUSTER_MATCH::decode(syndrome_ref syndrome)
 {
     result_type out{.flipped_obs=obs_type(num_observables)};
-#if defined(ENABLE_LOGGER)
-    logger.error() << "Syndrome:";
-    for (size_t i = 0; i < num_detectors; i++)
-        if (syndrome[i])
-            logger.error() << " " << i;
-    logger.error() << "\n";
-#endif
 
     s_hamming_weight.add(syndrome.popcnt());
 
     syndrome_type filtered_syndrome(syndrome);
-    auto filter_out = filter_isolated_errors(filtered_syndrome, logger);
+    auto filter_out = filter_isolated_errors(filtered_syndrome);
     out.flipped_obs ^= filter_out.flipped_obs;
     s_filtered.add(syndrome.popcnt() - filtered_syndrome.popcnt());
     s_post_filter_hamming_weight.add(filtered_syndrome.popcnt());
@@ -218,21 +209,9 @@ CLUSTER_MATCH::decode(syndrome_ref syndrome, LOGGER& logger)
     if (filtered_syndrome.popcnt() == 0)
         return out;
 
-    // 1. compute clusters:
-#if defined(ENABLE_LOGGER)
-    logger.error() << "uf_compute_clusters ------------------------------\n";
-    logger.tab_level++;
-#endif
-    auto clusters = uf_compute_clusters(filtered_syndrome, logger);
-#if defined(ENABLE_LOGGER)
-    logger.tab_level--;
-#endif
+    auto clusters = uf_compute_clusters(filtered_syndrome);
     s_clusters.add(clusters.size());
 
-    // 2. synthesize and decode matching problems (one per cluster)
-#if defined(ENABLE_LOGGER)
-    logger.error() << "performing matching on clusters (count = " << clusters.size() << ") ---------\n";
-#endif
     for (size_t i = 0; i < clusters.size(); i++)
     {
         auto& cl = clusters[i];
@@ -240,49 +219,10 @@ CLUSTER_MATCH::decode(syndrome_ref syndrome, LOGGER& logger)
         s_cluster_size.add(cl.all.size());
         s_cluster_hamming_weight.add(cl.flipped.size());
 
-#if defined(ENABLE_LOGGER)
-        logger.error() << "cluster " << i 
-                        << ", size = " << cl.all.size() 
-                        << ", hw = " << cl.flipped.size() 
-                        << ", detectors =";
-        for (det_id_type d : cl.flipped)
-            logger.error() << " " << d;
-        logger.error() << "\n";
-        logger.tab_level++;
-#endif
-
-#if defined(ENABLE_LOGGER)
-        logger.error() << "synthesize_matching_problem:" << "\n";
-        logger.tab_level++;
-#endif
-        auto mp = synthesize_matching_problem(std::move(cl), logger);
-#if defined(ENABLE_LOGGER)
-        logger.tab_level--;
-#endif
-
-#if defined(ENABLE_LOGGER)
-        logger.error() << "solve_matching_problem:" << "\n";
-        logger.tab_level++;
-#endif
-        auto mp_result = solve_matching_problem(std::move(mp), logger);
-#if defined(ENABLE_LOGGER)
-        logger.tab_level--;
-#endif
-
-        // merge `mp_result` with `out`
+        auto mp = synthesize_matching_problem(std::move(cl));
+        auto mp_result = solve_matching_problem(std::move(mp));
         out.flipped_obs ^= mp_result.flipped_obs;
-#if defined(ENABLE_LOGGER)
-        logger.tab_level--;
-#endif
     }
-
-#if defined(ENABLE_LOGGER)
-    logger.error() << "final solution =";
-    for (size_t i = 0; i < num_observables; i++)
-        if (out.flipped_obs[i])
-            logger.error() << i;
-    logger.error() << "\n";
-#endif
 
     return out;
 }
@@ -324,7 +264,7 @@ CLUSTER_MATCH::print_stats(std::ostream& ostrm) const
 ////////////////////////////////////////////////////////////////
 
 result_type
-CLUSTER_MATCH::filter_isolated_errors(syndrome_ref syndrome, LOGGER& logger)
+CLUSTER_MATCH::filter_isolated_errors(syndrome_ref syndrome)
 {
     // count active degree of all syndrome bits:
     std::vector<size_t> active_degree(num_detectors, 0);
@@ -369,7 +309,7 @@ CLUSTER_MATCH::filter_isolated_errors(syndrome_ref syndrome, LOGGER& logger)
 ////////////////////////////////////////////////////////////////
 
 std::vector<cluster_type>
-CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome, LOGGER& logger)
+CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome)
 {
     // initialize `uf_pool` (storage for UF data structures) and
     // `growth_fifo` (what detectors to traverse from) using `syndrome`
@@ -481,7 +421,7 @@ CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome, LOGGER& logger)
 ////////////////////////////////////////////////////////////////
 
 matching_problem_type
-CLUSTER_MATCH::synthesize_matching_problem(cluster_type&& cl, LOGGER& logger)
+CLUSTER_MATCH::synthesize_matching_problem(cluster_type&& cl)
 {
     assert((cl.flipped.size() % 2) == 0);
     const size_t n = cl.all.size();
@@ -540,13 +480,6 @@ CLUSTER_MATCH::synthesize_matching_problem(cluster_type&& cl, LOGGER& logger)
         {
             const det_id_type d2 = cl.flipped[jj];
             const size_t j = idx_map.at(d2);
-#if defined(ENABLE_LOGGER)
-            logger.error() << "mwpm edge between " << d1 << " and " << d2
-                            << ", weight = " << dist[j].w
-                            << ", frame flips = " << dist[j].frame_flips[0]
-                            << "\n";
-            
-#endif
             mwpm_edge_type e{ .d1=d1,
                                 .d2=d2,
                                 .w_qu=dist[j].w,
@@ -565,7 +498,7 @@ CLUSTER_MATCH::synthesize_matching_problem(cluster_type&& cl, LOGGER& logger)
 ////////////////////////////////////////////////////////////////
 
 result_type
-CLUSTER_MATCH::solve_matching_problem(matching_problem_type&& mp, LOGGER& logger)
+CLUSTER_MATCH::solve_matching_problem(matching_problem_type&& mp)
 {
     // create index map for `mp.detectors`
     std::unordered_map<det_id_type, size_t> idx_map;
@@ -602,15 +535,6 @@ CLUSTER_MATCH::solve_matching_problem(matching_problem_type&& mp, LOGGER& logger
         {
             const auto& e = mp.edges[i];
             out.flipped_obs ^= e.frame_flips;
-
-#if defined(ENABLE_LOGGER)
-            logger.error() << "edge " << i << " between " << e.d1 << " and " << e.d2 
-                            << " in matching, frame flips =";
-            for (size_t i = 0; i < num_observables; i++)
-                if (e.frame_flips[i])
-                    logger.error() << i;
-            logger.error() << "\n";
-#endif
         }
     }
     
