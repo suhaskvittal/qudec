@@ -8,11 +8,5 @@
 `define W_BIT_WIDTH                  8
 `define OBS_BIT_WIDTH                1
 
-`define EXTRACT_ACTIVE_CHUNK_WIDTH   32
-`define EXTRACT_ACTIVE_OUT_COUNT     10   // ceiling of `D_COUNT_PER_ROUND/EXTRACT_ACTIVE_CHUNK_WIDTH`
-
-`define RBF_SIZE    16
-`define LG_RBF_SIZE 4
-
-`define FBF_SIZE    256
-`define LG_FBF_SIZE 8
+`define D_MAX                        128
+`define LG_D_MAX                     7
