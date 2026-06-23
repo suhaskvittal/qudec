@@ -7,13 +7,11 @@
 #define DECODER_SURFACE_CODE_h
 
 #include "decoder/common.h"
-#include "stats.h"
 
 #include <stim.h>
 #include <pymatching/sparse_blossom/driver/mwpm_decoding.h>
 
 #include <iosfwd>
-#include <vector>
 
 namespace decoder
 {
@@ -39,11 +37,8 @@ public:
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-#include "decoder/surface_code/cluster_match.h"
-
-////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////
-
 } // namespace decoder
+
+#include "decoder/surface_code/cluster_match.h"
 
 #endif // DECODER_SURFACE_CODE_h

@@ -3,13 +3,25 @@
  *  date:   20 May 2026
  * */
 
+#if defined(VERILATOR_CLUSTER_MATCH)
+#include <verilated.h>
+#include "Vastrea.h"
+#include "Vinitialize_neighbors.h"
+#include "Vfilter.h"
+#endif
+
 #include "decoder/surface_code.h"
+
+#if defined(VERILATOR_CLUSTER_MATCH)
+double sc_time_stamp() { return 0; }
+#endif
 
 #include <PerfectMatching.h>
 
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstring>
 #include <limits>
 #include <numeric>
 #include <queue>
@@ -117,7 +129,7 @@ struct uf_growth_type
 
 struct distance_type
 {
-    uint64_t w =std::numeric_limits<uint64_t>::max();
+    double w =std::numeric_limits<uint64_t>::max();
     obs_type frame_flips;
 };
 
@@ -147,12 +159,14 @@ using distance_queue_type = std::priority_queue<distance_queue_entry,
 CLUSTER_MATCH::CLUSTER_MATCH(const stim::DetectorErrorModel& dem,
                                 size_t _code_distance,
                                 size_t _astrea_hw_max,
-                                quantization_level ql)
+                                quantization_level ql,
+                                uint8_t _hw_emu_enable)
     :num_detectors(dem.count_detectors()),
     num_observables(dem.count_observables()),
     code_distance(_code_distance),
     astrea_hw_max(_astrea_hw_max),
     astrea_weight_quantization(ql),
+    hw_emu_enable(_hw_emu_enable),
     adj_matrix_(num_detectors)
 {
     // setup `adj_matrix_`
@@ -182,6 +196,8 @@ CLUSTER_MATCH::CLUSTER_MATCH(const stim::DetectorErrorModel& dem,
                                 _update_adjacency_list(adj_matrix_[d2], d1, pr, frame_flips);
                         });
             });
+
+    // Verilator setup:
 }
 
 const adj_list_type&
@@ -197,9 +213,18 @@ result_type
 CLUSTER_MATCH::decode(syndrome_ref syndrome)
 {
     result_type out{.flipped_obs=obs_type(num_observables)};
-
     s_hamming_weight.add(syndrome.popcnt());
 
+#if defined(VERILATOR_CLUSTER_MATCH)
+    // 0. Initialize verilator context + modules:
+    VerilatedContext v_ctx;
+    Vastrea v_astrea(&v_ctx);
+#else
+    if (hw_emu_enable)
+        std::cerr << "CLUSTER_MATCH::decode: `hw_emu_enable > 0` but VERILATOR_CLUSTER_MATCH macro is undefined." << _die{};
+#endif
+
+    // 1. Filter syndrome and remove isolated weight-1 errors.
     syndrome_type filtered_syndrome(syndrome);
     auto filter_out = filter_isolated_errors(filtered_syndrome);
     out.flipped_obs ^= filter_out.flipped_obs;
@@ -209,6 +234,7 @@ CLUSTER_MATCH::decode(syndrome_ref syndrome)
     if (filtered_syndrome.popcnt() == 0)
         return out;
 
+    // 2. Use UF algorithm to compute matching clusters
     auto clusters = uf_compute_clusters(filtered_syndrome);
     s_clusters.add(clusters.size());
 
@@ -219,11 +245,27 @@ CLUSTER_MATCH::decode(syndrome_ref syndrome)
         s_cluster_size.add(cl.all.size());
         s_cluster_hamming_weight.add(cl.flipped.size());
 
-        auto mp = synthesize_matching_problem(std::move(cl));
-        auto mp_result = solve_matching_problem(std::move(mp));
+        matching_problem_type mp;
+        result_type mp_result;
+
+        // 3. Compute pairwise distances for all detection events in the cluster.
+        mp = synthesize_matching_problem(std::move(cl));
+
+        // 4. Run Astrea to get correction for cluster.
+#if defined(VERILATOR_CLUSTER_MATCH)
+        if (hw_emu_enable & hw_emu_flag::astrea)
+            mp_result = v_solve_matching_problem(std::move(mp), v_astrea);
+        else
+            mp_result = solve_matching_problem(std::move(mp));
+#else
+        mp_result = solve_matching_problem(std::move(mp));
+#endif
         out.flipped_obs ^= mp_result.flipped_obs;
     }
 
+#if defined(VERILATOR_CLUSTER_MATCH)
+    v_astrea.final();
+#endif
     return out;
 }
 
@@ -421,7 +463,7 @@ CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome)
 ////////////////////////////////////////////////////////////////
 
 matching_problem_type
-CLUSTER_MATCH::synthesize_matching_problem(cluster_type&& cl)
+CLUSTER_MATCH::synthesize_matching_problem(cluster_type cl)
 {
     assert((cl.flipped.size() % 2) == 0);
     const size_t n = cl.all.size();
@@ -498,7 +540,7 @@ CLUSTER_MATCH::synthesize_matching_problem(cluster_type&& cl)
 ////////////////////////////////////////////////////////////////
 
 result_type
-CLUSTER_MATCH::solve_matching_problem(matching_problem_type&& mp)
+CLUSTER_MATCH::solve_matching_problem(matching_problem_type mp)
 {
     // create index map for `mp.detectors`
     std::unordered_map<det_id_type, size_t> idx_map;
@@ -528,17 +570,17 @@ CLUSTER_MATCH::solve_matching_problem(matching_problem_type&& mp)
     pm.Solve();
 
     // Retrieve the solution to the MWPM problem:
-    result_type out{.flipped_obs=obs_type(num_observables)};
+    result_type out{.flipped_obs=obs_type(num_observables), .matching_weight=0};
     for (size_t i = 0; i < m; i++)
     {
         if (pm.GetSolution(i))
         {
             const auto& e = mp.edges[i];
             out.flipped_obs ^= e.frame_flips;
+            out.matching_weight += e.w_qu;
         }
     }
     
-
     return out;
 }
 
@@ -568,7 +610,7 @@ _quantize(double w, quantization_level ql)
     }
     else if (ql == quantization_level::b16)
     {
-        q = std::round(1000*w);
+        q = std::round(100*w);
         q = std::min(q, uint64_t{(1ull<<16)-1});
     }
     else
@@ -682,3 +724,5 @@ uf_type::merge_find(uf_type* np)
 ////////////////////////////////////////////////////////////////
 
 } // namespace decoder
+
+#include "cluster_match.v.cpp"

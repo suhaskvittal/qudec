@@ -29,6 +29,9 @@ using obs_ref = syndrome_ref;
 struct result_type
 {
     obs_type flipped_obs{1};
+
+    // Decoder specific parameters:
+    int matching_weight{};
 };
 
 ////////////////////////////////////////////////////////////////

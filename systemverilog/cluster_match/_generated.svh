@@ -5,7 +5,7 @@
 `define D_COUNT_PER_ROUND_BIT_WIDTH  9
 
 `define D_BIT_WIDTH                  13
-`define W_BIT_WIDTH                  8
+`define W_BIT_WIDTH                  24
 `define OBS_BIT_WIDTH                1
 
 `define D_MAX                        128

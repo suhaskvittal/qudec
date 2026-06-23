@@ -3,8 +3,6 @@
  *  date:   16 May 2026
  * */
 
-#include "decoder/logger.h"
-
 #if defined(ENABLE_MPI)
 #include <mpi.h>
 #endif
@@ -34,7 +32,6 @@ estimate_logical_error_rate(const stim::DetectorErrorModel& dem, D& decoder, EXP
         if (prob_x[k] > prob_x[conf.start_level])
             conf.start_level = k;
 
-    decoder::LOGGER logger;
     std::mt19937_64 rng;
     rng.seed(conf.seed + world_rank);
     bool no_errors_found_yet{true};
@@ -83,7 +80,7 @@ estimate_logical_error_rate(const stim::DetectorErrorModel& dem, D& decoder, EXP
 #endif
 
             // decode and determine if logical error occurred:
-            auto result = decoder.decode(syndromes[i], logger);
+            auto result = decoder.decode(syndromes[i]);
             bool any_mismatch{false};
             for (size_t j = 0; j < dem.count_observables(); j++)
                 any_mismatch |= (result.flipped_obs[j] != obs_array[i][j]);
@@ -91,11 +88,6 @@ estimate_logical_error_rate(const stim::DetectorErrorModel& dem, D& decoder, EXP
                 error_count++;
             samples++;
 
-            // print out debug/error info:
-            logger.dump_info(std::cout, conf.verbosity);
-            if (any_mismatch && conf.verbosity > 0)
-                logger.dump_error(std::cout);
-            logger.reset();
         }
 
 #if defined(ENABLE_MPI)

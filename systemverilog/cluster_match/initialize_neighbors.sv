@@ -75,7 +75,7 @@ module INITIALIZE_NEIGHBORS
             begin
                 for (int j = 0; j < `D_MAX; j++)
                 begin
-                    st[1].present_in_syndrome[i] <= st[1].present_in_syndrome
+                    st[1].present_in_syndrome[i] <= st[1].present_in_syndrome[i]
                                                     | (st[0].adj_list[i].d == syn[j]);
                 end
             end
@@ -88,7 +88,7 @@ module INITIALIZE_NEIGHBORS
             begin
                 if (st[1].present_in_syndrome[i])
                 begin
-                    st[2].a <= st[1].adj_list[i];
+                    st[2].a <= st[1].adj_list[i].d;
                     break;
                 end
             end

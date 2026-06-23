@@ -107,7 +107,9 @@ module FILTER
             if (lu_buffer[i].v && lu_buffer[i].dst_match == d)
             begin
                 buf_match = 1'b1;
+                /* verilator lint_off WIDTHTRUNC */
                 buf_match_idx = i;
+                /* verilator lint_on WIDTHTRUNC */
                 break;
             end
         end

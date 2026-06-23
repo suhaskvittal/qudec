@@ -6,9 +6,9 @@
 ////////////////////////////////////////////
 ////////////////////////////////////////////
 
-typedef logic[`D_BIT_WIDTH-1:0]  detector_type;
-typedef logic[`W_BIT_WIDTH:0]    weight_type;
-typedef logic[`OBS_BIT_WIDTH:0]  obs_type;
+typedef logic[`D_BIT_WIDTH-1:0]    detector_type;
+typedef logic[`W_BIT_WIDTH-1:0]    weight_type;
+typedef logic[`OBS_BIT_WIDTH-1:0]  obs_type;
 
 typedef detector_type[`D_MAX-1:0] syndrome_type;
 
@@ -31,8 +31,8 @@ typedef neighbor_data_type[`ADJ_MAX_DEGREE-1:0]  adj_type;
 // passed into `ASTREA`
 typedef struct packed
 {
-    weight_type w;
     obs_type f;
+    weight_type w;
 } edge_type;
 
 ////////////////////////////////////////////
