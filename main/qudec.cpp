@@ -17,6 +17,19 @@
 #include <mpi.h>
 #endif
 
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
+namespace
+{
+
+double run(
+
+} // anon
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
 int
 main(int argc, char* argv[])
 {
@@ -40,6 +53,7 @@ main(int argc, char* argv[])
     int64_t cm_astrea_hw_max;
 
     ARGPARSE()
+        .required("decoder-name", "Decoder to run", decoder_name)
         .required("code-distance", "Code distance of surface code", d)
         .optional("-v", "--verbose", "Verbosity level", conf.verbosity, 0)
         .optional("-s", "--samples", "Samples per error level", conf.samples_per_level, 10000)
@@ -64,6 +78,7 @@ main(int argc, char* argv[])
 
     // Build decoder and run estimation
 //  decoder::PYMATCHING dec(dem);
+//  decoder::BLOSSOMV dec(dem);
     decoder::CLUSTER_MATCH dec(dem, d, cm_astrea_hw_max, decoder::CLUSTER_MATCH::quantization_level::b16);
 
     double ler = estimate_logical_error_rate(dem, dec, conf);
@@ -80,3 +95,6 @@ main(int argc, char* argv[])
 #endif
     return 0;
 }
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
