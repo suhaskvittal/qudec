@@ -33,10 +33,19 @@ struct EXPERIMENT_CONFIG
 /*
  * Estimates the logical error rate of the given decoder on the
  * given error model.
+ *
+ * `ERROR_CALLBACK` is called on a logical error (any mismatch in
+ * frames). This callback is given (1) the syndrome, (2) the true
+ * frame flips, and (3) the decoder's result.
  * */
+template <class D_TYPE, class ERROR_CALLBACK>
+double estimate_logical_error_rate(const stim::DetectorErrorModel&, D_TYPE&, EXPERIMENT_CONFIG, const ERROR_CALLBACK&);
 
-template <class D_TYPE>
-double estimate_logical_error_rate(const stim::DetectorErrorModel&, D_TYPE&, EXPERIMENT_CONFIG);
+template <class D_TYPE> double
+estimate_logical_error_rate(const stim::DetectorErrorModel& dem, D_TYPE& dec, EXPERIMENT_CONFIG conf)
+{
+    return estimate_logical_error_rate(dem, dec, conf, [] (auto, auto, auto) {});
+}
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////

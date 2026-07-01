@@ -46,6 +46,7 @@ using cluster_type = CLUSTER_MATCH::cluster_type;
 using mwpm_edge_type = CLUSTER_MATCH::mwpm_edge_type;
 using matching_problem_type = CLUSTER_MATCH::matching_problem_type;
 using quantization_level = CLUSTER_MATCH::quantization_level;
+using assignment_type = MATCHING_DATA::assignment_type;
 
 constexpr det_id_type BOUNDARY_ID{-1};
 
@@ -136,7 +137,7 @@ struct distance_type
 struct distance_queue_entry
 {
     det_id_type d;
-    uint64_t w;
+    double w;
 };
 
 struct distance_cmp
@@ -196,8 +197,6 @@ CLUSTER_MATCH::CLUSTER_MATCH(const stim::DetectorErrorModel& dem,
                                 _update_adjacency_list(adj_matrix_[d2], d1, pr, frame_flips);
                         });
             });
-
-    // Verilator setup:
 }
 
 const adj_list_type&
@@ -228,6 +227,8 @@ CLUSTER_MATCH::decode(syndrome_ref syndrome)
     syndrome_type filtered_syndrome(syndrome);
     auto filter_out = filter_isolated_errors(filtered_syndrome);
     out.flipped_obs ^= filter_out.flipped_obs;
+    out.matching_data.merge(filter_out.matching_data);
+
     s_filtered.add(syndrome.popcnt() - filtered_syndrome.popcnt());
     s_post_filter_hamming_weight.add(filtered_syndrome.popcnt());
 
@@ -256,16 +257,18 @@ CLUSTER_MATCH::decode(syndrome_ref syndrome)
         if (hw_emu_enable & hw_emu_flag::astrea)
             mp_result = v_solve_matching_problem(std::move(mp), v_astrea);
         else
-            mp_result = solve_matching_problem(std::move(mp));
+            mp_result = solve_matching_problem(std::move(mp), i);
 #else
-        mp_result = solve_matching_problem(std::move(mp));
+        mp_result = solve_matching_problem(std::move(mp), i);
 #endif
         out.flipped_obs ^= mp_result.flipped_obs;
+        out.matching_data.merge(mp_result.matching_data);
     }
 
 #if defined(VERILATOR_CLUSTER_MATCH)
     v_astrea.final();
 #endif
+
     return out;
 }
 
@@ -309,9 +312,11 @@ result_type
 CLUSTER_MATCH::filter_isolated_errors(syndrome_ref syndrome)
 {
     // count active degree of all syndrome bits:
+    const bool count_boundary = (syndrome.popcnt() & 1);
     std::vector<size_t> active_degree(num_detectors, 0);
-    std::vector<std::pair<det_id_type, obs_type>> active_companion(num_detectors, 
-                                                                    {0,obs_type(num_observables)});
+    std::vector<std::pair<det_id_type, adj_entry_type>> active_companion(num_detectors,
+                                                                        std::make_pair(0, adj_entry_type{.frame_flips=obs_type(1)}) );
+    size_t boundary_degree{0};
     for (size_t i = 0; i < num_detectors; i++)
     {
         if (syndrome[i])
@@ -319,11 +324,18 @@ CLUSTER_MATCH::filter_isolated_errors(syndrome_ref syndrome)
             for (const auto& e : adj_matrix(i))
             {
                 if (e.d == BOUNDARY_ID)
-                    continue;
-                if (syndrome[e.d])
+                {
+                    if (count_boundary)
+                    {
+                        active_degree[i]++;
+                        boundary_degree++;
+                        active_companion[i] = std::make_pair(BOUNDARY_ID, e);
+                    }
+                }
+                else if (syndrome[e.d])
                 {
                     active_degree[i]++;
-                    active_companion[i] = std::make_pair(e.d, e.frame_flips);
+                    active_companion[i] = std::make_pair(e.d, e);
                 }
             }
         }
@@ -335,12 +347,17 @@ CLUSTER_MATCH::filter_isolated_errors(syndrome_ref syndrome)
     {
         if (syndrome[i] && active_degree[i] == 1)
         {
-            auto [j, frame_flips] = active_companion[i];
-            if (active_degree[j])
+            auto [j, e] = active_companion[i];
+            if ((j == BOUNDARY_ID && boundary_degree == 1) || (j != BOUNDARY_ID && active_degree[j] == 1))
             {
                 syndrome[i] ^= 1;
-                syndrome[j] ^= 1;
-                out.flipped_obs ^= frame_flips;
+                if (j != BOUNDARY_ID)
+                    syndrome[j] ^= 1;
+                out.flipped_obs ^= e.frame_flips;
+                // update matching data:
+                auto w_qu = _quantize(-std::log(e.pr), astrea_weight_quantization);
+                assignment_type a{.d1=i, .d2=j, .pr=e.pr, .w_qu=w_qu, .frame_flips=e.frame_flips};
+                out.matching_data.add(a);
             }
         }
     }
@@ -486,9 +503,9 @@ CLUSTER_MATCH::synthesize_matching_problem(cluster_type cl)
     {
         std::fill(dist.begin(), dist.end(), fill_val);
         const det_id_type d1 = cl.flipped[ii];
-        dist[idx_map[d1]].w = 0;
+        dist[idx_map[d1]].w = 0.0;
         distance_queue_type pq;
-        pq.push({d1, 0});
+        pq.push({d1, 0.0});
         while (pq.size() > 0)
         {
             auto e = std::move(pq.top());
@@ -496,9 +513,10 @@ CLUSTER_MATCH::synthesize_matching_problem(cluster_type cl)
             const auto z1 = e.d;
             const auto w1 = e.w;
             const auto i = idx_map.at(z1);
-            if (w1 != dist[i].w)
+            if (std::abs(w1 - dist[i].w) > 1e-6)
                 continue;
             tick++;
+            // Accumulate the raw `-log(pr)`; quantization happens once below.
             for (const auto& x : adj_matrix(z1))
             {
                 const auto z2 = x.d;
@@ -506,8 +524,7 @@ CLUSTER_MATCH::synthesize_matching_problem(cluster_type cl)
                 if (idx_it == idx_map.end())
                     continue;
                 const auto j = idx_it->second;
-                const uint64_t w_qu = _quantize(-std::log(x.pr), astrea_weight_quantization);
-                const auto w2 = w1 + w_qu;
+                const double w2 = w1 + (-std::log(x.pr));
                 if (w2 < dist[j].w)
                 {
                     dist[j].w = w2;
@@ -517,15 +534,17 @@ CLUSTER_MATCH::synthesize_matching_problem(cluster_type cl)
             }
         }
 
-        // create mwpm edges:
+        // create mwpm edges: `dist[j].w` is the accumulated `-log` path weight, so the
+        // matching's error probability is `exp(-w)` and its quantized weight `_quantize(w)`.
         for (size_t jj = ii+1; jj < hw; jj++)
         {
             const det_id_type d2 = cl.flipped[jj];
             const size_t j = idx_map.at(d2);
             mwpm_edge_type e{ .d1=d1,
                                 .d2=d2,
-                                .w_qu=dist[j].w,
-                                .frame_flips=std::move(dist[j].frame_flips) };
+                                .pr=std::exp(-dist[j].w),
+                                .w_qu=_quantize(dist[j].w, astrea_weight_quantization),
+                                .frame_flips=dist[j].frame_flips };
             mp.edges.push_back(e);
         }
     }
@@ -540,7 +559,7 @@ CLUSTER_MATCH::synthesize_matching_problem(cluster_type cl)
 ////////////////////////////////////////////////////////////////
 
 result_type
-CLUSTER_MATCH::solve_matching_problem(matching_problem_type mp)
+CLUSTER_MATCH::solve_matching_problem(matching_problem_type mp, int cluster_id)
 {
     // create index map for `mp.detectors`
     std::unordered_map<det_id_type, size_t> idx_map;
@@ -570,14 +589,18 @@ CLUSTER_MATCH::solve_matching_problem(matching_problem_type mp)
     pm.Solve();
 
     // Retrieve the solution to the MWPM problem:
-    result_type out{.flipped_obs=obs_type(num_observables), .matching_weight=0};
+    result_type out{.flipped_obs=obs_type(num_observables)};
     for (size_t i = 0; i < m; i++)
     {
         if (pm.GetSolution(i))
         {
             const auto& e = mp.edges[i];
             out.flipped_obs ^= e.frame_flips;
-            out.matching_weight += e.w_qu;
+            // update matching data:
+            assignment_type a{e};
+            a.matching_step = 1;
+            a.cluster_id = cluster_id;
+            out.matching_data.add(a);
         }
     }
     
@@ -642,7 +665,7 @@ _update_adjacency_list(adj_list_type& adj, det_id_type d, double p, obs_ref fram
 constexpr size_t
 _max_growth_steps(size_t d)
 {
-    double g = static_cast<double>(d-1) / 4.0;
+    double g = static_cast<double>(d-1) / 4.0 + 1.0;
     g = std::max(1.0, std::ceil(g));
     return static_cast<size_t>( std::round(g) );
 }
@@ -725,4 +748,6 @@ uf_type::merge_find(uf_type* np)
 
 } // namespace decoder
 
+#if defined(VERILATOR_CLUSTER_MATCH)
 #include "cluster_match.v.cpp"
+#endif

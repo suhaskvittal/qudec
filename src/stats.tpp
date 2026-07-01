@@ -21,7 +21,7 @@ TEMPL_CLASS::STATS_HISTOGRAM(T _range_min,
     range_max(_range_max),
     bucket_width((range_max-range_min) / _num_buckets),
     num_buckets(_num_buckets),
-    buckets_(num_buckets, 0)
+    buckets_(num_buckets+2, 0)
 {
     // verify that `bucket_width*num_buckets = (range_max-range_min)`
     if (bucket_width * num_buckets != (range_max-range_min))

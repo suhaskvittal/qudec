@@ -45,6 +45,7 @@ endif()
 set(QUDEC_FILES
     src/decoder/surface_code.cpp
     src/decoder/surface_code/cluster_match.cpp
+    src/decoder/surface_code/matching_data.cpp
     src/globals.cpp
     src/sampler.cpp
 )

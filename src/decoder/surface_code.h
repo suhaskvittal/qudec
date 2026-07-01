@@ -74,23 +74,45 @@ public:
      * An edge in the matching problem: both endpoints, a quantized weight, and the
      * accumulated Pauli frame flips along the shortest path between the endpoints.
      * */
-    struct mwpm_edge_type
+    using mwpm_edge_type = MATCHING_DATA::assignment_type;
+
+    /*
+     * A matching problem: the detectors to be matched and the complete graph of
+     * edges between them.
+     * */
+    struct matching_problem_type
     {
-        det_id_type d1;
-        det_id_type d2;
-        uint64_t    w_qu;
-        obs_type    frame_flips;
+        std::vector<det_id_type>    detectors;
+        std::vector<mwpm_edge_type> edges;
     };
 
     const size_t num_detectors;
     const size_t num_observables;
-
+public:
     BLOSSOMV(const stim::DetectorErrorModel&);
 
     result_type decode(syndrome_ref);
 
     void print_stats(std::ostream&) const {}
 private:
+    /*
+     * `collect_detection_events()` gathers all flipped detectors, appending the
+     * boundary when their count is odd so that a perfect matching exists.
+     * */
+    std::vector<det_id_type> collect_detection_events(syndrome_ref) const;
+
+    /*
+     * `synthesize_matching_problem()` computes the pairwise distances between all
+     * detection events (Dijkstra over the full decoding graph).
+     * */
+    matching_problem_type synthesize_matching_problem(std::vector<det_id_type>) const;
+
+    /*
+     * `solve_matching_problem()` runs Blossom-5 and returns the correction implied
+     * by the min-weight perfect matching.
+     * */
+    result_type solve_matching_problem(const matching_problem_type&) const;
+
     /*
      * Decoding graph adjacency data:
      * */

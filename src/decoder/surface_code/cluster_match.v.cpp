@@ -57,11 +57,12 @@ CLUSTER_MATCH::v_solve_matching_problem(matching_problem_type mp, Vastrea& astre
     syndrome_type frame_flips(num_observables);
     const size_t ff_words = (num_observables+7)/8;
     memcpy(frame_flips.u8, &astrea.frame_flips, ff_words);
-    result_type out{ .flipped_obs=std::move(frame_flips), .matching_weight=astrea.m_weight };
+    result_type out{ .flipped_obs=std::move(frame_flips) };
+    out.matching_data.total_weight = astrea.m_weight;
 
     // if we need to validate, then also run `solve_matching_problem()` and check that the
     // results match
-    auto sw_result = solve_matching_problem(mp);
+    auto sw_result = solve_matching_problem(mp, 0);
     for (size_t i = 0; i < num_observables; i++)
     {
         if (out.flipped_obs[i] != sw_result.flipped_obs[i])
@@ -69,8 +70,8 @@ CLUSTER_MATCH::v_solve_matching_problem(matching_problem_type mp, Vastrea& astre
             std::cerr << "CLUSTER_MATCH::v_solve_matching_problem: Astrea had mismatch with software" 
                         << "\n\thamming weight = " << mp.detectors.size() 
                         << "\n\tedge count = " << mp.edges.size()
-                        << "\n\tHW matching weight = " << out.matching_weight
-                        << "\n\tSW matching weight = " << sw_result.matching_weight;
+                        << "\n\tHW matching weight = " << out.matching_data.total_weight
+                        << "\n\tSW matching weight = " << sw_result.matching_data.total_weight;
             std::cerr << "\n\tedges:";
             for (const auto& e : mp.edges)
                 std::cerr << "\n\t\t" << e.d1 << ", " << e.d2 << ", w = " << e.w_qu << ", f = " << e.frame_flips[0];

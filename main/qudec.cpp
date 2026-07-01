@@ -20,16 +20,6 @@
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-namespace
-{
-
-double run(
-
-} // anon
-
-////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////
-
 int
 main(int argc, char* argv[])
 {
@@ -44,6 +34,7 @@ main(int argc, char* argv[])
     /*
      * Simulation configuration:
      * */
+    std::string decoder_name;
     int64_t d;
     EXPERIMENT_CONFIG conf;
 
@@ -76,18 +67,49 @@ main(int argc, char* argv[])
     // Convert to DEM with error decomposition required by PyMatching
     auto dem = stim::circuit_to_dem(gen.circuit, {.decompose_errors = true});
 
-    // Build decoder and run estimation
-//  decoder::PYMATCHING dec(dem);
-//  decoder::BLOSSOMV dec(dem);
-    decoder::CLUSTER_MATCH dec(dem, d, cm_astrea_hw_max, decoder::CLUSTER_MATCH::quantization_level::b16);
-
-    double ler = estimate_logical_error_rate(dem, dec, conf);
-
-    if (world_rank == 0)
+    // Build decoder, run estimation, and report results.
+    auto run = [&] (auto&& dec, const auto& error_callback)
     {
-        std::cout << "Logical error rate: " << ler << "\n";
-        dec.print_stats(std::cout);
+        double ler = estimate_logical_error_rate(dem, dec, conf, error_callback);
+        if (world_rank == 0)
+        {
+            std::cout << "Logical error rate: " << ler << "\n";
+            dec.print_stats(std::cout);
+        }
+    };
+
+    if (decoder_name == "pymatching")
+    {
+        run(decoder::PYMATCHING(dem), [] (auto, auto, auto) {});
     }
+    else if (decoder_name == "blossom5")
+    {
+        run(decoder::BLOSSOMV(dem), [] (auto, auto, auto) {});
+    }
+    else if (decoder_name == "cluster_match")
+    {
+        decoder::CLUSTER_MATCH dec(dem, d, cm_astrea_hw_max, decoder::CLUSTER_MATCH::quantization_level::b16);
+        decoder::BLOSSOMV reference(dem);
+        run(dec,
+            [&reference] (decoder::syndrome_ref syndrome, decoder::obs_ref obs, const decoder::result_type& res)
+            {
+                auto ref_res = reference.decode(syndrome);
+                bool any_mismatch{false};
+                for (size_t i = 0; i < reference.num_observables; i++)
+                    any_mismatch |= (ref_res.flipped_obs[i] != obs[i]);
+                if (!any_mismatch)
+                {
+                    std::cout << "\nsyndrome:";
+                    for (size_t i = 0; i < reference.num_detectors; i++)
+                        if (syndrome[i])
+                            std::cout << " " << i;
+                    std::cout << "\n";
+                    decoder::matching_show_diff(std::cout, res.matching_data, ref_res.matching_data, reference.num_observables);
+                }
+            });
+    }
+    else
+        std::cerr << "unknown decoder name: " << decoder_name << _die{};
 
 #if defined(ENABLE_MPI)
     MPI_Barrier(MPI_COMM_WORLD);

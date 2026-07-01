@@ -49,8 +49,8 @@ public:
     std::string to_string_some() const;
     std::string to_string_full() const;
 private:
-    size_t underflow_idx() const { return num_buckets+1; }
-    size_t overflow_idx() const { return num_buckets+2; }
+    size_t underflow_idx() const { return num_buckets; }
+    size_t overflow_idx() const { return num_buckets+1; }
 };
 
 ////////////////////////////////////////////////////////////////

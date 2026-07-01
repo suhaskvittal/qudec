@@ -68,20 +68,9 @@ public:
 
     /*
      * We need to compute pairwise distances between all
-     * detectors in the syndrome to run Astrea's matching
-     * step. This is the data we need:
-     *  (1) both detector ids,
-     *  (2) a integer quantized weight (see `quantization_level` below)
-     *  (3) a double that is the unquantized weight
-     *  (4) the Pauli frame flip
+     * detectors in the syndrome to run Astrea's matching step.
      * */
-    struct mwpm_edge_type
-    {
-        det_id_type d1;
-        det_id_type d2;
-        uint64_t  w_qu;
-        obs_type frame_flips;
-    };
+    using mwpm_edge_type = MATCHING_DATA::assignment_type;
 
     /*
      * This is the barebones information needed for matching: a list
@@ -194,7 +183,7 @@ private:
     /*
      * `solve_matching_problem()` computes the min-weight error for the given matching problem.
      * */
-    result_type solve_matching_problem(matching_problem_type);
+    result_type solve_matching_problem(matching_problem_type, int cluster_id);
 
     /*
      * Verilator emulation of the above functions.

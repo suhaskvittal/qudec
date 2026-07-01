@@ -6,20 +6,14 @@
 #ifndef DECODER_COMMON_h
 #define DECODER_COMMON_h
 
+#include "decoder/surface_code/matching_data.h"
 #include "globals.h"
 
-#include <stim.h>
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
 
 namespace decoder
 {
-
-////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////
-
-using syndrome_type = stim::simd_bits<64>;
-using syndrome_ref = stim::simd_bits_range_ref<64>;
-using obs_type = syndrome_type;
-using obs_ref = syndrome_ref;
 
 /*
  * `result_type` is a generic result output that must
@@ -31,7 +25,7 @@ struct result_type
     obs_type flipped_obs{1};
 
     // Decoder specific parameters:
-    int matching_weight{};
+    MATCHING_DATA matching_data;
 };
 
 ////////////////////////////////////////////////////////////////

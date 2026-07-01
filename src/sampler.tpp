@@ -10,8 +10,11 @@
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-template <class D> double
-estimate_logical_error_rate(const stim::DetectorErrorModel& dem, D& decoder, EXPERIMENT_CONFIG conf)
+template <class D, class ERROR_CALLBACK> double
+estimate_logical_error_rate(const stim::DetectorErrorModel& dem, 
+                            D& decoder, 
+                            EXPERIMENT_CONFIG conf, 
+                            const ERROR_CALLBACK& error_callback)
 {
     // generate probability polynomial: 
     POLY prob_x = compute_probability_polynomial(dem, conf.max_level);
@@ -85,9 +88,12 @@ estimate_logical_error_rate(const stim::DetectorErrorModel& dem, D& decoder, EXP
             for (size_t j = 0; j < dem.count_observables(); j++)
                 any_mismatch |= (result.flipped_obs[j] != obs_array[i][j]);
             if (any_mismatch)
+            {
                 error_count++;
+                if (conf.verbosity)
+                    error_callback(syndromes[i], obs_array[i], result);
+            }
             samples++;
-
         }
 
 #if defined(ENABLE_MPI)
