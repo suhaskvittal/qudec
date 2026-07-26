@@ -44,7 +44,6 @@ endif()
 
 set(QUDEC_FILES
     src/decoder/surface_code.cpp
-    src/decoder/surface_code/cluster_match.cpp
     src/decoder/surface_code/matching_data.cpp
     src/globals.cpp
     src/sampler.cpp
@@ -62,42 +61,6 @@ target_link_libraries(qudeclib PUBLIC libstim libpymatching blossom5)
 if(ENABLE_MPI)
     target_compile_definitions(qudeclib PUBLIC ENABLE_MPI)
     target_link_libraries(qudeclib PUBLIC MPI::MPI_CXX)
-endif()
-
-###################################################
-# Verilator (hardware emulation)
-###################################################
-
-option(VERILATOR_CLUSTER_MATCH "Enable Verilator hardware emulation for CLUSTER_MATCH" OFF)
-
-if(VERILATOR_CLUSTER_MATCH)
-    find_package(verilator REQUIRED HINTS $ENV{VERILATOR_ROOT})
-
-    verilate(qudeclib
-        SOURCES systemverilog/cluster_match/filter.sv
-        INCLUDE_DIRS systemverilog
-        TOP_MODULE FILTER
-        VERILATOR_ARGS --cc --assert --x-assign unique --x-initial unique
-    )
-    verilate(qudeclib
-        SOURCES systemverilog/cluster_match/initialize_neighbors.sv
-        INCLUDE_DIRS systemverilog
-        TOP_MODULE INITIALIZE_NEIGHBORS
-        VERILATOR_ARGS --cc --assert --x-assign unique --x-initial unique
-    )
-
-    verilate(qudeclib
-        SOURCES systemverilog/cluster_match/astrea.sv
-        INCLUDE_DIRS systemverilog
-        TOP_MODULE ASTREA
-        VERILATOR_ARGS --cc --assert --x-assign unique --x-initial unique
-    )
-
-    target_compile_definitions(qudeclib PUBLIC VERILATOR_CLUSTER_MATCH)
-
-    add_executable(qudec_verilator main/qudec_verilator.cpp)
-    target_compile_options(qudec_verilator PRIVATE ${COMPILE_OPTIONS})
-    target_link_libraries(qudec_verilator PRIVATE qudeclib)
 endif()
 
 ###################################################

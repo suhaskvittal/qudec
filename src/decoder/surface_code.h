@@ -127,6 +127,4 @@ private:
 
 } // namespace decoder
 
-#include "decoder/surface_code/cluster_match.h"
-
 #endif // DECODER_SURFACE_CODE_h

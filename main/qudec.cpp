@@ -86,30 +86,10 @@ main(int argc, char* argv[])
     {
         run(decoder::BlossomV(dem), [] (auto, auto, auto) {});
     }
-    else if (decoder_name == "cluster_match")
-    {
-        decoder::ClusterMatch dec(dem, d, cm_astrea_hw_max, decoder::ClusterMatch::quantization_level::b16);
-        decoder::BlossomV reference(dem);
-        run(dec,
-            [&reference] (decoder::SyndromeRef syndrome, decoder::ObsRef obs, const decoder::result_type& res)
-            {
-                auto ref_res = reference.decode(syndrome);
-                bool any_mismatch{false};
-                for (size_t i = 0; i < reference.num_observables; i++)
-                    any_mismatch |= (ref_res.flipped_obs[i] != obs[i]);
-                if (!any_mismatch)
-                {
-                    std::cout << "\nsyndrome:";
-                    for (size_t i = 0; i < reference.num_detectors; i++)
-                        if (syndrome[i])
-                            std::cout << " " << i;
-                    std::cout << "\n";
-                    decoder::matching_show_diff(std::cout, res.matching_data, ref_res.matching_data, reference.num_observables);
-                }
-            });
-    }
     else
+    {
         std::cerr << "unknown decoder name: " << decoder_name << _die{};
+    }
 
 #if defined(ENABLE_MPI)
     MPI_Barrier(MPI_COMM_WORLD);
