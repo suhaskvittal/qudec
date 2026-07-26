@@ -14,7 +14,7 @@
 ////////////////////////////////////////////////////////////////
 
 template <class T>
-class STATS_HISTOGRAM
+class StatsHistogram
 {
 public:
     const T range_min;
@@ -30,7 +30,7 @@ private:
     std::vector<size_t> buckets_;
     size_t count_{0};
 public:
-    STATS_HISTOGRAM(T range_min, T range_max, size_t num_buckets);
+    StatsHistogram(T range_min, T range_max, size_t num_buckets);
 
     template <class U> void add(U);
 
@@ -60,7 +60,7 @@ template <class T>
 void print_stat(std::ostream&, std::string_view name, T);
 
 template <class T>
-std::ostream& operator<<(std::ostream&, const STATS_HISTOGRAM<T>&);
+std::ostream& operator<<(std::ostream&, const StatsHistogram<T>&);
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////

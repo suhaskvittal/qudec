@@ -20,7 +20,7 @@ namespace decoder
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-class PYMATCHING
+class PyMatching
 {
 public:
     const size_t num_detectors;
@@ -28,9 +28,9 @@ public:
 private:
     pm::Mwpm mwpm_;
 public:
-    PYMATCHING(const stim::DetectorErrorModel&);
+    PyMatching(const stim::DetectorErrorModel&);
 
-    result_type decode(syndrome_ref);
+    result_type decode(SyndromeRef);
 
     void print_stats(std::ostream&) const {}
 };
@@ -39,10 +39,10 @@ public:
 ////////////////////////////////////////////////////////////////
 
 /*
- * `BLOSSOMV` is a global Minimum-Weight Perfect Matching (MWPM) decoder built on
- * top of Blossom-5. Unlike `CLUSTER_MATCH`, it does not split the syndrome into
+ * `BlossomV` is a global Minimum-Weight Perfect Matching (MWPM) decoder built on
+ * top of Blossom-5. Unlike `ClusterMatch`, it does not split the syndrome into
  * clusters: it matches all detection events at once. As such, it is an exact
- * software reference / ground-truth decoder whose accuracy should track `PYMATCHING`.
+ * software reference / ground-truth decoder whose accuracy should track `PyMatching`.
  *
  * The decoder works in three steps:
  *   (1) The constructor encaches the decoding graph (adjacency matrix + boundary
@@ -52,7 +52,7 @@ public:
  *   (3) Blossom-5 computes the MWPM and the Pauli frame flips of the matched edges
  *       are applied as the correction.
  * */
-class BLOSSOMV
+class BlossomV
 {
 public:
     using det_id_type = int64_t;
@@ -65,7 +65,7 @@ public:
     {
         det_id_type d;
         double      pr;
-        obs_type    frame_flips;
+        ObsType    frame_flips;
     };
 
     using adj_list_type = std::vector<adj_entry_type>;
@@ -74,7 +74,7 @@ public:
      * An edge in the matching problem: both endpoints, a quantized weight, and the
      * accumulated Pauli frame flips along the shortest path between the endpoints.
      * */
-    using mwpm_edge_type = MATCHING_DATA::assignment_type;
+    using mwpm_edge_type = MatchingData::assignment_type;
 
     /*
      * A matching problem: the detectors to be matched and the complete graph of
@@ -89,9 +89,9 @@ public:
     const size_t num_detectors;
     const size_t num_observables;
 public:
-    BLOSSOMV(const stim::DetectorErrorModel&);
+    BlossomV(const stim::DetectorErrorModel&);
 
-    result_type decode(syndrome_ref);
+    result_type decode(SyndromeRef);
 
     void print_stats(std::ostream&) const {}
 private:
@@ -99,7 +99,7 @@ private:
      * `collect_detection_events()` gathers all flipped detectors, appending the
      * boundary when their count is odd so that a perfect matching exists.
      * */
-    std::vector<det_id_type> collect_detection_events(syndrome_ref) const;
+    std::vector<det_id_type> collect_detection_events(SyndromeRef) const;
 
     /*
      * `synthesize_matching_problem()` computes the pairwise distances between all

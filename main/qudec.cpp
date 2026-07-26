@@ -36,7 +36,7 @@ main(int argc, char* argv[])
      * */
     std::string decoder_name;
     int64_t d;
-    EXPERIMENT_CONFIG conf;
+    ExperimentConfig conf;
 
     /*
      * CLUSTER-MATCH parameters:
@@ -80,18 +80,18 @@ main(int argc, char* argv[])
 
     if (decoder_name == "pymatching")
     {
-        run(decoder::PYMATCHING(dem), [] (auto, auto, auto) {});
+        run(decoder::PyMatching(dem), [] (auto, auto, auto) {});
     }
     else if (decoder_name == "blossom5")
     {
-        run(decoder::BLOSSOMV(dem), [] (auto, auto, auto) {});
+        run(decoder::BlossomV(dem), [] (auto, auto, auto) {});
     }
     else if (decoder_name == "cluster_match")
     {
-        decoder::CLUSTER_MATCH dec(dem, d, cm_astrea_hw_max, decoder::CLUSTER_MATCH::quantization_level::b16);
-        decoder::BLOSSOMV reference(dem);
+        decoder::ClusterMatch dec(dem, d, cm_astrea_hw_max, decoder::ClusterMatch::quantization_level::b16);
+        decoder::BlossomV reference(dem);
         run(dec,
-            [&reference] (decoder::syndrome_ref syndrome, decoder::obs_ref obs, const decoder::result_type& res)
+            [&reference] (decoder::SyndromeRef syndrome, decoder::ObsRef obs, const decoder::result_type& res)
             {
                 auto ref_res = reference.decode(syndrome);
                 bool any_mismatch{false};

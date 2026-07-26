@@ -22,10 +22,10 @@ namespace decoder
  * */
 struct result_type
 {
-    obs_type flipped_obs{1};
+    ObsType flipped_obs{1};
 
     // Decoder specific parameters:
-    MATCHING_DATA matching_data;
+    MatchingData matching_data;
 };
 
 ////////////////////////////////////////////////////////////////

@@ -20,7 +20,7 @@
 constexpr size_t verilator_width(size_t N, size_t W);
 
 template <size_t N, size_t W> 
-using v_wide_data_type = VlWide<verilator_width(N,W)>;
+using VWideDataType = VlWide<verilator_width(N,W)>;
 
 /*
  * Builds a packed array from an iterator range and
@@ -32,8 +32,8 @@ using v_wide_data_type = VlWide<verilator_width(N,W)>;
  * the entry. For example, if W <= 64, then K = 1.
  * If 64 < W <= 128, then K = 2. Et cetera.
  * */
-template <size_t N, size_t W, class ITER_TYPE, class CALLBACK>
-v_wide_data_type<N,W> verilator_build_packed_array(ITER_TYPE begin, ITER_TYPE end, const CALLBACK&);
+template <size_t N, size_t W, class IterType, class Callback>
+VWideDataType<N,W> verilator_build_packed_array(IterType begin, IterType end, const Callback&);
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////

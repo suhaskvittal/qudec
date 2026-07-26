@@ -21,15 +21,15 @@ verilator_width(size_t N, size_t W)
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-template <size_t N, size_t W, class ITER_TYPE, class CALLBACK> v_wide_data_type<N,W>
-verilator_build_packed_array(ITER_TYPE begin, ITER_TYPE end, const CALLBACK& f_cb)
+template <size_t N, size_t W, class IterType, class Callback> VWideDataType<N,W>
+verilator_build_packed_array(IterType begin, IterType end, const Callback& f_cb)
 {
-    using word_type = uint64_t;
-    constexpr size_t word_bit_width = 8*sizeof(word_type);
+    using WordType = uint64_t;
+    constexpr size_t word_bit_width = 8*sizeof(WordType);
     constexpr size_t K_WORD = (W+word_bit_width-1)/word_bit_width;
-    constexpr size_t K_B32 = (sizeof(word_type)/sizeof(uint32_t))*K_WORD;
+    constexpr size_t K_B32 = (sizeof(WordType)/sizeof(uint32_t))*K_WORD;
 
-    v_wide_data_type<N,W> out{};
+    VWideDataType<N,W> out{};
 
     size_t word_idx{0}, 
            bit_idx{0};

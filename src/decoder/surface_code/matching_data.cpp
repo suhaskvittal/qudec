@@ -17,7 +17,7 @@ namespace decoder
 namespace
 {
 
-std::string _frames_to_string(obs_ref, size_t num_observables);
+std::string _frames_to_string(ObsRef, size_t num_observables);
 
 } // anon
 
@@ -25,7 +25,7 @@ std::string _frames_to_string(obs_ref, size_t num_observables);
 ////////////////////////////////////////////////////////////////
 
 void
-MATCHING_DATA::add(const assignment_type& a)
+MatchingData::add(const assignment_type& a)
 {
     total_weight += a.w_qu;
     probability *= a.pr;
@@ -37,7 +37,7 @@ MATCHING_DATA::add(const assignment_type& a)
 }
 
 void
-MATCHING_DATA::merge(const MATCHING_DATA& other)
+MatchingData::merge(const MatchingData& other)
 {
     total_weight += other.total_weight;
     probability *= other.probability;
@@ -53,7 +53,7 @@ MATCHING_DATA::merge(const MATCHING_DATA& other)
 ////////////////////////////////////////////////////////////////
 
 void
-matching_show_diff(std::ostream& ostrm, MATCHING_DATA m1, MATCHING_DATA m2, size_t num_observables)
+matching_show_diff(std::ostream& ostrm, MatchingData m1, MatchingData m2, size_t num_observables)
 {
     auto ff_diff = m1.frame_flips ^ m2.frame_flips;
     bool any_mismatch{false};
@@ -130,7 +130,7 @@ namespace
 {
 
 std::string
-_frames_to_string(obs_ref frame_flips, size_t num_observables)
+_frames_to_string(ObsRef frame_flips, size_t num_observables)
 {
     std::stringstream ss;
     for (size_t i = 0; i < num_observables; i++)

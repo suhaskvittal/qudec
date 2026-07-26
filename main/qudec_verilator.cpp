@@ -29,7 +29,7 @@ main(int argc, char* argv[])
 #endif
 
     int64_t d;
-    EXPERIMENT_CONFIG conf;
+    ExperimentConfig conf;
 
     bool enable_astrea{false};
     bool enable_filter{false};
@@ -54,12 +54,12 @@ main(int argc, char* argv[])
     auto gen = stim::generate_surface_code_circuit(params);
     auto dem = stim::circuit_to_dem(gen.circuit, {.decompose_errors = true});
 
-    uint8_t hw_emu_enable = decoder::CLUSTER_MATCH::hw_emu_flag::validate;
-    if (enable_astrea) hw_emu_enable |= decoder::CLUSTER_MATCH::hw_emu_flag::astrea;
-    if (enable_filter) hw_emu_enable |= decoder::CLUSTER_MATCH::hw_emu_flag::filter;
+    uint8_t hw_emu_enable = decoder::ClusterMatch::hw_emu_flag::validate;
+    if (enable_astrea) hw_emu_enable |= decoder::ClusterMatch::hw_emu_flag::astrea;
+    if (enable_filter) hw_emu_enable |= decoder::ClusterMatch::hw_emu_flag::filter;
 
-    decoder::CLUSTER_MATCH dec(dem, d, 6,
-        decoder::CLUSTER_MATCH::quantization_level::b16,
+    decoder::ClusterMatch dec(dem, d, 6,
+        decoder::ClusterMatch::quantization_level::b16,
         hw_emu_enable);
 
     double ler = estimate_logical_error_rate(dem, dec, conf);

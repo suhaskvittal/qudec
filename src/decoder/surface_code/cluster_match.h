@@ -34,7 +34,7 @@ namespace decoder
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-class CLUSTER_MATCH
+class ClusterMatch
 {
 public:
     using det_id_type = int64_t;
@@ -50,7 +50,7 @@ public:
     {
         det_id_type d; 
         double      pr;
-        obs_type    frame_flips;
+        ObsType    frame_flips;
     };
 
     using adj_list_type = std::vector<adj_entry_type>;
@@ -70,7 +70,7 @@ public:
      * We need to compute pairwise distances between all
      * detectors in the syndrome to run Astrea's matching step.
      * */
-    using mwpm_edge_type = MATCHING_DATA::assignment_type;
+    using mwpm_edge_type = MatchingData::assignment_type;
 
     /*
      * This is the barebones information needed for matching: a list
@@ -128,7 +128,7 @@ public:
     /*
      * Statistics:
      * */
-    STATS_HISTOGRAM<uint64_t> s_clusters{0,32,4},
+    StatsHistogram<uint64_t> s_clusters{0,32,4},
                                 s_filtered{0,128,16},
                                 s_hamming_weight{0,512,16},
                                 s_post_filter_hamming_weight{0,512,16},
@@ -141,7 +141,7 @@ public:
     /*
      * Hardware emulation statistics:
      * */
-    STATS_HISTOGRAM<uint64_t> s_hw_filter_latency{0, 256, 16},
+    StatsHistogram<uint64_t> s_hw_filter_latency{0, 256, 16},
                                 s_astrea_latency{0, 256, 16};
 private:
     /*
@@ -150,7 +150,7 @@ private:
     std::vector<adj_list_type> adj_matrix_;
     adj_list_type boundary_adjacency_;
 public:
-    CLUSTER_MATCH(const stim::DetectorErrorModel&,
+    ClusterMatch(const stim::DetectorErrorModel&,
                     size_t code_distance,
                     size_t astrea_hw_max,
                     quantization_level,
@@ -158,21 +158,21 @@ public:
 
     const adj_list_type& adj_matrix(det_id_type) const;
 
-    result_type decode(syndrome_ref);
+    result_type decode(SyndromeRef);
 
     void print_stats(std::ostream&) const;
 private:
     /*
      * `filter_isolated_errors()` removes any isolated weight-1 errors from the syndrome.
      * */
-    result_type filter_isolated_errors(syndrome_ref);
+    result_type filter_isolated_errors(SyndromeRef);
 
     /*
      * `uf_compute_clusters()` computes sub-clusters within the syndrome that correspond
      * to different matching problems. The size of a cluster is limited by `astrea_hw_max`,
      * and its width is limited by `code_distance`.
      * */
-    std::vector<cluster_type> uf_compute_clusters(syndrome_ref);
+    std::vector<cluster_type> uf_compute_clusters(SyndromeRef);
 
     /*
      * `synthesize_matching_problem()` computes the pairwise distances for all detection
@@ -188,7 +188,7 @@ private:
     /*
      * Verilator emulation of the above functions.
      * */
-    result_type v_filter_isolated_errors(syndrome_ref, Vinitialize_neighbors&, Vfilter&);
+    result_type v_filter_isolated_errors(SyndromeRef, Vinitialize_neighbors&, Vfilter&);
     result_type v_solve_matching_problem(matching_problem_type, Vastrea&);
 };
 

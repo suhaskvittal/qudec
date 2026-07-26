@@ -22,14 +22,14 @@ namespace decoder
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-PYMATCHING::PYMATCHING(const stim::DetectorErrorModel& dem)
+PyMatching::PyMatching(const stim::DetectorErrorModel& dem)
     :num_detectors(dem.count_detectors()),
     num_observables(dem.count_observables()),
     mwpm_(pm::detector_error_model_to_mwpm(dem, pm::NUM_DISTINCT_WEIGHTS))
 {}
 
 result_type
-PYMATCHING::decode(syndrome_ref syn)
+PyMatching::decode(SyndromeRef syn)
 {
     // Collect indices of fired detectors.
     std::vector<uint64_t> det_events;
@@ -38,7 +38,7 @@ PYMATCHING::decode(syndrome_ref syn)
             det_events.push_back(i);
     // Decode.
     result_type res;
-    res.flipped_obs = obs_type(num_observables);
+    res.flipped_obs = ObsType(num_observables);
     pm::total_weight_int weight = 0;
     pm::decode_detection_events(mwpm_, det_events, res.flipped_obs.u8, weight, false);
     return res;
@@ -53,13 +53,13 @@ namespace
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-using det_id_type = BLOSSOMV::det_id_type;
-using adj_entry_type = BLOSSOMV::adj_entry_type;
-using adj_list_type = BLOSSOMV::adj_list_type;
-using mwpm_edge_type = BLOSSOMV::mwpm_edge_type;
-using matching_problem_type = BLOSSOMV::matching_problem_type;
+using DetIdType = BlossomV::det_id_type;
+using AdjEntryType = BlossomV::adj_entry_type;
+using AdjListType = BlossomV::adj_list_type;
+using MwpmEdgeType = BlossomV::mwpm_edge_type;
+using MatchingProblemType = BlossomV::matching_problem_type;
 
-constexpr det_id_type BOUNDARY_ID{-1};
+constexpr DetIdType BOUNDARY_ID{-1};
 
 /*
  * Scale used when quantizing edge weights to integers. Blossom-5's `REAL` type is
@@ -82,14 +82,14 @@ _quantize(double w)
  * already present in the adjacency list (merges the parallel-edge probabilities).
  * */
 void
-_update_adjacency_list(adj_list_type& adj, det_id_type d, double p, obs_ref frame_flips)
+_update_adjacency_list(AdjListType& adj, DetIdType d, double p, ObsRef frame_flips)
 {
     auto adj_it = std::find_if(adj.begin(), adj.end(),
                         [d] (const auto& e) { return e.d == d; });
     if (adj_it != adj.end())
         adj_it->pr = (1-adj_it->pr)*p + (1-p)*adj_it->pr;
     else
-        adj.push_back(adj_entry_type{d, p, obs_type{frame_flips}});
+        adj.push_back(AdjEntryType{d, p, ObsType{frame_flips}});
 }
 
 /*
@@ -100,12 +100,12 @@ _update_adjacency_list(adj_list_type& adj, det_id_type d, double p, obs_ref fram
 struct distance_type
 {
     double   w = std::numeric_limits<double>::max();
-    obs_type frame_flips;
+    ObsType frame_flips;
 };
 
 struct distance_queue_entry
 {
-    det_id_type d;
+    DetIdType d;
     double      w;
 };
 
@@ -114,7 +114,7 @@ struct distance_cmp
     bool operator()(const distance_queue_entry& a, const distance_queue_entry& b) const { return a.w > b.w; }
 };
 
-using distance_queue_type = std::priority_queue<distance_queue_entry,
+using DistanceQueueType = std::priority_queue<distance_queue_entry,
                                                 std::vector<distance_queue_entry>,
                                                 distance_cmp>;
 
@@ -126,7 +126,7 @@ using distance_queue_type = std::priority_queue<distance_queue_entry,
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-BLOSSOMV::BLOSSOMV(const stim::DetectorErrorModel& dem)
+BlossomV::BlossomV(const stim::DetectorErrorModel& dem)
     :num_detectors(dem.count_detectors()),
     num_observables(dem.count_observables()),
     adj_matrix_(num_detectors)
@@ -139,17 +139,17 @@ BLOSSOMV::BLOSSOMV(const stim::DetectorErrorModel& dem)
                 inst.for_separated_targets(
                         [this, pr] (const auto& grp)
                         {
-                            std::vector<det_id_type> dets;
-                            obs_type frame_flips(num_observables);
+                            std::vector<DetIdType> dets;
+                            ObsType frame_flips(num_observables);
                             for (const auto& t : grp)
                             {
                                 if (t.is_relative_detector_id())
-                                    dets.push_back(static_cast<det_id_type>(t.val()));
+                                    dets.push_back(static_cast<DetIdType>(t.val()));
                                 else if (t.is_observable_id())
                                     frame_flips[t.val()] ^= 1;
                             }
 
-                            det_id_type d1 = dets[0],
+                            DetIdType d1 = dets[0],
                                         d2 = (dets.size() == 1) ? BOUNDARY_ID : dets[1];
                             _update_adjacency_list(adj_matrix_[d1], d2, pr, frame_flips);
                             if (d2 == BOUNDARY_ID)
@@ -160,8 +160,8 @@ BLOSSOMV::BLOSSOMV(const stim::DetectorErrorModel& dem)
             });
 }
 
-const adj_list_type&
-BLOSSOMV::adj_matrix(det_id_type d) const
+const AdjListType&
+BlossomV::adj_matrix(DetIdType d) const
 {
     return (d == BOUNDARY_ID) ? boundary_adjacency_ : adj_matrix_[d];
 }
@@ -170,11 +170,11 @@ BLOSSOMV::adj_matrix(det_id_type d) const
 ////////////////////////////////////////////////////////////////
 
 result_type
-BLOSSOMV::decode(syndrome_ref syndrome)
+BlossomV::decode(SyndromeRef syndrome)
 {
     auto detectors = collect_detection_events(syndrome);
     if (detectors.empty())
-        return result_type{.flipped_obs=obs_type(num_observables)};
+        return result_type{.flipped_obs=ObsType(num_observables)};
 
     auto mp = synthesize_matching_problem(std::move(detectors));
     return solve_matching_problem(mp);
@@ -183,11 +183,11 @@ BLOSSOMV::decode(syndrome_ref syndrome)
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-std::vector<det_id_type>
-BLOSSOMV::collect_detection_events(syndrome_ref syndrome) const
+std::vector<DetIdType>
+BlossomV::collect_detection_events(SyndromeRef syndrome) const
 {
-    std::vector<det_id_type> detectors;
-    for (det_id_type i = 0; i < static_cast<det_id_type>(num_detectors); i++)
+    std::vector<DetIdType> detectors;
+    for (DetIdType i = 0; i < static_cast<DetIdType>(num_detectors); i++)
         if (syndrome[i])
             detectors.push_back(i);
 
@@ -203,38 +203,38 @@ BLOSSOMV::collect_detection_events(syndrome_ref syndrome) const
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-matching_problem_type
-BLOSSOMV::synthesize_matching_problem(std::vector<det_id_type> detectors) const
+MatchingProblemType
+BlossomV::synthesize_matching_problem(std::vector<DetIdType> detectors) const
 {
     const size_t n = detectors.size();
 
     // map a detector id to its slot in `dist` (boundary lives at index `num_detectors`)
-    auto slot = [this] (det_id_type d) -> size_t
+    auto slot = [this] (DetIdType d) -> size_t
                 {
                     return (d == BOUNDARY_ID) ? num_detectors : static_cast<size_t>(d);
                 };
 
     // Compute pairwise distances via Dijkstra over the full decoding graph: run from
     // each detector and read off the upper triangle (distances are symmetric).
-    const distance_type fill_val{.frame_flips=obs_type(num_observables)};
+    const distance_type fill_val{.frame_flips=ObsType(num_observables)};
     std::vector<distance_type> dist(num_detectors+1, fill_val);
 
-    std::vector<mwpm_edge_type> edges;
+    std::vector<MwpmEdgeType> edges;
     edges.reserve(n*(n-1)/2);
 
     for (size_t ii = 0; ii+1 < n; ii++)
     {
-        const det_id_type d1 = detectors[ii];
+        const DetIdType d1 = detectors[ii];
 
         std::fill(dist.begin(), dist.end(), fill_val);
         dist[slot(d1)].w = 0.0;
-        distance_queue_type pq;
+        DistanceQueueType pq;
         pq.push({d1, 0.0});
         while (pq.size() > 0)
         {
             auto e = std::move(pq.top());
             pq.pop();
-            const det_id_type z1 = e.d;
+            const DetIdType z1 = e.d;
             const double w1 = e.w;
             const size_t i = slot(z1);
             if (w1 != dist[i].w)
@@ -257,11 +257,11 @@ BLOSSOMV::synthesize_matching_problem(std::vector<det_id_type> detectors) const
         // create mwpm edges to all detectors later in `detectors`
         for (size_t jj = ii+1; jj < n; jj++)
         {
-            const det_id_type d2 = detectors[jj];
+            const DetIdType d2 = detectors[jj];
             const size_t j = slot(d2);
             // `dist[j].w` is the accumulated `-log` path weight: the matching's error
             // probability is `exp(-w)`, and the quantized weight is `_quantize(w)`.
-            edges.push_back(mwpm_edge_type{ .d1=d1,
+            edges.push_back(MwpmEdgeType{ .d1=d1,
                                             .d2=d2,
                                             .pr=std::exp(-dist[j].w),
                                             .w_qu=_quantize(dist[j].w),
@@ -269,19 +269,19 @@ BLOSSOMV::synthesize_matching_problem(std::vector<det_id_type> detectors) const
         }
     }
 
-    return matching_problem_type{ .detectors=std::move(detectors), .edges=std::move(edges) };
+    return MatchingProblemType{ .detectors=std::move(detectors), .edges=std::move(edges) };
 }
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
 result_type
-BLOSSOMV::solve_matching_problem(const matching_problem_type& mp) const
+BlossomV::solve_matching_problem(const MatchingProblemType& mp) const
 {
-    using assignment_type = MATCHING_DATA::assignment_type;
+    using AssignmentType = MatchingData::assignment_type;
 
     // map a detector id to its matching-problem node index
-    std::unordered_map<det_id_type, size_t> idx_map;
+    std::unordered_map<DetIdType, size_t> idx_map;
     idx_map.reserve(mp.detectors.size());
     for (size_t i = 0; i < mp.detectors.size(); i++)
         idx_map[mp.detectors[i]] = i;
@@ -301,7 +301,7 @@ BLOSSOMV::solve_matching_problem(const matching_problem_type& mp) const
     pm.Solve();
 
     // Apply the frame flips of every matched edge.
-    result_type out{.flipped_obs=obs_type(num_observables)};
+    result_type out{.flipped_obs=ObsType(num_observables)};
     for (size_t k = 0; k < m; k++)
     {
         if (pm.GetSolution(k))

@@ -4,7 +4,7 @@
  * */
 
 #define TEMPL_PARAM template <class T>
-#define TEMPL_CLASS STATS_HISTOGRAM<T>
+#define TEMPL_CLASS StatsHistogram<T>
 
 #include <iomanip>
 #include <iostream>
@@ -14,7 +14,7 @@
 ////////////////////////////////////////////////////////////////
 
 TEMPL_PARAM
-TEMPL_CLASS::STATS_HISTOGRAM(T _range_min,
+TEMPL_CLASS::StatsHistogram(T _range_min,
                              T _range_max,
                              size_t _num_buckets)
     :range_min(_range_min),
@@ -97,7 +97,7 @@ print_stat(std::ostream& ostrm, std::string_view name, T val)
 }
 
 template <class T> std::ostream&
-operator<<(std::ostream& ostrm, const STATS_HISTOGRAM<T>& hist)
+operator<<(std::ostream& ostrm, const StatsHistogram<T>& hist)
 {
     return (ostrm << hist.to_string_some());
 }

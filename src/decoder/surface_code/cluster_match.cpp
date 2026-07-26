@@ -39,27 +39,27 @@ namespace
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-using det_id_type = CLUSTER_MATCH::det_id_type;
-using adj_entry_type = CLUSTER_MATCH::adj_entry_type;
-using adj_list_type = CLUSTER_MATCH::adj_list_type;
-using cluster_type = CLUSTER_MATCH::cluster_type;
-using mwpm_edge_type = CLUSTER_MATCH::mwpm_edge_type;
-using matching_problem_type = CLUSTER_MATCH::matching_problem_type;
-using quantization_level = CLUSTER_MATCH::quantization_level;
-using assignment_type = MATCHING_DATA::assignment_type;
+using DetIdType = ClusterMatch::det_id_type;
+using AdjEntryType = ClusterMatch::adj_entry_type;
+using AdjListType = ClusterMatch::adj_list_type;
+using ClusterType = ClusterMatch::cluster_type;
+using MwpmEdgeType = ClusterMatch::mwpm_edge_type;
+using MatchingProblemType = ClusterMatch::matching_problem_type;
+using QuantizationLevel = ClusterMatch::quantization_level;
+using AssignmentType = MatchingData::assignment_type;
 
-constexpr det_id_type BOUNDARY_ID{-1};
+constexpr DetIdType BOUNDARY_ID{-1};
 
 /*
- * Quantizes a weight according to the given `quantization_level`
+ * Quantizes a weight according to the given `QuantizationLevel`
  * */
-uint64_t _quantize(double, quantization_level);
+uint64_t _quantize(double, QuantizationLevel);
 
 /*
  * Safe adjacency list update that also handles the case where the given
  * detector is already present in the adjacency list.
  * */
-void _update_adjacency_list(adj_list_type&, det_id_type, double p, obs_ref);
+void _update_adjacency_list(AdjListType&, DetIdType, double p, ObsRef);
 
 /*
  * Returns maximum of `1` and `ceil((d-1)/4)`
@@ -75,7 +75,7 @@ constexpr size_t _get_mwpm_edge_count(size_t hw);
 ////////////////////////////////////////////////////////////////
 
 /*
- * Union find data structures used in `CLUSTER_MATCH::uf_compute_clusters()`
+ * Union find data structures used in `ClusterMatch::uf_compute_clusters()`
  * */
 
 struct uf_type
@@ -88,15 +88,15 @@ public:
      * otherwise). `flipped_detectors` only contains detectors in the
      * syndrome.
      * */
-    std::vector<det_id_type> all_detectors;
-    std::vector<det_id_type> flipped_detectors;
+    std::vector<DetIdType> all_detectors;
+    std::vector<DetIdType> flipped_detectors;
 
     /*
      * Boundary can have multiplicity, so we need to track it separately.
      * */
     bool has_boundary{false};
 public:
-    uf_type(det_id_type);
+    uf_type(DetIdType);
 
     uf_type* find();
     void merge(uf_type*);
@@ -117,7 +117,7 @@ private:
 
 struct uf_growth_type
 {
-    det_id_type d;
+    DetIdType d;
     size_t      step{0};
 };
 
@@ -131,12 +131,12 @@ struct uf_growth_type
 struct distance_type
 {
     double w =std::numeric_limits<uint64_t>::max();
-    obs_type frame_flips;
+    ObsType frame_flips;
 };
 
 struct distance_queue_entry
 {
-    det_id_type d;
+    DetIdType d;
     double w;
 };
 
@@ -145,7 +145,7 @@ struct distance_cmp
     bool operator()(const distance_queue_entry& a, const distance_queue_entry& b) const { return a.w > b.w; }
 };
 
-using distance_queue_type = std::priority_queue<distance_queue_entry, 
+using DistanceQueueType = std::priority_queue<distance_queue_entry, 
                                                 std::vector<distance_queue_entry>, 
                                                 distance_cmp>;
 
@@ -157,10 +157,10 @@ using distance_queue_type = std::priority_queue<distance_queue_entry,
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-CLUSTER_MATCH::CLUSTER_MATCH(const stim::DetectorErrorModel& dem,
+ClusterMatch::ClusterMatch(const stim::DetectorErrorModel& dem,
                                 size_t _code_distance,
                                 size_t _astrea_hw_max,
-                                quantization_level ql,
+                                QuantizationLevel ql,
                                 uint8_t _hw_emu_enable)
     :num_detectors(dem.count_detectors()),
     num_observables(dem.count_observables()),
@@ -178,17 +178,17 @@ CLUSTER_MATCH::CLUSTER_MATCH(const stim::DetectorErrorModel& dem,
                 inst.for_separated_targets(
                         [this, pr] (const auto& grp)
                         {
-                            std::vector<det_id_type> dets;
-                            obs_type frame_flips(num_observables);
+                            std::vector<DetIdType> dets;
+                            ObsType frame_flips(num_observables);
                             for (const auto& t : grp)
                             {
                                 if (t.is_relative_detector_id())
-                                    dets.push_back(static_cast<det_id_type>(t.val()));
+                                    dets.push_back(static_cast<DetIdType>(t.val()));
                                 else if (t.is_observable_id())
                                     frame_flips[t.val()] ^= 1;
                             }
                             
-                            det_id_type d1 = dets[0],
+                            DetIdType d1 = dets[0],
                                         d2 = (dets.size() == 1) ? BOUNDARY_ID : dets[1];
                             _update_adjacency_list(adj_matrix_[d1], d2, pr, frame_flips);
                             if (d2 == BOUNDARY_ID)
@@ -199,8 +199,8 @@ CLUSTER_MATCH::CLUSTER_MATCH(const stim::DetectorErrorModel& dem,
             });
 }
 
-const adj_list_type&
-CLUSTER_MATCH::adj_matrix(det_id_type d) const
+const AdjListType&
+ClusterMatch::adj_matrix(DetIdType d) const
 {
     return (d == BOUNDARY_ID) ? boundary_adjacency_ : adj_matrix_[d];
 }
@@ -209,9 +209,9 @@ CLUSTER_MATCH::adj_matrix(det_id_type d) const
 ////////////////////////////////////////////////////////////////
 
 result_type
-CLUSTER_MATCH::decode(syndrome_ref syndrome)
+ClusterMatch::decode(SyndromeRef syndrome)
 {
-    result_type out{.flipped_obs=obs_type(num_observables)};
+    result_type out{.flipped_obs=ObsType(num_observables)};
     s_hamming_weight.add(syndrome.popcnt());
 
 #if defined(VERILATOR_CLUSTER_MATCH)
@@ -224,7 +224,7 @@ CLUSTER_MATCH::decode(syndrome_ref syndrome)
 #endif
 
     // 1. Filter syndrome and remove isolated weight-1 errors.
-    syndrome_type filtered_syndrome(syndrome);
+    SyndromeType filtered_syndrome(syndrome);
     auto filter_out = filter_isolated_errors(filtered_syndrome);
     out.flipped_obs ^= filter_out.flipped_obs;
     out.matching_data.merge(filter_out.matching_data);
@@ -246,7 +246,7 @@ CLUSTER_MATCH::decode(syndrome_ref syndrome)
         s_cluster_size.add(cl.all.size());
         s_cluster_hamming_weight.add(cl.flipped.size());
 
-        matching_problem_type mp;
+        MatchingProblemType mp;
         result_type mp_result;
 
         // 3. Compute pairwise distances for all detection events in the cluster.
@@ -276,7 +276,7 @@ CLUSTER_MATCH::decode(syndrome_ref syndrome)
 ////////////////////////////////////////////////////////////////
 
 void
-CLUSTER_MATCH::print_stats(std::ostream& ostrm) const
+ClusterMatch::print_stats(std::ostream& ostrm) const
 {
     // report both statistics and any useful RTL data:
     std::vector<size_t> degree_array(num_detectors);
@@ -309,13 +309,13 @@ CLUSTER_MATCH::print_stats(std::ostream& ostrm) const
 ////////////////////////////////////////////////////////////////
 
 result_type
-CLUSTER_MATCH::filter_isolated_errors(syndrome_ref syndrome)
+ClusterMatch::filter_isolated_errors(SyndromeRef syndrome)
 {
     // count active degree of all syndrome bits:
     const bool count_boundary = (syndrome.popcnt() & 1);
     std::vector<size_t> active_degree(num_detectors, 0);
-    std::vector<std::pair<det_id_type, adj_entry_type>> active_companion(num_detectors,
-                                                                        std::make_pair(0, adj_entry_type{.frame_flips=obs_type(1)}) );
+    std::vector<std::pair<DetIdType, AdjEntryType>> active_companion(num_detectors,
+                                                                        std::make_pair(0, AdjEntryType{.frame_flips=ObsType(1)}) );
     size_t boundary_degree{0};
     for (size_t i = 0; i < num_detectors; i++)
     {
@@ -356,7 +356,7 @@ CLUSTER_MATCH::filter_isolated_errors(syndrome_ref syndrome)
                 out.flipped_obs ^= e.frame_flips;
                 // update matching data:
                 auto w_qu = _quantize(-std::log(e.pr), astrea_weight_quantization);
-                assignment_type a{.d1=i, .d2=j, .pr=e.pr, .w_qu=w_qu, .frame_flips=e.frame_flips};
+                AssignmentType a{.d1=i, .d2=j, .pr=e.pr, .w_qu=w_qu, .frame_flips=e.frame_flips};
                 out.matching_data.add(a);
             }
         }
@@ -367,8 +367,8 @@ CLUSTER_MATCH::filter_isolated_errors(syndrome_ref syndrome)
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-std::vector<cluster_type>
-CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome)
+std::vector<ClusterType>
+ClusterMatch::uf_compute_clusters(SyndromeRef syndrome)
 {
     // initialize `uf_pool` (storage for UF data structures) and
     // `growth_fifo` (what detectors to traverse from) using `syndrome`
@@ -377,7 +377,7 @@ CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome)
     std::deque<uf_growth_type> growth_fifo;
 
     uf_pool.reserve(syndrome.popcnt());
-    for (det_id_type i = 0; i < num_detectors; i++)
+    for (DetIdType i = 0; i < num_detectors; i++)
     {
         if (syndrome[i])
         {
@@ -400,7 +400,7 @@ CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome)
         if (g.step >= max_steps)
             continue;
         tick++;
-        const det_id_type d1 = g.d;
+        const DetIdType d1 = g.d;
         assert(d1 != BOUNDARY_ID);
 
         // run find on `uf_lookup[d1].owner` now so we have the updated owner:
@@ -413,7 +413,7 @@ CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome)
         // traverse:
         for (const auto& e : adj_matrix(g.d))
         {
-            const det_id_type d2 = e.d;
+            const DetIdType d2 = e.d;
 
             // handle `d2 == BOUNDARY_ID` specially:
             if (d2 == BOUNDARY_ID)
@@ -453,13 +453,13 @@ CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome)
     s_growth_ticks.add(tick);
 
     // form clusters:
-    std::vector<cluster_type> clusters;
+    std::vector<ClusterType> clusters;
     clusters.reserve(unique_clusters);
     for (const auto& uf : uf_pool)
     {
         if (uf.parent != nullptr)
             continue;
-        cluster_type cl{ std::move(uf.all_detectors), 
+        ClusterType cl{ std::move(uf.all_detectors), 
                          std::move(uf.flipped_detectors) };
         // only add boundary if `cl` is already odd:
         if (cl.flipped.size() % 2 == 1)
@@ -479,32 +479,32 @@ CLUSTER_MATCH::uf_compute_clusters(syndrome_ref syndrome)
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-matching_problem_type
-CLUSTER_MATCH::synthesize_matching_problem(cluster_type cl)
+MatchingProblemType
+ClusterMatch::synthesize_matching_problem(ClusterType cl)
 {
     assert((cl.flipped.size() % 2) == 0);
     const size_t n = cl.all.size();
     const size_t hw = cl.flipped.size();
     
     // create a map that maps detector id to index in `cl.all`
-    std::unordered_map<det_id_type, size_t> idx_map;
+    std::unordered_map<DetIdType, size_t> idx_map;
     idx_map.reserve(n);
     for (size_t i = 0; i < n; i++)
         idx_map.insert({cl.all[i], i});
 
-    // run `dijkstra's` `n-1` times to create `matching_problem_type`
-    matching_problem_type mp;
+    // run `dijkstra's` `n-1` times to create `MatchingProblemType`
+    MatchingProblemType mp;
     mp.edges.reserve(hw*(hw-1)/2);
 
-    const distance_type fill_val{.frame_flips=obs_type(num_observables)};
+    const distance_type fill_val{.frame_flips=ObsType(num_observables)};
     std::vector<distance_type> dist(n, fill_val);
     uint64_t tick{0};
     for (size_t ii = 0; ii < hw-1; ii++)
     {
         std::fill(dist.begin(), dist.end(), fill_val);
-        const det_id_type d1 = cl.flipped[ii];
+        const DetIdType d1 = cl.flipped[ii];
         dist[idx_map[d1]].w = 0.0;
-        distance_queue_type pq;
+        DistanceQueueType pq;
         pq.push({d1, 0.0});
         while (pq.size() > 0)
         {
@@ -538,9 +538,9 @@ CLUSTER_MATCH::synthesize_matching_problem(cluster_type cl)
         // matching's error probability is `exp(-w)` and its quantized weight `_quantize(w)`.
         for (size_t jj = ii+1; jj < hw; jj++)
         {
-            const det_id_type d2 = cl.flipped[jj];
+            const DetIdType d2 = cl.flipped[jj];
             const size_t j = idx_map.at(d2);
-            mwpm_edge_type e{ .d1=d1,
+            MwpmEdgeType e{ .d1=d1,
                                 .d2=d2,
                                 .pr=std::exp(-dist[j].w),
                                 .w_qu=_quantize(dist[j].w, astrea_weight_quantization),
@@ -559,10 +559,10 @@ CLUSTER_MATCH::synthesize_matching_problem(cluster_type cl)
 ////////////////////////////////////////////////////////////////
 
 result_type
-CLUSTER_MATCH::solve_matching_problem(matching_problem_type mp, int cluster_id)
+ClusterMatch::solve_matching_problem(MatchingProblemType mp, int cluster_id)
 {
     // create index map for `mp.detectors`
-    std::unordered_map<det_id_type, size_t> idx_map;
+    std::unordered_map<DetIdType, size_t> idx_map;
     idx_map.reserve(mp.detectors.size());
     for (size_t i = 0; i < mp.detectors.size(); i++)
         idx_map[mp.detectors[i]] = i;
@@ -589,7 +589,7 @@ CLUSTER_MATCH::solve_matching_problem(matching_problem_type mp, int cluster_id)
     pm.Solve();
 
     // Retrieve the solution to the MWPM problem:
-    result_type out{.flipped_obs=obs_type(num_observables)};
+    result_type out{.flipped_obs=ObsType(num_observables)};
     for (size_t i = 0; i < m; i++)
     {
         if (pm.GetSolution(i))
@@ -597,7 +597,7 @@ CLUSTER_MATCH::solve_matching_problem(matching_problem_type mp, int cluster_id)
             const auto& e = mp.edges[i];
             out.flipped_obs ^= e.frame_flips;
             // update matching data:
-            assignment_type a{e};
+            AssignmentType a{e};
             a.matching_step = 1;
             a.cluster_id = cluster_id;
             out.matching_data.add(a);
@@ -617,21 +617,21 @@ namespace
 ////////////////////////////////////////////////////////////////
 
 uint64_t
-_quantize(double w, quantization_level ql)
+_quantize(double w, QuantizationLevel ql)
 {
     uint64_t q;
-    if (ql == quantization_level::b4)
+    if (ql == QuantizationLevel::b4)
     {
         q = std::round(w); 
         q = std::min(q, uint64_t{15});
         return q;
     }
-    else if (ql == quantization_level::b8)
+    else if (ql == QuantizationLevel::b8)
     {
         q = std::round(15*w);
         q = std::min(q, uint64_t{255});
     }
-    else if (ql == quantization_level::b16)
+    else if (ql == QuantizationLevel::b16)
     {
         q = std::round(100*w);
         q = std::min(q, uint64_t{(1ull<<16)-1});
@@ -645,7 +645,7 @@ _quantize(double w, quantization_level ql)
 }
 
 void
-_update_adjacency_list(adj_list_type& adj, det_id_type d, double p, obs_ref frame_flips)
+_update_adjacency_list(AdjListType& adj, DetIdType d, double p, ObsRef frame_flips)
 {
     // check if `d` is in `adj`
     auto adj_it = std::find_if(adj.begin(), adj.end(),
@@ -657,7 +657,7 @@ _update_adjacency_list(adj_list_type& adj, det_id_type d, double p, obs_ref fram
     }
     else
     {
-        adj_entry_type e{d, p, obs_type{frame_flips}};
+        AdjEntryType e{d, p, ObsType{frame_flips}};
         adj.push_back(e);
     }
 }
@@ -684,7 +684,7 @@ _get_mwpm_edge_count(size_t hw)
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-uf_type::uf_type(det_id_type d)
+uf_type::uf_type(DetIdType d)
     :all_detectors{d},
     flipped_detectors{d}
 {}
@@ -712,9 +712,9 @@ uf_type::merge(uf_type* other)
     // update `other`
     auto* p = find();
     uf_type* old_parent = other->merge_find(p);
-    for (det_id_type d : old_parent->all_detectors)
+    for (DetIdType d : old_parent->all_detectors)
         p->all_detectors.push_back(d);
-    for (det_id_type d : old_parent->flipped_detectors)
+    for (DetIdType d : old_parent->flipped_detectors)
         p->flipped_detectors.push_back(d);
     p->has_boundary |= old_parent->has_boundary;
 }

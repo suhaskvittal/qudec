@@ -15,7 +15,7 @@
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-struct EXPERIMENT_CONFIG
+struct ExperimentConfig
 {
     int64_t verbosity{0};
     int64_t samples_per_level{10'000};
@@ -34,15 +34,15 @@ struct EXPERIMENT_CONFIG
  * Estimates the logical error rate of the given decoder on the
  * given error model.
  *
- * `ERROR_CALLBACK` is called on a logical error (any mismatch in
+ * `ErrorCallback` is called on a logical error (any mismatch in
  * frames). This callback is given (1) the syndrome, (2) the true
  * frame flips, and (3) the decoder's result.
  * */
-template <class D_TYPE, class ERROR_CALLBACK>
-double estimate_logical_error_rate(const stim::DetectorErrorModel&, D_TYPE&, EXPERIMENT_CONFIG, const ERROR_CALLBACK&);
+template <class DType, class ErrorCallback>
+double estimate_logical_error_rate(const stim::DetectorErrorModel&, DType&, ExperimentConfig, const ErrorCallback&);
 
-template <class D_TYPE> double
-estimate_logical_error_rate(const stim::DetectorErrorModel& dem, D_TYPE& dec, EXPERIMENT_CONFIG conf)
+template <class DType> double
+estimate_logical_error_rate(const stim::DetectorErrorModel& dem, DType& dec, ExperimentConfig conf)
 {
     return estimate_logical_error_rate(dem, dec, conf, [] (auto, auto, auto) {});
 }
@@ -50,10 +50,10 @@ estimate_logical_error_rate(const stim::DetectorErrorModel& dem, D_TYPE& dec, EX
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-using POLY = std::vector<double>;
-using SYNDROME_TABLE = stim::simd_bit_table<64>;
-using PROBLEM = std::pair<SYNDROME_TABLE, SYNDROME_TABLE>;
-using RNG = std::mt19937_64;
+using Poly = std::vector<double>;
+using SyndromeTable = stim::simd_bit_table<64>;
+using Problem = std::pair<SyndromeTable, SyndromeTable>;
+using Rng = std::mt19937_64;
 
 /*
  * This function returns an array containing the probability of `K`
@@ -69,13 +69,13 @@ using RNG = std::mt19937_64;
  *
  * This array is need for accurately estimating the logical error rate.
  * */
-POLY compute_probability_polynomial(const stim::DetectorErrorModel& dem, size_t max_errors);
+Poly compute_probability_polynomial(const stim::DetectorErrorModel& dem, size_t max_errors);
 
 /*
  * Returns `count` randomly generated syndromes, each with `k` errors, from the given
  * DEM.
  * */
-PROBLEM generate_syndromes_with_k_errors(const stim::DetectorErrorModel&, size_t k, size_t count, RNG&);
+Problem generate_syndromes_with_k_errors(const stim::DetectorErrorModel&, size_t k, size_t count, Rng&);
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////

@@ -10,14 +10,14 @@
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-template <class D, class ERROR_CALLBACK> double
+template <class D, class ErrorCallback> double
 estimate_logical_error_rate(const stim::DetectorErrorModel& dem, 
                             D& decoder, 
-                            EXPERIMENT_CONFIG conf, 
-                            const ERROR_CALLBACK& error_callback)
+                            ExperimentConfig conf, 
+                            const ErrorCallback& error_callback)
 {
     // generate probability polynomial: 
-    POLY prob_x = compute_probability_polynomial(dem, conf.max_level);
+    Poly prob_x = compute_probability_polynomial(dem, conf.max_level);
 
     // now start sampling DEM for errors:
     double ler{0.0};

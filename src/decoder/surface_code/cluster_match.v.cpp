@@ -15,7 +15,7 @@ namespace decoder
 ////////////////////////////////////////////////////////////////
 
 result_type
-CLUSTER_MATCH::v_solve_matching_problem(matching_problem_type mp, Vastrea& astrea)
+ClusterMatch::v_solve_matching_problem(matching_problem_type mp, Vastrea& astrea)
 {
     constexpr size_t MAX_SUPPORTED_HW{6};
     constexpr size_t EDGE_COUNT = _get_mwpm_edge_count(MAX_SUPPORTED_HW);
@@ -54,7 +54,7 @@ CLUSTER_MATCH::v_solve_matching_problem(matching_problem_type mp, Vastrea& astre
     astrea.eval();
 
     // return output:
-    syndrome_type frame_flips(num_observables);
+    SyndromeType frame_flips(num_observables);
     const size_t ff_words = (num_observables+7)/8;
     memcpy(frame_flips.u8, &astrea.frame_flips, ff_words);
     result_type out{ .flipped_obs=std::move(frame_flips) };
