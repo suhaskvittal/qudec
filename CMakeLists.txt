@@ -43,6 +43,7 @@ endif()
 ###################################################
 
 set(QUDEC_FILES
+    src/circuit_generator.cpp
     src/decoder/surface_code.cpp
     src/decoder/surface_code/matching_data.cpp
     src/globals.cpp

@@ -1,5 +1,4 @@
-/*
- *  author: Suhas Vittal
+/* author: Suhas Vittal
  *  date:   16 May 2026
  * */
 
@@ -30,9 +29,12 @@ public:
     const bool estimate_complementary_gap;
 
     /*
-     * Statistics
+     * `s_gap` is the complementary gap distribution.
+     * `s_gap_error` are logical errors at a given complementary gap.
      * */
-    StatsHistogram<double> s_gap{"GAP", -128, 128, 16};
+    StatsHistogram<double> s_signed_gap{"SIGNED_GAP", -128, 128, 16},
+                           s_unsigned_gap{"UNSIGNED_GAP", 0, 128, 16},
+                           s_unsigned_gap_errors{"UNSIGNED_GAP_ERRORS", 0, 128, 16};
 private:
     /*
      * When `estimate_complementary_gap` is set, the matching graph is built from an
@@ -52,7 +54,6 @@ private:
      * */
     double norm_const_{1.0};
     double decibels_per_w_{1.0};
-
 public:
     PyMatching(const stim::DetectorErrorModel&, bool enable_gap_estimation);
 
@@ -63,7 +64,9 @@ public:
     void 
     mpi_accumulate()
     {
-        s_gap.mpi_accumulate();
+        s_signed_gap.mpi_accumulate();
+        s_unsigned_gap.mpi_accumulate();
+        s_unsigned_gap_errors.mpi_accumulate();
     }
 private:
     result_type internal_decode(SyndromeRef, bool fire_obs_det, pm::total_weight_int& weight_out);

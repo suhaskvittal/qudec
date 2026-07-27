@@ -133,11 +133,17 @@ PyMatching::decode(SyndromeRef syn, ObsRef obs)
     if (predict_flip)
         std::swap(w_primary, w_complement);
     double g = (w_complement-w_primary) * decibels_per_w_;
+
     // negate gap if this is an error:
+    s_unsigned_gap.add(g);
     if (obs[0] != out.flipped_obs[0])
+    {
+        s_unsigned_gap_errors.add(g);
         g = -g;
+    }
     out.matching_data.gap = g;
-    s_gap.add(g);
+    s_signed_gap.add(g);
+
     return out;
 }
 
@@ -174,8 +180,10 @@ PyMatching::print_stats(std::ostream& ostrm) const
     // otherwise it is empty (and its mean would divide by a zero count).
     if (estimate_complementary_gap)
     {
-        ostrm << s_gap.to_string_full() << "\n";
-        ostrm << "normalization constant = " << norm_const_ 
+        ostrm << s_signed_gap.to_string_full()
+                << "\n" << s_unsigned_gap.to_string_full()
+                << "\n" << s_unsigned_gap_errors.to_string_full()
+                << "\nnormalization constant = " << norm_const_ 
                 << "\ndecibels per weight = " << decibels_per_w_
                 << "\n";
     }

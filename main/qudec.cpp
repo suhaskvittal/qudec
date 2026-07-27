@@ -3,8 +3,9 @@
  *  date:   16 May 2026
  * */
 
-#include "sampler.h"
+#include "circuit_generator.h"
 #include "decoder/surface_code.h"
+#include "sampler.h"
 
 #include <stim/gen/gen_surface_code.h>
 #include <stim/util_top/circuit_to_dem.h>
@@ -67,16 +68,10 @@ main(int argc, char* argv[])
     conf.rare_event.start_level = (d-1)/2 - 1;
     conf.rare_event.max_level = 128;
 
-    stim::CircuitGenParameters params(r, d, "rotated_memory_z");
-    double p = 1e-3;
-    params.after_clifford_depolarization = p;
-    params.before_round_data_depolarization = p;
-    params.before_measure_flip_probability = p;
-    params.after_reset_flip_probability = p;
-    auto gen = stim::generate_surface_code_circuit(params);
+    auto circuit = si1000(d, r, 1e-3, false);
 
     // Convert to DEM with error decomposition required by PyMatching
-    auto dem = stim::circuit_to_dem(gen.circuit, {.decompose_errors = true});
+    auto dem = stim::circuit_to_dem(circuit, {.decompose_errors = true});
 
     // Build decoder, run estimation, and report results.
     auto run = [&] (auto&& dec, const auto& error_callback)
