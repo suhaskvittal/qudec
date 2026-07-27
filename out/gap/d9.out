@@ -1,0 +1,1751 @@
+[81920 / 100000000] (0.08192%) -- errors = 6 , logical error rate = 7.32422e-05
+[163840 / 100000000] (0.16384%) -- errors = 13 , logical error rate = 7.93457e-05
+[245760 / 100000000] (0.24576%) -- errors = 21 , logical error rate = 8.54492e-05
+[327680 / 100000000] (0.32768%) -- errors = 24 , logical error rate = 7.32422e-05
+[409600 / 100000000] (0.4096%) -- errors = 28 , logical error rate = 6.83594e-05
+[491520 / 100000000] (0.49152%) -- errors = 35 , logical error rate = 7.12077e-05
+[573440 / 100000000] (0.57344%) -- errors = 37 , logical error rate = 6.45229e-05
+[655360 / 100000000] (0.65536%) -- errors = 40 , logical error rate = 6.10352e-05
+[737280 / 100000000] (0.73728%) -- errors = 45 , logical error rate = 6.10352e-05
+[819200 / 100000000] (0.8192%) -- errors = 47 , logical error rate = 5.7373e-05
+[901120 / 100000000] (0.90112%) -- errors = 49 , logical error rate = 5.43768e-05
+[983040 / 100000000] (0.98304%) -- errors = 55 , logical error rate = 5.59489e-05
+[1064960 / 100000000] (1.06496%) -- errors = 61 , logical error rate = 5.72791e-05
+[1146880 / 100000000] (1.14688%) -- errors = 66 , logical error rate = 5.75474e-05
+[1228800 / 100000000] (1.2288%) -- errors = 68 , logical error rate = 5.53385e-05
+[1310720 / 100000000] (1.31072%) -- errors = 71 , logical error rate = 5.41687e-05
+[1392640 / 100000000] (1.39264%) -- errors = 81 , logical error rate = 5.81629e-05
+[1474560 / 100000000] (1.47456%) -- errors = 86 , logical error rate = 5.83225e-05
+[1556480 / 100000000] (1.55648%) -- errors = 91 , logical error rate = 5.84653e-05
+[1638400 / 100000000] (1.6384%) -- errors = 95 , logical error rate = 5.79834e-05
+[1720320 / 100000000] (1.72032%) -- errors = 99 , logical error rate = 5.75474e-05
+[1802240 / 100000000] (1.80224%) -- errors = 104 , logical error rate = 5.7706e-05
+[1884160 / 100000000] (1.88416%) -- errors = 110 , logical error rate = 5.83815e-05
+[1966080 / 100000000] (1.96608%) -- errors = 116 , logical error rate = 5.90007e-05
+[2048000 / 100000000] (2.048%) -- errors = 121 , logical error rate = 5.9082e-05
+[2129920 / 100000000] (2.12992%) -- errors = 126 , logical error rate = 5.91572e-05
+[2211840 / 100000000] (2.21184%) -- errors = 129 , logical error rate = 5.83225e-05
+[2293760 / 100000000] (2.29376%) -- errors = 131 , logical error rate = 5.71115e-05
+[2375680 / 100000000] (2.37568%) -- errors = 139 , logical error rate = 5.85096e-05
+[2457600 / 100000000] (2.4576%) -- errors = 142 , logical error rate = 5.77799e-05
+[2539520 / 100000000] (2.53952%) -- errors = 142 , logical error rate = 5.59161e-05
+[2621440 / 100000000] (2.62144%) -- errors = 145 , logical error rate = 5.53131e-05
+[2703360 / 100000000] (2.70336%) -- errors = 148 , logical error rate = 5.47467e-05
+[2785280 / 100000000] (2.78528%) -- errors = 150 , logical error rate = 5.38545e-05
+[2867200 / 100000000] (2.8672%) -- errors = 152 , logical error rate = 5.30134e-05
+[2949120 / 100000000] (2.94912%) -- errors = 156 , logical error rate = 5.28971e-05
+[3031040 / 100000000] (3.03104%) -- errors = 158 , logical error rate = 5.21273e-05
+[3112960 / 100000000] (3.11296%) -- errors = 160 , logical error rate = 5.1398e-05
+[3194880 / 100000000] (3.19488%) -- errors = 161 , logical error rate = 5.03931e-05
+[3276800 / 100000000] (3.2768%) -- errors = 165 , logical error rate = 5.0354e-05
+[3358720 / 100000000] (3.35872%) -- errors = 167 , logical error rate = 4.97213e-05
+[3440640 / 100000000] (3.44064%) -- errors = 172 , logical error rate = 4.99907e-05
+[3522560 / 100000000] (3.52256%) -- errors = 175 , logical error rate = 4.96798e-05
+[3604480 / 100000000] (3.60448%) -- errors = 178 , logical error rate = 4.9383e-05
+[3686400 / 100000000] (3.6864%) -- errors = 183 , logical error rate = 4.96419e-05
+[3768320 / 100000000] (3.76832%) -- errors = 186 , logical error rate = 4.93589e-05
+[3850240 / 100000000] (3.85024%) -- errors = 191 , logical error rate = 4.96073e-05
+[3932160 / 100000000] (3.93216%) -- errors = 196 , logical error rate = 4.98454e-05
+[4014080 / 100000000] (4.01408%) -- errors = 197 , logical error rate = 4.90772e-05
+[4096000 / 100000000] (4.096%) -- errors = 201 , logical error rate = 4.90723e-05
+[4177920 / 100000000] (4.17792%) -- errors = 206 , logical error rate = 4.93068e-05
+[4259840 / 100000000] (4.25984%) -- errors = 210 , logical error rate = 4.92976e-05
+[4341760 / 100000000] (4.34176%) -- errors = 218 , logical error rate = 5.02101e-05
+[4423680 / 100000000] (4.42368%) -- errors = 221 , logical error rate = 4.99584e-05
+[4505600 / 100000000] (4.5056%) -- errors = 224 , logical error rate = 4.97159e-05
+[4587520 / 100000000] (4.58752%) -- errors = 226 , logical error rate = 4.92641e-05
+[4669440 / 100000000] (4.66944%) -- errors = 234 , logical error rate = 5.01131e-05
+[4751360 / 100000000] (4.75136%) -- errors = 235 , logical error rate = 4.94595e-05
+[4833280 / 100000000] (4.83328%) -- errors = 238 , logical error rate = 4.92419e-05
+[4915200 / 100000000] (4.9152%) -- errors = 243 , logical error rate = 4.94385e-05
+[4997120 / 100000000] (4.99712%) -- errors = 246 , logical error rate = 4.92284e-05
+[5079040 / 100000000] (5.07904%) -- errors = 251 , logical error rate = 4.94188e-05
+[5160960 / 100000000] (5.16096%) -- errors = 256 , logical error rate = 4.96032e-05
+[5242880 / 100000000] (5.24288%) -- errors = 257 , logical error rate = 4.90189e-05
+[5324800 / 100000000] (5.3248%) -- errors = 260 , logical error rate = 4.88281e-05
+[5406720 / 100000000] (5.40672%) -- errors = 262 , logical error rate = 4.84582e-05
+[5488640 / 100000000] (5.48864%) -- errors = 266 , logical error rate = 4.84637e-05
+[5570560 / 100000000] (5.57056%) -- errors = 272 , logical error rate = 4.88281e-05
+[5652480 / 100000000] (5.65248%) -- errors = 274 , logical error rate = 4.84743e-05
+[5734400 / 100000000] (5.7344%) -- errors = 277 , logical error rate = 4.8305e-05
+[5816320 / 100000000] (5.81632%) -- errors = 278 , logical error rate = 4.77965e-05
+[5898240 / 100000000] (5.89824%) -- errors = 281 , logical error rate = 4.76413e-05
+[5980160 / 100000000] (5.98016%) -- errors = 283 , logical error rate = 4.73231e-05
+[6062080 / 100000000] (6.06208%) -- errors = 287 , logical error rate = 4.73435e-05
+[6144000 / 100000000] (6.144%) -- errors = 290 , logical error rate = 4.72005e-05
+[6225920 / 100000000] (6.22592%) -- errors = 296 , logical error rate = 4.75432e-05
+[6307840 / 100000000] (6.30784%) -- errors = 303 , logical error rate = 4.80355e-05
+[6389760 / 100000000] (6.38976%) -- errors = 308 , logical error rate = 4.82021e-05
+[6471680 / 100000000] (6.47168%) -- errors = 309 , logical error rate = 4.77465e-05
+[6553600 / 100000000] (6.5536%) -- errors = 310 , logical error rate = 4.73022e-05
+[6635520 / 100000000] (6.63552%) -- errors = 315 , logical error rate = 4.74718e-05
+[6717440 / 100000000] (6.71744%) -- errors = 319 , logical error rate = 4.74883e-05
+[6799360 / 100000000] (6.79936%) -- errors = 319 , logical error rate = 4.69162e-05
+[6881280 / 100000000] (6.88128%) -- errors = 321 , logical error rate = 4.66483e-05
+[6963200 / 100000000] (6.9632%) -- errors = 322 , logical error rate = 4.62431e-05
+[7045120 / 100000000] (7.04512%) -- errors = 325 , logical error rate = 4.61312e-05
+[7127040 / 100000000] (7.12704%) -- errors = 333 , logical error rate = 4.67235e-05
+[7208960 / 100000000] (7.20896%) -- errors = 338 , logical error rate = 4.68861e-05
+[7290880 / 100000000] (7.29088%) -- errors = 344 , logical error rate = 4.71822e-05
+[7372800 / 100000000] (7.3728%) -- errors = 348 , logical error rate = 4.72005e-05
+[7454720 / 100000000] (7.45472%) -- errors = 351 , logical error rate = 4.70843e-05
+[7536640 / 100000000] (7.53664%) -- errors = 355 , logical error rate = 4.71032e-05
+[7618560 / 100000000] (7.61856%) -- errors = 360 , logical error rate = 4.7253e-05
+[7700480 / 100000000] (7.70048%) -- errors = 363 , logical error rate = 4.71399e-05
+[7782400 / 100000000] (7.7824%) -- errors = 370 , logical error rate = 4.75432e-05
+[7864320 / 100000000] (7.86432%) -- errors = 373 , logical error rate = 4.74294e-05
+[7946240 / 100000000] (7.94624%) -- errors = 375 , logical error rate = 4.71921e-05
+[8028160 / 100000000] (8.02816%) -- errors = 378 , logical error rate = 4.70843e-05
+[8110080 / 100000000] (8.11008%) -- errors = 382 , logical error rate = 4.71019e-05
+[8192000 / 100000000] (8.192%) -- errors = 389 , logical error rate = 4.74854e-05
+[8273920 / 100000000] (8.27392%) -- errors = 391 , logical error rate = 4.72569e-05
+[8355840 / 100000000] (8.35584%) -- errors = 395 , logical error rate = 4.72723e-05
+[8437760 / 100000000] (8.43776%) -- errors = 398 , logical error rate = 4.71689e-05
+[8519680 / 100000000] (8.51968%) -- errors = 401 , logical error rate = 4.70675e-05
+[8601600 / 100000000] (8.6016%) -- errors = 405 , logical error rate = 4.70843e-05
+[8683520 / 100000000] (8.68352%) -- errors = 408 , logical error rate = 4.69856e-05
+[8765440 / 100000000] (8.76544%) -- errors = 410 , logical error rate = 4.67746e-05
+[8847360 / 100000000] (8.84736%) -- errors = 413 , logical error rate = 4.66806e-05
+[8929280 / 100000000] (8.92928%) -- errors = 418 , logical error rate = 4.68123e-05
+[9011200 / 100000000] (9.0112%) -- errors = 423 , logical error rate = 4.69416e-05
+[9093120 / 100000000] (9.09312%) -- errors = 430 , logical error rate = 4.72885e-05
+[9175040 / 100000000] (9.17504%) -- errors = 432 , logical error rate = 4.70843e-05
+[9256960 / 100000000] (9.25696%) -- errors = 438 , logical error rate = 4.73157e-05
+[9338880 / 100000000] (9.33888%) -- errors = 442 , logical error rate = 4.7329e-05
+[9420800 / 100000000] (9.4208%) -- errors = 446 , logical error rate = 4.73421e-05
+[9502720 / 100000000] (9.50272%) -- errors = 451 , logical error rate = 4.74601e-05
+[9584640 / 100000000] (9.58464%) -- errors = 452 , logical error rate = 4.71588e-05
+[9666560 / 100000000] (9.66656%) -- errors = 459 , logical error rate = 4.74833e-05
+[9748480 / 100000000] (9.74848%) -- errors = 463 , logical error rate = 4.74946e-05
+[9830400 / 100000000] (9.8304%) -- errors = 469 , logical error rate = 4.77091e-05
+[9912320 / 100000000] (9.91232%) -- errors = 473 , logical error rate = 4.77184e-05
+[9994240 / 100000000] (9.99424%) -- errors = 477 , logical error rate = 4.77275e-05
+[10076160 / 100000000] (10.0762%) -- errors = 478 , logical error rate = 4.74387e-05
+[10158080 / 100000000] (10.1581%) -- errors = 481 , logical error rate = 4.73515e-05
+[10240000 / 100000000] (10.24%) -- errors = 486 , logical error rate = 4.74609e-05
+[10321920 / 100000000] (10.3219%) -- errors = 486 , logical error rate = 4.70843e-05
+[10403840 / 100000000] (10.4038%) -- errors = 491 , logical error rate = 4.71941e-05
+[10485760 / 100000000] (10.4858%) -- errors = 495 , logical error rate = 4.72069e-05
+[10567680 / 100000000] (10.5677%) -- errors = 498 , logical error rate = 4.71248e-05
+[10649600 / 100000000] (10.6496%) -- errors = 499 , logical error rate = 4.68562e-05
+[10731520 / 100000000] (10.7315%) -- errors = 502 , logical error rate = 4.67781e-05
+[10813440 / 100000000] (10.8134%) -- errors = 505 , logical error rate = 4.67011e-05
+[10895360 / 100000000] (10.8954%) -- errors = 509 , logical error rate = 4.67171e-05
+[10977280 / 100000000] (10.9773%) -- errors = 520 , logical error rate = 4.73706e-05
+[11059200 / 100000000] (11.0592%) -- errors = 523 , logical error rate = 4.72909e-05
+[11141120 / 100000000] (11.1411%) -- errors = 533 , logical error rate = 4.78408e-05
+[11223040 / 100000000] (11.223%) -- errors = 536 , logical error rate = 4.77589e-05
+[11304960 / 100000000] (11.305%) -- errors = 541 , logical error rate = 4.78551e-05
+[11386880 / 100000000] (11.3869%) -- errors = 541 , logical error rate = 4.75108e-05
+[11468800 / 100000000] (11.4688%) -- errors = 543 , logical error rate = 4.73458e-05
+[11550720 / 100000000] (11.5507%) -- errors = 548 , logical error rate = 4.74429e-05
+[11632640 / 100000000] (11.6326%) -- errors = 550 , logical error rate = 4.72808e-05
+[11714560 / 100000000] (11.7146%) -- errors = 554 , logical error rate = 4.72916e-05
+[11796480 / 100000000] (11.7965%) -- errors = 555 , logical error rate = 4.70479e-05
+[11878400 / 100000000] (11.8784%) -- errors = 560 , logical error rate = 4.71444e-05
+[11960320 / 100000000] (11.9603%) -- errors = 563 , logical error rate = 4.70723e-05
+[12042240 / 100000000] (12.0422%) -- errors = 566 , logical error rate = 4.70012e-05
+[12124160 / 100000000] (12.1242%) -- errors = 571 , logical error rate = 4.7096e-05
+[12206080 / 100000000] (12.2061%) -- errors = 577 , logical error rate = 4.72715e-05
+[12288000 / 100000000] (12.288%) -- errors = 581 , logical error rate = 4.72819e-05
+[12369920 / 100000000] (12.3699%) -- errors = 586 , logical error rate = 4.7373e-05
+[12451840 / 100000000] (12.4518%) -- errors = 589 , logical error rate = 4.73022e-05
+[12533760 / 100000000] (12.5338%) -- errors = 593 , logical error rate = 4.73122e-05
+[12615680 / 100000000] (12.6157%) -- errors = 600 , logical error rate = 4.75599e-05
+[12697600 / 100000000] (12.6976%) -- errors = 603 , logical error rate = 4.74893e-05
+[12779520 / 100000000] (12.7795%) -- errors = 604 , logical error rate = 4.72631e-05
+[12861440 / 100000000] (12.8614%) -- errors = 607 , logical error rate = 4.71953e-05
+[12943360 / 100000000] (12.9434%) -- errors = 613 , logical error rate = 4.73602e-05
+[13025280 / 100000000] (13.0253%) -- errors = 614 , logical error rate = 4.71391e-05
+[13107200 / 100000000] (13.1072%) -- errors = 619 , logical error rate = 4.7226e-05
+[13189120 / 100000000] (13.1891%) -- errors = 623 , logical error rate = 4.72359e-05
+[13271040 / 100000000] (13.271%) -- errors = 625 , logical error rate = 4.7095e-05
+[13352960 / 100000000] (13.353%) -- errors = 629 , logical error rate = 4.71057e-05
+[13434880 / 100000000] (13.4349%) -- errors = 630 , logical error rate = 4.68929e-05
+[13516800 / 100000000] (13.5168%) -- errors = 632 , logical error rate = 4.67566e-05
+[13598720 / 100000000] (13.5987%) -- errors = 635 , logical error rate = 4.66956e-05
+[13680640 / 100000000] (13.6806%) -- errors = 638 , logical error rate = 4.66352e-05
+[13762560 / 100000000] (13.7626%) -- errors = 640 , logical error rate = 4.6503e-05
+[13844480 / 100000000] (13.8445%) -- errors = 644 , logical error rate = 4.65167e-05
+[13926400 / 100000000] (13.9264%) -- errors = 647 , logical error rate = 4.64585e-05
+[14008320 / 100000000] (14.0083%) -- errors = 655 , logical error rate = 4.67579e-05
+[14090240 / 100000000] (14.0902%) -- errors = 660 , logical error rate = 4.68409e-05
+[14172160 / 100000000] (14.1722%) -- errors = 662 , logical error rate = 4.67113e-05
+[14254080 / 100000000] (14.2541%) -- errors = 667 , logical error rate = 4.67936e-05
+[14336000 / 100000000] (14.336%) -- errors = 670 , logical error rate = 4.67355e-05
+[14417920 / 100000000] (14.4179%) -- errors = 674 , logical error rate = 4.67474e-05
+[14499840 / 100000000] (14.4998%) -- errors = 679 , logical error rate = 4.68281e-05
+[14581760 / 100000000] (14.5818%) -- errors = 684 , logical error rate = 4.69079e-05
+[14663680 / 100000000] (14.6637%) -- errors = 689 , logical error rate = 4.69868e-05
+[14745600 / 100000000] (14.7456%) -- errors = 690 , logical error rate = 4.67936e-05
+[14827520 / 100000000] (14.8275%) -- errors = 695 , logical error rate = 4.68723e-05
+[14909440 / 100000000] (14.9094%) -- errors = 703 , logical error rate = 4.71513e-05
+[14991360 / 100000000] (14.9914%) -- errors = 712 , logical error rate = 4.7494e-05
+[15073280 / 100000000] (15.0733%) -- errors = 720 , logical error rate = 4.77666e-05
+[15155200 / 100000000] (15.1552%) -- errors = 723 , logical error rate = 4.77064e-05
+[15237120 / 100000000] (15.2371%) -- errors = 727 , logical error rate = 4.77124e-05
+[15319040 / 100000000] (15.319%) -- errors = 729 , logical error rate = 4.75878e-05
+[15400960 / 100000000] (15.401%) -- errors = 732 , logical error rate = 4.75295e-05
+[15482880 / 100000000] (15.4829%) -- errors = 739 , logical error rate = 4.77301e-05
+[15564800 / 100000000] (15.5648%) -- errors = 743 , logical error rate = 4.77359e-05
+[15646720 / 100000000] (15.6467%) -- errors = 747 , logical error rate = 4.77416e-05
+[15728640 / 100000000] (15.7286%) -- errors = 750 , logical error rate = 4.76837e-05
+[15810560 / 100000000] (15.8106%) -- errors = 755 , logical error rate = 4.77529e-05
+[15892480 / 100000000] (15.8925%) -- errors = 758 , logical error rate = 4.76955e-05
+[15974400 / 100000000] (15.9744%) -- errors = 758 , logical error rate = 4.74509e-05
+[16056320 / 100000000] (16.0563%) -- errors = 760 , logical error rate = 4.73334e-05
+[16138240 / 100000000] (16.1382%) -- errors = 766 , logical error rate = 4.74649e-05
+[16220160 / 100000000] (16.2202%) -- errors = 768 , logical error rate = 4.73485e-05
+[16302080 / 100000000] (16.3021%) -- errors = 772 , logical error rate = 4.73559e-05
+[16384000 / 100000000] (16.384%) -- errors = 776 , logical error rate = 4.73633e-05
+[16465920 / 100000000] (16.4659%) -- errors = 779 , logical error rate = 4.73098e-05
+[16547840 / 100000000] (16.5478%) -- errors = 781 , logical error rate = 4.71965e-05
+[16629760 / 100000000] (16.6298%) -- errors = 783 , logical error rate = 4.70843e-05
+[16711680 / 100000000] (16.7117%) -- errors = 789 , logical error rate = 4.72125e-05
+[16793600 / 100000000] (16.7936%) -- errors = 795 , logical error rate = 4.73395e-05
+[16875520 / 100000000] (16.8755%) -- errors = 799 , logical error rate = 4.73467e-05
+[16957440 / 100000000] (16.9574%) -- errors = 803 , logical error rate = 4.73538e-05
+[17039360 / 100000000] (17.0394%) -- errors = 809 , logical error rate = 4.74783e-05
+[17121280 / 100000000] (17.1213%) -- errors = 818 , logical error rate = 4.77768e-05
+[17203200 / 100000000] (17.2032%) -- errors = 822 , logical error rate = 4.77818e-05
+[17285120 / 100000000] (17.2851%) -- errors = 824 , logical error rate = 4.76711e-05
+[17367040 / 100000000] (17.367%) -- errors = 827 , logical error rate = 4.76189e-05
+[17448960 / 100000000] (17.449%) -- errors = 831 , logical error rate = 4.76246e-05
+[17530880 / 100000000] (17.5309%) -- errors = 834 , logical error rate = 4.75732e-05
+[17612800 / 100000000] (17.6128%) -- errors = 838 , logical error rate = 4.7579e-05
+[17694720 / 100000000] (17.6947%) -- errors = 844 , logical error rate = 4.76978e-05
+[17776640 / 100000000] (17.7766%) -- errors = 846 , logical error rate = 4.75905e-05
+[17858560 / 100000000] (17.8586%) -- errors = 851 , logical error rate = 4.76522e-05
+[17940480 / 100000000] (17.9405%) -- errors = 860 , logical error rate = 4.79363e-05
+[18022400 / 100000000] (18.0224%) -- errors = 867 , logical error rate = 4.81068e-05
+[18104320 / 100000000] (18.1043%) -- errors = 867 , logical error rate = 4.78891e-05
+[18186240 / 100000000] (18.1862%) -- errors = 870 , logical error rate = 4.78384e-05
+[18268160 / 100000000] (18.2682%) -- errors = 877 , logical error rate = 4.8007e-05
+[18350080 / 100000000] (18.3501%) -- errors = 878 , logical error rate = 4.78472e-05
+[18432000 / 100000000] (18.432%) -- errors = 880 , logical error rate = 4.77431e-05
+[18513920 / 100000000] (18.5139%) -- errors = 882 , logical error rate = 4.76398e-05
+[18595840 / 100000000] (18.5958%) -- errors = 887 , logical error rate = 4.76988e-05
+[18677760 / 100000000] (18.6778%) -- errors = 889 , logical error rate = 4.75967e-05
+[18759680 / 100000000] (18.7597%) -- errors = 894 , logical error rate = 4.76554e-05
+[18841600 / 100000000] (18.8416%) -- errors = 901 , logical error rate = 4.78197e-05
+[18923520 / 100000000] (18.9235%) -- errors = 905 , logical error rate = 4.78241e-05
+[19005440 / 100000000] (19.0054%) -- errors = 907 , logical error rate = 4.77232e-05
+[19087360 / 100000000] (19.0874%) -- errors = 909 , logical error rate = 4.76231e-05
+[19169280 / 100000000] (19.1693%) -- errors = 916 , logical error rate = 4.77848e-05
+[19251200 / 100000000] (19.2512%) -- errors = 922 , logical error rate = 4.78931e-05
+[19333120 / 100000000] (19.3331%) -- errors = 923 , logical error rate = 4.77419e-05
+[19415040 / 100000000] (19.415%) -- errors = 928 , logical error rate = 4.7798e-05
+[19496960 / 100000000] (19.497%) -- errors = 930 , logical error rate = 4.76997e-05
+[19578880 / 100000000] (19.5789%) -- errors = 936 , logical error rate = 4.78066e-05
+[19660800 / 100000000] (19.6608%) -- errors = 940 , logical error rate = 4.78109e-05
+[19742720 / 100000000] (19.7427%) -- errors = 943 , logical error rate = 4.77644e-05
+[19824640 / 100000000] (19.8246%) -- errors = 946 , logical error rate = 4.77184e-05
+[19906560 / 100000000] (19.9066%) -- errors = 949 , logical error rate = 4.76727e-05
+[19988480 / 100000000] (19.9885%) -- errors = 953 , logical error rate = 4.76775e-05
+[20070400 / 100000000] (20.0704%) -- errors = 955 , logical error rate = 4.75825e-05
+[20152320 / 100000000] (20.1523%) -- errors = 958 , logical error rate = 4.7538e-05
+[20234240 / 100000000] (20.2342%) -- errors = 963 , logical error rate = 4.75926e-05
+[20316160 / 100000000] (20.3162%) -- errors = 971 , logical error rate = 4.77945e-05
+[20398080 / 100000000] (20.3981%) -- errors = 973 , logical error rate = 4.77006e-05
+[20480000 / 100000000] (20.48%) -- errors = 976 , logical error rate = 4.76563e-05
+[20561920 / 100000000] (20.5619%) -- errors = 981 , logical error rate = 4.77096e-05
+[20643840 / 100000000] (20.6438%) -- errors = 988 , logical error rate = 4.78593e-05
+[20725760 / 100000000] (20.7258%) -- errors = 992 , logical error rate = 4.78631e-05
+[20807680 / 100000000] (20.8077%) -- errors = 996 , logical error rate = 4.78669e-05
+[20889600 / 100000000] (20.8896%) -- errors = 1000 , logical error rate = 4.78707e-05
+[20971520 / 100000000] (20.9715%) -- errors = 1002 , logical error rate = 4.77791e-05
+[21053440 / 100000000] (21.0534%) -- errors = 1006 , logical error rate = 4.77832e-05
+[21135360 / 100000000] (21.1354%) -- errors = 1010 , logical error rate = 4.77872e-05
+[21217280 / 100000000] (21.2173%) -- errors = 1015 , logical error rate = 4.78384e-05
+[21299200 / 100000000] (21.2992%) -- errors = 1019 , logical error rate = 4.78422e-05
+[21381120 / 100000000] (21.3811%) -- errors = 1024 , logical error rate = 4.78927e-05
+[21463040 / 100000000] (21.463%) -- errors = 1027 , logical error rate = 4.78497e-05
+[21544960 / 100000000] (21.545%) -- errors = 1029 , logical error rate = 4.77606e-05
+[21626880 / 100000000] (21.6269%) -- errors = 1033 , logical error rate = 4.77646e-05
+[21708800 / 100000000] (21.7088%) -- errors = 1035 , logical error rate = 4.76765e-05
+[21790720 / 100000000] (21.7907%) -- errors = 1040 , logical error rate = 4.77267e-05
+[21872640 / 100000000] (21.8726%) -- errors = 1044 , logical error rate = 4.77309e-05
+[21954560 / 100000000] (21.9546%) -- errors = 1048 , logical error rate = 4.7735e-05
+[22036480 / 100000000] (22.0365%) -- errors = 1051 , logical error rate = 4.76936e-05
+[22118400 / 100000000] (22.1184%) -- errors = 1051 , logical error rate = 4.7517e-05
+[22200320 / 100000000] (22.2003%) -- errors = 1055 , logical error rate = 4.75218e-05
+[22282240 / 100000000] (22.2822%) -- errors = 1058 , logical error rate = 4.74818e-05
+[22364160 / 100000000] (22.3642%) -- errors = 1064 , logical error rate = 4.75761e-05
+[22446080 / 100000000] (22.4461%) -- errors = 1070 , logical error rate = 4.76698e-05
+[22528000 / 100000000] (22.528%) -- errors = 1074 , logical error rate = 4.7674e-05
+[22609920 / 100000000] (22.6099%) -- errors = 1076 , logical error rate = 4.75897e-05
+[22691840 / 100000000] (22.6918%) -- errors = 1079 , logical error rate = 4.75501e-05
+[22773760 / 100000000] (22.7738%) -- errors = 1080 , logical error rate = 4.7423e-05
+[22855680 / 100000000] (22.8557%) -- errors = 1082 , logical error rate = 4.73405e-05
+[22937600 / 100000000] (22.9376%) -- errors = 1083 , logical error rate = 4.72151e-05
+[23019520 / 100000000] (23.0195%) -- errors = 1085 , logical error rate = 4.71339e-05
+[23101440 / 100000000] (23.1014%) -- errors = 1089 , logical error rate = 4.71399e-05
+[23183360 / 100000000] (23.1834%) -- errors = 1094 , logical error rate = 4.7189e-05
+[23265280 / 100000000] (23.2653%) -- errors = 1096 , logical error rate = 4.71088e-05
+[23347200 / 100000000] (23.3472%) -- errors = 1097 , logical error rate = 4.69864e-05
+[23429120 / 100000000] (23.4291%) -- errors = 1098 , logical error rate = 4.68648e-05
+[23511040 / 100000000] (23.511%) -- errors = 1102 , logical error rate = 4.68716e-05
+[23592960 / 100000000] (23.593%) -- errors = 1108 , logical error rate = 4.69632e-05
+[23674880 / 100000000] (23.6749%) -- errors = 1112 , logical error rate = 4.69696e-05
+[23756800 / 100000000] (23.7568%) -- errors = 1119 , logical error rate = 4.71023e-05
+[23838720 / 100000000] (23.8387%) -- errors = 1120 , logical error rate = 4.69824e-05
+[23920640 / 100000000] (23.9206%) -- errors = 1122 , logical error rate = 4.69051e-05
+[24002560 / 100000000] (24.0026%) -- errors = 1125 , logical error rate = 4.687e-05
+[24084480 / 100000000] (24.0845%) -- errors = 1131 , logical error rate = 4.69597e-05
+[24166400 / 100000000] (24.1664%) -- errors = 1135 , logical error rate = 4.6966e-05
+[24248320 / 100000000] (24.2483%) -- errors = 1136 , logical error rate = 4.68486e-05
+[24330240 / 100000000] (24.3302%) -- errors = 1139 , logical error rate = 4.68142e-05
+[24412160 / 100000000] (24.4122%) -- errors = 1149 , logical error rate = 4.70667e-05
+[24494080 / 100000000] (24.4941%) -- errors = 1152 , logical error rate = 4.70318e-05
+[24576000 / 100000000] (24.576%) -- errors = 1154 , logical error rate = 4.69564e-05
+[24657920 / 100000000] (24.6579%) -- errors = 1161 , logical error rate = 4.70843e-05
+[24739840 / 100000000] (24.7398%) -- errors = 1162 , logical error rate = 4.69688e-05
+[24821760 / 100000000] (24.8218%) -- errors = 1166 , logical error rate = 4.69749e-05
+[24903680 / 100000000] (24.9037%) -- errors = 1170 , logical error rate = 4.6981e-05
+[24985600 / 100000000] (24.9856%) -- errors = 1176 , logical error rate = 4.70671e-05
+[25067520 / 100000000] (25.0675%) -- errors = 1180 , logical error rate = 4.70729e-05
+[25149440 / 100000000] (25.1494%) -- errors = 1187 , logical error rate = 4.71979e-05
+[25231360 / 100000000] (25.2314%) -- errors = 1193 , logical error rate = 4.72824e-05
+[25313280 / 100000000] (25.3133%) -- errors = 1196 , logical error rate = 4.72479e-05
+[25395200 / 100000000] (25.3952%) -- errors = 1199 , logical error rate = 4.72136e-05
+[25477120 / 100000000] (25.4771%) -- errors = 1203 , logical error rate = 4.72188e-05
+[25559040 / 100000000] (25.559%) -- errors = 1210 , logical error rate = 4.73414e-05
+[25640960 / 100000000] (25.641%) -- errors = 1213 , logical error rate = 4.73071e-05
+[25722880 / 100000000] (25.7229%) -- errors = 1216 , logical error rate = 4.72731e-05
+[25804800 / 100000000] (25.8048%) -- errors = 1222 , logical error rate = 4.73555e-05
+[25886720 / 100000000] (25.8867%) -- errors = 1225 , logical error rate = 4.73216e-05
+[25968640 / 100000000] (25.9686%) -- errors = 1228 , logical error rate = 4.72878e-05
+[26050560 / 100000000] (26.0506%) -- errors = 1234 , logical error rate = 4.73694e-05
+[26132480 / 100000000] (26.1325%) -- errors = 1236 , logical error rate = 4.72975e-05
+[26214400 / 100000000] (26.2144%) -- errors = 1240 , logical error rate = 4.73022e-05
+[26296320 / 100000000] (26.2963%) -- errors = 1245 , logical error rate = 4.7345e-05
+[26378240 / 100000000] (26.3782%) -- errors = 1249 , logical error rate = 4.73496e-05
+[26460160 / 100000000] (26.4602%) -- errors = 1253 , logical error rate = 4.73542e-05
+[26542080 / 100000000] (26.5421%) -- errors = 1257 , logical error rate = 4.73588e-05
+[26624000 / 100000000] (26.624%) -- errors = 1259 , logical error rate = 4.72882e-05
+[26705920 / 100000000] (26.7059%) -- errors = 1261 , logical error rate = 4.7218e-05
+[26787840 / 100000000] (26.7878%) -- errors = 1264 , logical error rate = 4.71856e-05
+[26869760 / 100000000] (26.8698%) -- errors = 1266 , logical error rate = 4.71162e-05
+[26951680 / 100000000] (26.9517%) -- errors = 1270 , logical error rate = 4.71214e-05
+[27033600 / 100000000] (27.0336%) -- errors = 1277 , logical error rate = 4.72375e-05
+[27115520 / 100000000] (27.1155%) -- errors = 1280 , logical error rate = 4.72054e-05
+[27197440 / 100000000] (27.1974%) -- errors = 1284 , logical error rate = 4.72103e-05
+[27279360 / 100000000] (27.2794%) -- errors = 1290 , logical error rate = 4.72885e-05
+[27361280 / 100000000] (27.3613%) -- errors = 1297 , logical error rate = 4.74028e-05
+[27443200 / 100000000] (27.4432%) -- errors = 1301 , logical error rate = 4.7407e-05
+[27525120 / 100000000] (27.5251%) -- errors = 1308 , logical error rate = 4.75202e-05
+[27607040 / 100000000] (27.607%) -- errors = 1313 , logical error rate = 4.75603e-05
+[27688960 / 100000000] (27.689%) -- errors = 1314 , logical error rate = 4.74557e-05
+[27770880 / 100000000] (27.7709%) -- errors = 1319 , logical error rate = 4.74958e-05
+[27852800 / 100000000] (27.8528%) -- errors = 1323 , logical error rate = 4.74997e-05
+[27934720 / 100000000] (27.9347%) -- errors = 1324 , logical error rate = 4.73962e-05
+[28016640 / 100000000] (28.0166%) -- errors = 1334 , logical error rate = 4.76146e-05
+[28098560 / 100000000] (28.0986%) -- errors = 1340 , logical error rate = 4.76893e-05
+[28180480 / 100000000] (28.1805%) -- errors = 1345 , logical error rate = 4.77281e-05
+[28262400 / 100000000] (28.2624%) -- errors = 1350 , logical error rate = 4.77666e-05
+[28344320 / 100000000] (28.3443%) -- errors = 1359 , logical error rate = 4.79461e-05
+[28426240 / 100000000] (28.4262%) -- errors = 1362 , logical error rate = 4.79135e-05
+[28508160 / 100000000] (28.5082%) -- errors = 1365 , logical error rate = 4.7881e-05
+[28590080 / 100000000] (28.5901%) -- errors = 1372 , logical error rate = 4.79887e-05
+[28672000 / 100000000] (28.672%) -- errors = 1373 , logical error rate = 4.78864e-05
+[28753920 / 100000000] (28.7539%) -- errors = 1378 , logical error rate = 4.79239e-05
+[28835840 / 100000000] (28.8358%) -- errors = 1383 , logical error rate = 4.79611e-05
+[28917760 / 100000000] (28.9178%) -- errors = 1385 , logical error rate = 4.78944e-05
+[28999680 / 100000000] (28.9997%) -- errors = 1390 , logical error rate = 4.79316e-05
+[29081600 / 100000000] (29.0816%) -- errors = 1392 , logical error rate = 4.78653e-05
+[29163520 / 100000000] (29.1635%) -- errors = 1395 , logical error rate = 4.78337e-05
+[29245440 / 100000000] (29.2454%) -- errors = 1396 , logical error rate = 4.77339e-05
+[29327360 / 100000000] (29.3274%) -- errors = 1403 , logical error rate = 4.78393e-05
+[29409280 / 100000000] (29.4093%) -- errors = 1404 , logical error rate = 4.774e-05
+[29491200 / 100000000] (29.4912%) -- errors = 1410 , logical error rate = 4.78109e-05
+[29573120 / 100000000] (29.5731%) -- errors = 1416 , logical error rate = 4.78813e-05
+[29655040 / 100000000] (29.655%) -- errors = 1423 , logical error rate = 4.79851e-05
+[29736960 / 100000000] (29.737%) -- errors = 1429 , logical error rate = 4.80547e-05
+[29818880 / 100000000] (29.8189%) -- errors = 1431 , logical error rate = 4.79897e-05
+[29900800 / 100000000] (29.9008%) -- errors = 1437 , logical error rate = 4.80589e-05
+[29982720 / 100000000] (29.9827%) -- errors = 1440 , logical error rate = 4.80277e-05
+[30064640 / 100000000] (30.0646%) -- errors = 1443 , logical error rate = 4.79966e-05
+[30146560 / 100000000] (30.1466%) -- errors = 1450 , logical error rate = 4.80984e-05
+[30228480 / 100000000] (30.2285%) -- errors = 1455 , logical error rate = 4.81334e-05
+[30310400 / 100000000] (30.3104%) -- errors = 1457 , logical error rate = 4.80693e-05
+[30392320 / 100000000] (30.3923%) -- errors = 1463 , logical error rate = 4.81372e-05
+[30474240 / 100000000] (30.4742%) -- errors = 1467 , logical error rate = 4.8139e-05
+[30556160 / 100000000] (30.5562%) -- errors = 1471 , logical error rate = 4.81409e-05
+[30638080 / 100000000] (30.6381%) -- errors = 1478 , logical error rate = 4.82406e-05
+[30720000 / 100000000] (30.72%) -- errors = 1486 , logical error rate = 4.83724e-05
+[30801920 / 100000000] (30.8019%) -- errors = 1490 , logical error rate = 4.83736e-05
+[30883840 / 100000000] (30.8838%) -- errors = 1495 , logical error rate = 4.84072e-05
+[30965760 / 100000000] (30.9658%) -- errors = 1499 , logical error rate = 4.84083e-05
+[31047680 / 100000000] (31.0477%) -- errors = 1500 , logical error rate = 4.83128e-05
+[31129600 / 100000000] (31.1296%) -- errors = 1506 , logical error rate = 4.83784e-05
+[31211520 / 100000000] (31.2115%) -- errors = 1510 , logical error rate = 4.83796e-05
+[31293440 / 100000000] (31.2934%) -- errors = 1511 , logical error rate = 4.82849e-05
+[31375360 / 100000000] (31.3754%) -- errors = 1514 , logical error rate = 4.82544e-05
+[31457280 / 100000000] (31.4573%) -- errors = 1514 , logical error rate = 4.81288e-05
+[31539200 / 100000000] (31.5392%) -- errors = 1517 , logical error rate = 4.80989e-05
+[31621120 / 100000000] (31.6211%) -- errors = 1522 , logical error rate = 4.81324e-05
+[31703040 / 100000000] (31.703%) -- errors = 1527 , logical error rate = 4.81657e-05
+[31784960 / 100000000] (31.785%) -- errors = 1534 , logical error rate = 4.82618e-05
+[31866880 / 100000000] (31.8669%) -- errors = 1538 , logical error rate = 4.82633e-05
+[31948800 / 100000000] (31.9488%) -- errors = 1542 , logical error rate = 4.82647e-05
+[32030720 / 100000000] (32.0307%) -- errors = 1543 , logical error rate = 4.81725e-05
+[32112640 / 100000000] (32.1126%) -- errors = 1548 , logical error rate = 4.82053e-05
+[32194560 / 100000000] (32.1946%) -- errors = 1554 , logical error rate = 4.8269e-05
+[32276480 / 100000000] (32.2765%) -- errors = 1555 , logical error rate = 4.81775e-05
+[32358400 / 100000000] (32.3584%) -- errors = 1557 , logical error rate = 4.81173e-05
+[32440320 / 100000000] (32.4403%) -- errors = 1563 , logical error rate = 4.81808e-05
+[32522240 / 100000000] (32.5222%) -- errors = 1567 , logical error rate = 4.81824e-05
+[32604160 / 100000000] (32.6042%) -- errors = 1571 , logical error rate = 4.8184e-05
+[32686080 / 100000000] (32.6861%) -- errors = 1576 , logical error rate = 4.82162e-05
+[32768000 / 100000000] (32.768%) -- errors = 1579 , logical error rate = 4.81873e-05
+[32849920 / 100000000] (32.8499%) -- errors = 1583 , logical error rate = 4.81889e-05
+[32931840 / 100000000] (32.9318%) -- errors = 1591 , logical error rate = 4.83119e-05
+[33013760 / 100000000] (33.0138%) -- errors = 1592 , logical error rate = 4.82223e-05
+[33095680 / 100000000] (33.0957%) -- errors = 1593 , logical error rate = 4.81332e-05
+[33177600 / 100000000] (33.1776%) -- errors = 1598 , logical error rate = 4.8165e-05
+[33259520 / 100000000] (33.2595%) -- errors = 1603 , logical error rate = 4.81967e-05
+[33341440 / 100000000] (33.3414%) -- errors = 1607 , logical error rate = 4.81983e-05
+[33423360 / 100000000] (33.4234%) -- errors = 1610 , logical error rate = 4.81699e-05
+[33505280 / 100000000] (33.5053%) -- errors = 1611 , logical error rate = 4.8082e-05
+[33587200 / 100000000] (33.5872%) -- errors = 1614 , logical error rate = 4.8054e-05
+[33669120 / 100000000] (33.6691%) -- errors = 1622 , logical error rate = 4.81747e-05
+[33751040 / 100000000] (33.751%) -- errors = 1627 , logical error rate = 4.82059e-05
+[33832960 / 100000000] (33.833%) -- errors = 1628 , logical error rate = 4.81188e-05
+[33914880 / 100000000] (33.9149%) -- errors = 1634 , logical error rate = 4.81794e-05
+[33996800 / 100000000] (33.9968%) -- errors = 1638 , logical error rate = 4.8181e-05
+[34078720 / 100000000] (34.0787%) -- errors = 1643 , logical error rate = 4.82119e-05
+[34160640 / 100000000] (34.1606%) -- errors = 1649 , logical error rate = 4.82719e-05
+[34242560 / 100000000] (34.2426%) -- errors = 1651 , logical error rate = 4.82149e-05
+[34324480 / 100000000] (34.3245%) -- errors = 1652 , logical error rate = 4.81289e-05
+[34406400 / 100000000] (34.4064%) -- errors = 1656 , logical error rate = 4.81306e-05
+[34488320 / 100000000] (34.4883%) -- errors = 1660 , logical error rate = 4.81322e-05
+[34570240 / 100000000] (34.5702%) -- errors = 1662 , logical error rate = 4.8076e-05
+[34652160 / 100000000] (34.6522%) -- errors = 1665 , logical error rate = 4.8049e-05
+[34734080 / 100000000] (34.7341%) -- errors = 1666 , logical error rate = 4.79644e-05
+[34816000 / 100000000] (34.816%) -- errors = 1669 , logical error rate = 4.79377e-05
+[34897920 / 100000000] (34.8979%) -- errors = 1675 , logical error rate = 4.79971e-05
+[34979840 / 100000000] (34.9798%) -- errors = 1678 , logical error rate = 4.79705e-05
+[35061760 / 100000000] (35.0618%) -- errors = 1683 , logical error rate = 4.8001e-05
+[35143680 / 100000000] (35.1437%) -- errors = 1690 , logical error rate = 4.80883e-05
+[35225600 / 100000000] (35.2256%) -- errors = 1694 , logical error rate = 4.809e-05
+[35307520 / 100000000] (35.3075%) -- errors = 1698 , logical error rate = 4.80917e-05
+[35389440 / 100000000] (35.3894%) -- errors = 1700 , logical error rate = 4.80369e-05
+[35471360 / 100000000] (35.4714%) -- errors = 1705 , logical error rate = 4.80669e-05
+[35553280 / 100000000] (35.5533%) -- errors = 1714 , logical error rate = 4.82093e-05
+[35635200 / 100000000] (35.6352%) -- errors = 1718 , logical error rate = 4.82108e-05
+[35717120 / 100000000] (35.7171%) -- errors = 1722 , logical error rate = 4.82122e-05
+[35799040 / 100000000] (35.799%) -- errors = 1726 , logical error rate = 4.82136e-05
+[35880960 / 100000000] (35.881%) -- errors = 1729 , logical error rate = 4.81871e-05
+[35962880 / 100000000] (35.9629%) -- errors = 1732 , logical error rate = 4.81608e-05
+[36044800 / 100000000] (36.0448%) -- errors = 1739 , logical error rate = 4.82455e-05
+[36126720 / 100000000] (36.1267%) -- errors = 1743 , logical error rate = 4.82468e-05
+[36208640 / 100000000] (36.2086%) -- errors = 1747 , logical error rate = 4.82482e-05
+[36290560 / 100000000] (36.2906%) -- errors = 1749 , logical error rate = 4.81944e-05
+[36372480 / 100000000] (36.3725%) -- errors = 1752 , logical error rate = 4.81683e-05
+[36454400 / 100000000] (36.4544%) -- errors = 1760 , logical error rate = 4.82795e-05
+[36536320 / 100000000] (36.5363%) -- errors = 1762 , logical error rate = 4.8226e-05
+[36618240 / 100000000] (36.6182%) -- errors = 1766 , logical error rate = 4.82273e-05
+[36700160 / 100000000] (36.7002%) -- errors = 1769 , logical error rate = 4.82014e-05
+[36782080 / 100000000] (36.7821%) -- errors = 1771 , logical error rate = 4.81484e-05
+[36864000 / 100000000] (36.864%) -- errors = 1777 , logical error rate = 4.82042e-05
+[36945920 / 100000000] (36.9459%) -- errors = 1781 , logical error rate = 4.82056e-05
+[37027840 / 100000000] (37.0278%) -- errors = 1786 , logical error rate = 4.8234e-05
+[37109760 / 100000000] (37.1098%) -- errors = 1788 , logical error rate = 4.81814e-05
+[37191680 / 100000000] (37.1917%) -- errors = 1794 , logical error rate = 4.82366e-05
+[37273600 / 100000000] (37.2736%) -- errors = 1800 , logical error rate = 4.82916e-05
+[37355520 / 100000000] (37.3555%) -- errors = 1803 , logical error rate = 4.8266e-05
+[37437440 / 100000000] (37.4374%) -- errors = 1807 , logical error rate = 4.82672e-05
+[37519360 / 100000000] (37.5194%) -- errors = 1814 , logical error rate = 4.83484e-05
+[37601280 / 100000000] (37.6013%) -- errors = 1820 , logical error rate = 4.84026e-05
+[37683200 / 100000000] (37.6832%) -- errors = 1822 , logical error rate = 4.83505e-05
+[37765120 / 100000000] (37.7651%) -- errors = 1825 , logical error rate = 4.8325e-05
+[37847040 / 100000000] (37.847%) -- errors = 1831 , logical error rate = 4.83789e-05
+[37928960 / 100000000] (37.929%) -- errors = 1833 , logical error rate = 4.83272e-05
+[38010880 / 100000000] (38.0109%) -- errors = 1839 , logical error rate = 4.83809e-05
+[38092800 / 100000000] (38.0928%) -- errors = 1843 , logical error rate = 4.83818e-05
+[38174720 / 100000000] (38.1747%) -- errors = 1847 , logical error rate = 4.83828e-05
+[38256640 / 100000000] (38.2566%) -- errors = 1855 , logical error rate = 4.84883e-05
+[38338560 / 100000000] (38.3386%) -- errors = 1858 , logical error rate = 4.8463e-05
+[38420480 / 100000000] (38.4205%) -- errors = 1861 , logical error rate = 4.84377e-05
+[38502400 / 100000000] (38.5024%) -- errors = 1864 , logical error rate = 4.84126e-05
+[38584320 / 100000000] (38.5843%) -- errors = 1869 , logical error rate = 4.84394e-05
+[38666240 / 100000000] (38.6662%) -- errors = 1877 , logical error rate = 4.85436e-05
+[38748160 / 100000000] (38.7482%) -- errors = 1883 , logical error rate = 4.85959e-05
+[38830080 / 100000000] (38.8301%) -- errors = 1890 , logical error rate = 4.86736e-05
+[38912000 / 100000000] (38.912%) -- errors = 1893 , logical error rate = 4.86482e-05
+[38993920 / 100000000] (38.9939%) -- errors = 1897 , logical error rate = 4.86486e-05
+[39075840 / 100000000] (39.0758%) -- errors = 1902 , logical error rate = 4.86746e-05
+[39157760 / 100000000] (39.1578%) -- errors = 1908 , logical error rate = 4.8726e-05
+[39239680 / 100000000] (39.2397%) -- errors = 1912 , logical error rate = 4.87262e-05
+[39321600 / 100000000] (39.3216%) -- errors = 1914 , logical error rate = 4.86755e-05
+[39403520 / 100000000] (39.4035%) -- errors = 1916 , logical error rate = 4.86251e-05
+[39485440 / 100000000] (39.4854%) -- errors = 1921 , logical error rate = 4.86508e-05
+[39567360 / 100000000] (39.5674%) -- errors = 1926 , logical error rate = 4.86765e-05
+[39649280 / 100000000] (39.6493%) -- errors = 1928 , logical error rate = 4.86264e-05
+[39731200 / 100000000] (39.7312%) -- errors = 1932 , logical error rate = 4.86268e-05
+[39813120 / 100000000] (39.8131%) -- errors = 1933 , logical error rate = 4.85518e-05
+[39895040 / 100000000] (39.895%) -- errors = 1937 , logical error rate = 4.85524e-05
+[39976960 / 100000000] (39.977%) -- errors = 1941 , logical error rate = 4.8553e-05
+[40058880 / 100000000] (40.0589%) -- errors = 1942 , logical error rate = 4.84786e-05
+[40140800 / 100000000] (40.1408%) -- errors = 1944 , logical error rate = 4.84295e-05
+[40222720 / 100000000] (40.2227%) -- errors = 1945 , logical error rate = 4.83558e-05
+[40304640 / 100000000] (40.3046%) -- errors = 1949 , logical error rate = 4.83567e-05
+[40386560 / 100000000] (40.3866%) -- errors = 1952 , logical error rate = 4.83329e-05
+[40468480 / 100000000] (40.4685%) -- errors = 1956 , logical error rate = 4.83339e-05
+[40550400 / 100000000] (40.5504%) -- errors = 1959 , logical error rate = 4.83103e-05
+[40632320 / 100000000] (40.6323%) -- errors = 1964 , logical error rate = 4.83359e-05
+[40714240 / 100000000] (40.7142%) -- errors = 1966 , logical error rate = 4.82878e-05
+[40796160 / 100000000] (40.7962%) -- errors = 1972 , logical error rate = 4.83379e-05
+[40878080 / 100000000] (40.8781%) -- errors = 1978 , logical error rate = 4.83878e-05
+[40960000 / 100000000] (40.96%) -- errors = 1979 , logical error rate = 4.83154e-05
+[41041920 / 100000000] (41.0419%) -- errors = 1983 , logical error rate = 4.83165e-05
+[41123840 / 100000000] (41.1238%) -- errors = 1985 , logical error rate = 4.82688e-05
+[41205760 / 100000000] (41.2058%) -- errors = 1989 , logical error rate = 4.827e-05
+[41287680 / 100000000] (41.2877%) -- errors = 1993 , logical error rate = 4.82711e-05
+[41369600 / 100000000] (41.3696%) -- errors = 1996 , logical error rate = 4.8248e-05
+[41451520 / 100000000] (41.4515%) -- errors = 1999 , logical error rate = 4.8225e-05
+[41533440 / 100000000] (41.5334%) -- errors = 2007 , logical error rate = 4.83225e-05
+[41615360 / 100000000] (41.6154%) -- errors = 2010 , logical error rate = 4.82995e-05
+[41697280 / 100000000] (41.6973%) -- errors = 2012 , logical error rate = 4.82525e-05
+[41779200 / 100000000] (41.7792%) -- errors = 2019 , logical error rate = 4.83255e-05
+[41861120 / 100000000] (41.8611%) -- errors = 2022 , logical error rate = 4.83026e-05
+[41943040 / 100000000] (41.943%) -- errors = 2025 , logical error rate = 4.82798e-05
+[42024960 / 100000000] (42.025%) -- errors = 2029 , logical error rate = 4.82808e-05
+[42106880 / 100000000] (42.1069%) -- errors = 2034 , logical error rate = 4.83056e-05
+[42188800 / 100000000] (42.1888%) -- errors = 2039 , logical error rate = 4.83304e-05
+[42270720 / 100000000] (42.2707%) -- errors = 2047 , logical error rate = 4.8426e-05
+[42352640 / 100000000] (42.3526%) -- errors = 2051 , logical error rate = 4.84267e-05
+[42434560 / 100000000] (42.4346%) -- errors = 2055 , logical error rate = 4.84275e-05
+[42516480 / 100000000] (42.5165%) -- errors = 2062 , logical error rate = 4.84988e-05
+[42598400 / 100000000] (42.5984%) -- errors = 2065 , logical error rate = 4.8476e-05
+[42680320 / 100000000] (42.6803%) -- errors = 2070 , logical error rate = 4.85001e-05
+[42762240 / 100000000] (42.7622%) -- errors = 2074 , logical error rate = 4.85007e-05
+[42844160 / 100000000] (42.8442%) -- errors = 2076 , logical error rate = 4.84547e-05
+[42926080 / 100000000] (42.9261%) -- errors = 2085 , logical error rate = 4.85719e-05
+[43008000 / 100000000] (43.008%) -- errors = 2087 , logical error rate = 4.85259e-05
+[43089920 / 100000000] (43.0899%) -- errors = 2095 , logical error rate = 4.86193e-05
+[43171840 / 100000000] (43.1718%) -- errors = 2097 , logical error rate = 4.85733e-05
+[43253760 / 100000000] (43.2538%) -- errors = 2098 , logical error rate = 4.85045e-05
+[43335680 / 100000000] (43.3357%) -- errors = 2103 , logical error rate = 4.85281e-05
+[43417600 / 100000000] (43.4176%) -- errors = 2107 , logical error rate = 4.85287e-05
+[43499520 / 100000000] (43.4995%) -- errors = 2109 , logical error rate = 4.84833e-05
+[43581440 / 100000000] (43.5814%) -- errors = 2116 , logical error rate = 4.85528e-05
+[43663360 / 100000000] (43.6634%) -- errors = 2119 , logical error rate = 4.85304e-05
+[43745280 / 100000000] (43.7453%) -- errors = 2123 , logical error rate = 4.8531e-05
+[43827200 / 100000000] (43.8272%) -- errors = 2129 , logical error rate = 4.85771e-05
+[43909120 / 100000000] (43.9091%) -- errors = 2133 , logical error rate = 4.85776e-05
+[43991040 / 100000000] (43.991%) -- errors = 2138 , logical error rate = 4.86008e-05
+[44072960 / 100000000] (44.073%) -- errors = 2141 , logical error rate = 4.85785e-05
+[44154880 / 100000000] (44.1549%) -- errors = 2144 , logical error rate = 4.85564e-05
+[44236800 / 100000000] (44.2368%) -- errors = 2147 , logical error rate = 4.85343e-05
+[44318720 / 100000000] (44.3187%) -- errors = 2150 , logical error rate = 4.85122e-05
+[44400640 / 100000000] (44.4006%) -- errors = 2155 , logical error rate = 4.85353e-05
+[44482560 / 100000000] (44.4826%) -- errors = 2158 , logical error rate = 4.85134e-05
+[44564480 / 100000000] (44.5645%) -- errors = 2164 , logical error rate = 4.85589e-05
+[44646400 / 100000000] (44.6464%) -- errors = 2168 , logical error rate = 4.85593e-05
+[44728320 / 100000000] (44.7283%) -- errors = 2172 , logical error rate = 4.85598e-05
+[44810240 / 100000000] (44.8102%) -- errors = 2179 , logical error rate = 4.86273e-05
+[44892160 / 100000000] (44.8922%) -- errors = 2186 , logical error rate = 4.86945e-05
+[44974080 / 100000000] (44.9741%) -- errors = 2190 , logical error rate = 4.86947e-05
+[45056000 / 100000000] (45.056%) -- errors = 2196 , logical error rate = 4.87393e-05
+[45137920 / 100000000] (45.1379%) -- errors = 2199 , logical error rate = 4.87174e-05
+[45219840 / 100000000] (45.2198%) -- errors = 2204 , logical error rate = 4.87397e-05
+[45301760 / 100000000] (45.3018%) -- errors = 2209 , logical error rate = 4.87619e-05
+[45383680 / 100000000] (45.3837%) -- errors = 2213 , logical error rate = 4.8762e-05
+[45465600 / 100000000] (45.4656%) -- errors = 2219 , logical error rate = 4.88061e-05
+[45547520 / 100000000] (45.5475%) -- errors = 2219 , logical error rate = 4.87183e-05
+[45629440 / 100000000] (45.6294%) -- errors = 2221 , logical error rate = 4.86747e-05
+[45711360 / 100000000] (45.7114%) -- errors = 2224 , logical error rate = 4.86531e-05
+[45793280 / 100000000] (45.7933%) -- errors = 2227 , logical error rate = 4.86316e-05
+[45875200 / 100000000] (45.8752%) -- errors = 2233 , logical error rate = 4.86755e-05
+[45957120 / 100000000] (45.9571%) -- errors = 2239 , logical error rate = 4.87193e-05
+[46039040 / 100000000] (46.039%) -- errors = 2244 , logical error rate = 4.87412e-05
+[46120960 / 100000000] (46.121%) -- errors = 2247 , logical error rate = 4.87197e-05
+[46202880 / 100000000] (46.2029%) -- errors = 2250 , logical error rate = 4.86983e-05
+[46284800 / 100000000] (46.2848%) -- errors = 2251 , logical error rate = 4.86337e-05
+[46366720 / 100000000] (46.3667%) -- errors = 2256 , logical error rate = 4.86556e-05
+[46448640 / 100000000] (46.4486%) -- errors = 2260 , logical error rate = 4.86559e-05
+[46530560 / 100000000] (46.5306%) -- errors = 2266 , logical error rate = 4.86992e-05
+[46612480 / 100000000] (46.6125%) -- errors = 2269 , logical error rate = 4.8678e-05
+[46694400 / 100000000] (46.6944%) -- errors = 2279 , logical error rate = 4.88067e-05
+[46776320 / 100000000] (46.7763%) -- errors = 2284 , logical error rate = 4.88281e-05
+[46858240 / 100000000] (46.8582%) -- errors = 2286 , logical error rate = 4.87854e-05
+[46940160 / 100000000] (46.9402%) -- errors = 2292 , logical error rate = 4.88281e-05
+[47022080 / 100000000] (47.0221%) -- errors = 2298 , logical error rate = 4.88707e-05
+[47104000 / 100000000] (47.104%) -- errors = 2303 , logical error rate = 4.88918e-05
+[47185920 / 100000000] (47.1859%) -- errors = 2308 , logical error rate = 4.89129e-05
+[47267840 / 100000000] (47.2678%) -- errors = 2311 , logical error rate = 4.88916e-05
+[47349760 / 100000000] (47.3498%) -- errors = 2314 , logical error rate = 4.88704e-05
+[47431680 / 100000000] (47.4317%) -- errors = 2316 , logical error rate = 4.88281e-05
+[47513600 / 100000000] (47.5136%) -- errors = 2317 , logical error rate = 4.8765e-05
+[47595520 / 100000000] (47.5955%) -- errors = 2319 , logical error rate = 4.87231e-05
+[47677440 / 100000000] (47.6774%) -- errors = 2326 , logical error rate = 4.87862e-05
+[47759360 / 100000000] (47.7594%) -- errors = 2331 , logical error rate = 4.88072e-05
+[47841280 / 100000000] (47.8413%) -- errors = 2333 , logical error rate = 4.87654e-05
+[47923200 / 100000000] (47.9232%) -- errors = 2336 , logical error rate = 4.87447e-05
+[48005120 / 100000000] (48.0051%) -- errors = 2342 , logical error rate = 4.87865e-05
+[48087040 / 100000000] (48.087%) -- errors = 2347 , logical error rate = 4.88073e-05
+[48168960 / 100000000] (48.169%) -- errors = 2350 , logical error rate = 4.87866e-05
+[48250880 / 100000000] (48.2509%) -- errors = 2353 , logical error rate = 4.87659e-05
+[48332800 / 100000000] (48.3328%) -- errors = 2357 , logical error rate = 4.87661e-05
+[48414720 / 100000000] (48.4147%) -- errors = 2363 , logical error rate = 4.88075e-05
+[48496640 / 100000000] (48.4966%) -- errors = 2365 , logical error rate = 4.87663e-05
+[48578560 / 100000000] (48.5786%) -- errors = 2369 , logical error rate = 4.87664e-05
+[48660480 / 100000000] (48.6605%) -- errors = 2370 , logical error rate = 4.87048e-05
+[48742400 / 100000000] (48.7424%) -- errors = 2373 , logical error rate = 4.86845e-05
+[48824320 / 100000000] (48.8243%) -- errors = 2377 , logical error rate = 4.86848e-05
+[48906240 / 100000000] (48.9062%) -- errors = 2381 , logical error rate = 4.8685e-05
+[48988160 / 100000000] (48.9882%) -- errors = 2382 , logical error rate = 4.8624e-05
+[49070080 / 100000000] (49.0701%) -- errors = 2387 , logical error rate = 4.86447e-05
+[49152000 / 100000000] (49.152%) -- errors = 2389 , logical error rate = 4.86043e-05
+[49233920 / 100000000] (49.2339%) -- errors = 2393 , logical error rate = 4.86047e-05
+[49315840 / 100000000] (49.3158%) -- errors = 2394 , logical error rate = 4.85442e-05
+[49397760 / 100000000] (49.3978%) -- errors = 2399 , logical error rate = 4.8565e-05
+[49479680 / 100000000] (49.4797%) -- errors = 2406 , logical error rate = 4.8626e-05
+[49561600 / 100000000] (49.5616%) -- errors = 2415 , logical error rate = 4.87272e-05
+[49643520 / 100000000] (49.6435%) -- errors = 2418 , logical error rate = 4.87073e-05
+[49725440 / 100000000] (49.7254%) -- errors = 2427 , logical error rate = 4.8808e-05
+[49807360 / 100000000] (49.8074%) -- errors = 2430 , logical error rate = 4.8788e-05
+[49889280 / 100000000] (49.8893%) -- errors = 2432 , logical error rate = 4.87479e-05
+[49971200 / 100000000] (49.9712%) -- errors = 2433 , logical error rate = 4.8688e-05
+[50053120 / 100000000] (50.0531%) -- errors = 2433 , logical error rate = 4.86084e-05
+[50135040 / 100000000] (50.135%) -- errors = 2439 , logical error rate = 4.86486e-05
+[50216960 / 100000000] (50.217%) -- errors = 2441 , logical error rate = 4.86091e-05
+[50298880 / 100000000] (50.2989%) -- errors = 2444 , logical error rate = 4.85896e-05
+[50380800 / 100000000] (50.3808%) -- errors = 2452 , logical error rate = 4.86693e-05
+[50462720 / 100000000] (50.4627%) -- errors = 2458 , logical error rate = 4.87092e-05
+[50544640 / 100000000] (50.5446%) -- errors = 2461 , logical error rate = 4.86896e-05
+[50626560 / 100000000] (50.6266%) -- errors = 2465 , logical error rate = 4.86899e-05
+[50708480 / 100000000] (50.7085%) -- errors = 2470 , logical error rate = 4.87098e-05
+[50790400 / 100000000] (50.7904%) -- errors = 2475 , logical error rate = 4.87297e-05
+[50872320 / 100000000] (50.8723%) -- errors = 2479 , logical error rate = 4.87298e-05
+[50954240 / 100000000] (50.9542%) -- errors = 2481 , logical error rate = 4.86907e-05
+[51036160 / 100000000] (51.0362%) -- errors = 2482 , logical error rate = 4.86322e-05
+[51118080 / 100000000] (51.1181%) -- errors = 2489 , logical error rate = 4.86912e-05
+[51200000 / 100000000] (51.2%) -- errors = 2497 , logical error rate = 4.87695e-05
+[51281920 / 100000000] (51.2819%) -- errors = 2502 , logical error rate = 4.87891e-05
+[51363840 / 100000000] (51.3638%) -- errors = 2503 , logical error rate = 4.87308e-05
+[51445760 / 100000000] (51.4458%) -- errors = 2506 , logical error rate = 4.87115e-05
+[51527680 / 100000000] (51.5277%) -- errors = 2511 , logical error rate = 4.87311e-05
+[51609600 / 100000000] (51.6096%) -- errors = 2515 , logical error rate = 4.87312e-05
+[51691520 / 100000000] (51.6915%) -- errors = 2519 , logical error rate = 4.87314e-05
+[51773440 / 100000000] (51.7734%) -- errors = 2522 , logical error rate = 4.87122e-05
+[51855360 / 100000000] (51.8554%) -- errors = 2524 , logical error rate = 4.86738e-05
+[51937280 / 100000000] (51.9373%) -- errors = 2531 , logical error rate = 4.87319e-05
+[52019200 / 100000000] (52.0192%) -- errors = 2537 , logical error rate = 4.87705e-05
+[52101120 / 100000000] (52.1011%) -- errors = 2542 , logical error rate = 4.87897e-05
+[52183040 / 100000000] (52.183%) -- errors = 2548 , logical error rate = 4.88281e-05
+[52264960 / 100000000] (52.265%) -- errors = 2556 , logical error rate = 4.89047e-05
+[52346880 / 100000000] (52.3469%) -- errors = 2562 , logical error rate = 4.89427e-05
+[52428800 / 100000000] (52.4288%) -- errors = 2567 , logical error rate = 4.89616e-05
+[52510720 / 100000000] (52.5107%) -- errors = 2568 , logical error rate = 4.89043e-05
+[52592640 / 100000000] (52.5926%) -- errors = 2573 , logical error rate = 4.89232e-05
+[52674560 / 100000000] (52.6746%) -- errors = 2577 , logical error rate = 4.8923e-05
+[52756480 / 100000000] (52.7565%) -- errors = 2583 , logical error rate = 4.89608e-05
+[52838400 / 100000000] (52.8384%) -- errors = 2585 , logical error rate = 4.89228e-05
+[52920320 / 100000000] (52.9203%) -- errors = 2591 , logical error rate = 4.89604e-05
+[53002240 / 100000000] (53.0022%) -- errors = 2600 , logical error rate = 4.90545e-05
+[53084160 / 100000000] (53.0842%) -- errors = 2605 , logical error rate = 4.9073e-05
+[53166080 / 100000000] (53.1661%) -- errors = 2607 , logical error rate = 4.9035e-05
+[53248000 / 100000000] (53.248%) -- errors = 2611 , logical error rate = 4.90347e-05
+[53329920 / 100000000] (53.3299%) -- errors = 2616 , logical error rate = 4.90531e-05
+[53411840 / 100000000] (53.4118%) -- errors = 2619 , logical error rate = 4.90341e-05
+[53493760 / 100000000] (53.4938%) -- errors = 2623 , logical error rate = 4.90338e-05
+[53575680 / 100000000] (53.5757%) -- errors = 2626 , logical error rate = 4.90148e-05
+[53657600 / 100000000] (53.6576%) -- errors = 2630 , logical error rate = 4.90145e-05
+[53739520 / 100000000] (53.7395%) -- errors = 2633 , logical error rate = 4.89956e-05
+[53821440 / 100000000] (53.8214%) -- errors = 2637 , logical error rate = 4.89953e-05
+[53903360 / 100000000] (53.9034%) -- errors = 2643 , logical error rate = 4.90322e-05
+[53985280 / 100000000] (53.9853%) -- errors = 2647 , logical error rate = 4.90319e-05
+[54067200 / 100000000] (54.0672%) -- errors = 2650 , logical error rate = 4.90131e-05
+[54149120 / 100000000] (54.1491%) -- errors = 2655 , logical error rate = 4.90313e-05
+[54231040 / 100000000] (54.231%) -- errors = 2659 , logical error rate = 4.9031e-05
+[54312960 / 100000000] (54.313%) -- errors = 2660 , logical error rate = 4.89754e-05
+[54394880 / 100000000] (54.3949%) -- errors = 2664 , logical error rate = 4.89752e-05
+[54476800 / 100000000] (54.4768%) -- errors = 2669 , logical error rate = 4.89933e-05
+[54558720 / 100000000] (54.5587%) -- errors = 2674 , logical error rate = 4.90114e-05
+[54640640 / 100000000] (54.6406%) -- errors = 2680 , logical error rate = 4.90477e-05
+[54722560 / 100000000] (54.7226%) -- errors = 2685 , logical error rate = 4.90657e-05
+[54804480 / 100000000] (54.8045%) -- errors = 2694 , logical error rate = 4.91566e-05
+[54886400 / 100000000] (54.8864%) -- errors = 2697 , logical error rate = 4.91379e-05
+[54968320 / 100000000] (54.9683%) -- errors = 2700 , logical error rate = 4.91192e-05
+[55050240 / 100000000] (55.0502%) -- errors = 2704 , logical error rate = 4.91188e-05
+[55132160 / 100000000] (55.1322%) -- errors = 2710 , logical error rate = 4.91546e-05
+[55214080 / 100000000] (55.2141%) -- errors = 2714 , logical error rate = 4.91541e-05
+[55296000 / 100000000] (55.296%) -- errors = 2716 , logical error rate = 4.91175e-05
+[55377920 / 100000000] (55.3779%) -- errors = 2718 , logical error rate = 4.90809e-05
+[55459840 / 100000000] (55.4598%) -- errors = 2724 , logical error rate = 4.91166e-05
+[55541760 / 100000000] (55.5418%) -- errors = 2728 , logical error rate = 4.91162e-05
+[55623680 / 100000000] (55.6237%) -- errors = 2730 , logical error rate = 4.90798e-05
+[55705600 / 100000000] (55.7056%) -- errors = 2734 , logical error rate = 4.90794e-05
+[55787520 / 100000000] (55.7875%) -- errors = 2736 , logical error rate = 4.90432e-05
+[55869440 / 100000000] (55.8694%) -- errors = 2742 , logical error rate = 4.90787e-05
+[55951360 / 100000000] (55.9514%) -- errors = 2747 , logical error rate = 4.90962e-05
+[56033280 / 100000000] (56.0333%) -- errors = 2751 , logical error rate = 4.90958e-05
+[56115200 / 100000000] (56.1152%) -- errors = 2755 , logical error rate = 4.90954e-05
+[56197120 / 100000000] (56.1971%) -- errors = 2756 , logical error rate = 4.90417e-05
+[56279040 / 100000000] (56.279%) -- errors = 2759 , logical error rate = 4.90236e-05
+[56360960 / 100000000] (56.361%) -- errors = 2761 , logical error rate = 4.89878e-05
+[56442880 / 100000000] (56.4429%) -- errors = 2766 , logical error rate = 4.90053e-05
+[56524800 / 100000000] (56.5248%) -- errors = 2771 , logical error rate = 4.90227e-05
+[56606720 / 100000000] (56.6067%) -- errors = 2773 , logical error rate = 4.89871e-05
+[56688640 / 100000000] (56.6886%) -- errors = 2776 , logical error rate = 4.89692e-05
+[56770560 / 100000000] (56.7706%) -- errors = 2780 , logical error rate = 4.8969e-05
+[56852480 / 100000000] (56.8525%) -- errors = 2787 , logical error rate = 4.90216e-05
+[56934400 / 100000000] (56.9344%) -- errors = 2790 , logical error rate = 4.90038e-05
+[57016320 / 100000000] (57.0163%) -- errors = 2794 , logical error rate = 4.90035e-05
+[57098240 / 100000000] (57.0982%) -- errors = 2797 , logical error rate = 4.89857e-05
+[57180160 / 100000000] (57.1802%) -- errors = 2801 , logical error rate = 4.89855e-05
+[57262080 / 100000000] (57.2621%) -- errors = 2808 , logical error rate = 4.90377e-05
+[57344000 / 100000000] (57.344%) -- errors = 2813 , logical error rate = 4.90548e-05
+[57425920 / 100000000] (57.4259%) -- errors = 2818 , logical error rate = 4.90719e-05
+[57507840 / 100000000] (57.5078%) -- errors = 2819 , logical error rate = 4.90194e-05
+[57589760 / 100000000] (57.5898%) -- errors = 2822 , logical error rate = 4.90018e-05
+[57671680 / 100000000] (57.6717%) -- errors = 2826 , logical error rate = 4.90015e-05
+[57753600 / 100000000] (57.7536%) -- errors = 2829 , logical error rate = 4.8984e-05
+[57835520 / 100000000] (57.8355%) -- errors = 2832 , logical error rate = 4.89664e-05
+[57917440 / 100000000] (57.9174%) -- errors = 2836 , logical error rate = 4.89663e-05
+[57999360 / 100000000] (57.9994%) -- errors = 2843 , logical error rate = 4.90178e-05
+[58081280 / 100000000] (58.0813%) -- errors = 2847 , logical error rate = 4.90175e-05
+[58163200 / 100000000] (58.1632%) -- errors = 2853 , logical error rate = 4.90516e-05
+[58245120 / 100000000] (58.2451%) -- errors = 2860 , logical error rate = 4.91028e-05
+[58327040 / 100000000] (58.327%) -- errors = 2860 , logical error rate = 4.90339e-05
+[58408960 / 100000000] (58.409%) -- errors = 2864 , logical error rate = 4.90336e-05
+[58490880 / 100000000] (58.4909%) -- errors = 2871 , logical error rate = 4.90846e-05
+[58572800 / 100000000] (58.5728%) -- errors = 2877 , logical error rate = 4.91184e-05
+[58654720 / 100000000] (58.6547%) -- errors = 2882 , logical error rate = 4.9135e-05
+[58736640 / 100000000] (58.7366%) -- errors = 2886 , logical error rate = 4.91346e-05
+[58818560 / 100000000] (58.8186%) -- errors = 2889 , logical error rate = 4.91171e-05
+[58900480 / 100000000] (58.9005%) -- errors = 2891 , logical error rate = 4.90828e-05
+[58982400 / 100000000] (58.9824%) -- errors = 2894 , logical error rate = 4.90655e-05
+[59064320 / 100000000] (59.0643%) -- errors = 2899 , logical error rate = 4.90821e-05
+[59146240 / 100000000] (59.1462%) -- errors = 2900 , logical error rate = 4.9031e-05
+[59228160 / 100000000] (59.2282%) -- errors = 2905 , logical error rate = 4.90476e-05
+[59310080 / 100000000] (59.3101%) -- errors = 2908 , logical error rate = 4.90305e-05
+[59392000 / 100000000] (59.392%) -- errors = 2910 , logical error rate = 4.89965e-05
+[59473920 / 100000000] (59.4739%) -- errors = 2913 , logical error rate = 4.89795e-05
+[59555840 / 100000000] (59.5558%) -- errors = 2915 , logical error rate = 4.89457e-05
+[59637760 / 100000000] (59.6378%) -- errors = 2920 , logical error rate = 4.89623e-05
+[59719680 / 100000000] (59.7197%) -- errors = 2921 , logical error rate = 4.89118e-05
+[59801600 / 100000000] (59.8016%) -- errors = 2927 , logical error rate = 4.89452e-05
+[59883520 / 100000000] (59.8835%) -- errors = 2928 , logical error rate = 4.88949e-05
+[59965440 / 100000000] (59.9654%) -- errors = 2930 , logical error rate = 4.88615e-05
+[60047360 / 100000000] (60.0474%) -- errors = 2935 , logical error rate = 4.88781e-05
+[60129280 / 100000000] (60.1293%) -- errors = 2941 , logical error rate = 4.89113e-05
+[60211200 / 100000000] (60.2112%) -- errors = 2946 , logical error rate = 4.89278e-05
+[60293120 / 100000000] (60.2931%) -- errors = 2951 , logical error rate = 4.89442e-05
+[60375040 / 100000000] (60.375%) -- errors = 2956 , logical error rate = 4.89606e-05
+[60456960 / 100000000] (60.457%) -- errors = 2959 , logical error rate = 4.89439e-05
+[60538880 / 100000000] (60.5389%) -- errors = 2960 , logical error rate = 4.88942e-05
+[60620800 / 100000000] (60.6208%) -- errors = 2963 , logical error rate = 4.88776e-05
+[60702720 / 100000000] (60.7027%) -- errors = 2964 , logical error rate = 4.88281e-05
+[60784640 / 100000000] (60.7846%) -- errors = 2966 , logical error rate = 4.87952e-05
+[60866560 / 100000000] (60.8666%) -- errors = 2969 , logical error rate = 4.87788e-05
+[60948480 / 100000000] (60.9485%) -- errors = 2971 , logical error rate = 4.87461e-05
+[61030400 / 100000000] (61.0304%) -- errors = 2978 , logical error rate = 4.87954e-05
+[61112320 / 100000000] (61.1123%) -- errors = 2981 , logical error rate = 4.8779e-05
+[61194240 / 100000000] (61.1942%) -- errors = 2984 , logical error rate = 4.87628e-05
+[61276160 / 100000000] (61.2762%) -- errors = 2988 , logical error rate = 4.87628e-05
+[61358080 / 100000000] (61.3581%) -- errors = 2995 , logical error rate = 4.88118e-05
+[61440000 / 100000000] (61.44%) -- errors = 3002 , logical error rate = 4.88607e-05
+[61521920 / 100000000] (61.5219%) -- errors = 3005 , logical error rate = 4.88444e-05
+[61603840 / 100000000] (61.6038%) -- errors = 3009 , logical error rate = 4.88444e-05
+[61685760 / 100000000] (61.6858%) -- errors = 3012 , logical error rate = 4.88281e-05
+[61767680 / 100000000] (61.7677%) -- errors = 3019 , logical error rate = 4.88767e-05
+[61849600 / 100000000] (61.8496%) -- errors = 3020 , logical error rate = 4.88281e-05
+[61931520 / 100000000] (61.9315%) -- errors = 3030 , logical error rate = 4.8925e-05
+[62013440 / 100000000] (62.0134%) -- errors = 3038 , logical error rate = 4.89894e-05
+[62095360 / 100000000] (62.0954%) -- errors = 3044 , logical error rate = 4.90214e-05
+[62177280 / 100000000] (62.1773%) -- errors = 3045 , logical error rate = 4.89729e-05
+[62259200 / 100000000] (62.2592%) -- errors = 3045 , logical error rate = 4.89084e-05
+[62341120 / 100000000] (62.3411%) -- errors = 3053 , logical error rate = 4.89725e-05
+[62423040 / 100000000] (62.423%) -- errors = 3055 , logical error rate = 4.89403e-05
+[62504960 / 100000000] (62.505%) -- errors = 3057 , logical error rate = 4.89081e-05
+[62586880 / 100000000] (62.5869%) -- errors = 3062 , logical error rate = 4.8924e-05
+[62668800 / 100000000] (62.6688%) -- errors = 3068 , logical error rate = 4.89558e-05
+[62750720 / 100000000] (62.7507%) -- errors = 3072 , logical error rate = 4.89556e-05
+[62832640 / 100000000] (62.8326%) -- errors = 3076 , logical error rate = 4.89554e-05
+[62914560 / 100000000] (62.9146%) -- errors = 3081 , logical error rate = 4.89712e-05
+[62996480 / 100000000] (62.9965%) -- errors = 3086 , logical error rate = 4.89869e-05
+[63078400 / 100000000] (63.0784%) -- errors = 3089 , logical error rate = 4.89708e-05
+[63160320 / 100000000] (63.1603%) -- errors = 3092 , logical error rate = 4.89548e-05
+[63242240 / 100000000] (63.2422%) -- errors = 3097 , logical error rate = 4.89704e-05
+[63324160 / 100000000] (63.3242%) -- errors = 3105 , logical error rate = 4.90334e-05
+[63406080 / 100000000] (63.4061%) -- errors = 3112 , logical error rate = 4.90805e-05
+[63488000 / 100000000] (63.488%) -- errors = 3116 , logical error rate = 4.90801e-05
+[63569920 / 100000000] (63.5699%) -- errors = 3123 , logical error rate = 4.9127e-05
+[63651840 / 100000000] (63.6518%) -- errors = 3123 , logical error rate = 4.90638e-05
+[63733760 / 100000000] (63.7338%) -- errors = 3125 , logical error rate = 4.90321e-05
+[63815680 / 100000000] (63.8157%) -- errors = 3132 , logical error rate = 4.90788e-05
+[63897600 / 100000000] (63.8976%) -- errors = 3134 , logical error rate = 4.90472e-05
+[63979520 / 100000000] (63.9795%) -- errors = 3138 , logical error rate = 4.90469e-05
+[64061440 / 100000000] (64.0614%) -- errors = 3143 , logical error rate = 4.90623e-05
+[64143360 / 100000000] (64.1434%) -- errors = 3147 , logical error rate = 4.9062e-05
+[64225280 / 100000000] (64.2253%) -- errors = 3149 , logical error rate = 4.90305e-05
+[64307200 / 100000000] (64.3072%) -- errors = 3153 , logical error rate = 4.90303e-05
+[64389120 / 100000000] (64.3891%) -- errors = 3153 , logical error rate = 4.89679e-05
+[64471040 / 100000000] (64.471%) -- errors = 3157 , logical error rate = 4.89677e-05
+[64552960 / 100000000] (64.553%) -- errors = 3162 , logical error rate = 4.8983e-05
+[64634880 / 100000000] (64.6349%) -- errors = 3164 , logical error rate = 4.89519e-05
+[64716800 / 100000000] (64.7168%) -- errors = 3167 , logical error rate = 4.89363e-05
+[64798720 / 100000000] (64.7987%) -- errors = 3171 , logical error rate = 4.89362e-05
+[64880640 / 100000000] (64.8806%) -- errors = 3175 , logical error rate = 4.8936e-05
+[64962560 / 100000000] (64.9626%) -- errors = 3181 , logical error rate = 4.89667e-05
+[65044480 / 100000000] (65.0445%) -- errors = 3182 , logical error rate = 4.89204e-05
+[65126400 / 100000000] (65.1264%) -- errors = 3188 , logical error rate = 4.8951e-05
+[65208320 / 100000000] (65.2083%) -- errors = 3194 , logical error rate = 4.89815e-05
+[65290240 / 100000000] (65.2902%) -- errors = 3197 , logical error rate = 4.8966e-05
+[65372160 / 100000000] (65.3722%) -- errors = 3201 , logical error rate = 4.89658e-05
+[65454080 / 100000000] (65.4541%) -- errors = 3205 , logical error rate = 4.89656e-05
+[65536000 / 100000000] (65.536%) -- errors = 3207 , logical error rate = 4.89349e-05
+[65617920 / 100000000] (65.6179%) -- errors = 3212 , logical error rate = 4.895e-05
+[65699840 / 100000000] (65.6998%) -- errors = 3216 , logical error rate = 4.89499e-05
+[65781760 / 100000000] (65.7818%) -- errors = 3224 , logical error rate = 4.90105e-05
+[65863680 / 100000000] (65.8637%) -- errors = 3231 , logical error rate = 4.90559e-05
+[65945600 / 100000000] (65.9456%) -- errors = 3232 , logical error rate = 4.90101e-05
+[66027520 / 100000000] (66.0275%) -- errors = 3234 , logical error rate = 4.89796e-05
+[66109440 / 100000000] (66.1094%) -- errors = 3240 , logical error rate = 4.90096e-05
+[66191360 / 100000000] (66.1914%) -- errors = 3243 , logical error rate = 4.89943e-05
+[66273280 / 100000000] (66.2733%) -- errors = 3246 , logical error rate = 4.8979e-05
+[66355200 / 100000000] (66.3552%) -- errors = 3250 , logical error rate = 4.89788e-05
+[66437120 / 100000000] (66.4371%) -- errors = 3253 , logical error rate = 4.89636e-05
+[66519040 / 100000000] (66.519%) -- errors = 3260 , logical error rate = 4.90085e-05
+[66600960 / 100000000] (66.601%) -- errors = 3265 , logical error rate = 4.90233e-05
+[66682880 / 100000000] (66.6829%) -- errors = 3269 , logical error rate = 4.90231e-05
+[66764800 / 100000000] (66.7648%) -- errors = 3272 , logical error rate = 4.90079e-05
+[66846720 / 100000000] (66.8467%) -- errors = 3276 , logical error rate = 4.90076e-05
+[66928640 / 100000000] (66.9286%) -- errors = 3281 , logical error rate = 4.90224e-05
+[67010560 / 100000000] (67.0106%) -- errors = 3289 , logical error rate = 4.90818e-05
+[67092480 / 100000000] (67.0925%) -- errors = 3292 , logical error rate = 4.90666e-05
+[67174400 / 100000000] (67.1744%) -- errors = 3300 , logical error rate = 4.91259e-05
+[67256320 / 100000000] (67.2563%) -- errors = 3306 , logical error rate = 4.91552e-05
+[67338240 / 100000000] (67.3382%) -- errors = 3311 , logical error rate = 4.91697e-05
+[67420160 / 100000000] (67.4202%) -- errors = 3314 , logical error rate = 4.91544e-05
+[67502080 / 100000000] (67.5021%) -- errors = 3320 , logical error rate = 4.91837e-05
+[67584000 / 100000000] (67.584%) -- errors = 3322 , logical error rate = 4.91536e-05
+[67665920 / 100000000] (67.6659%) -- errors = 3325 , logical error rate = 4.91385e-05
+[67747840 / 100000000] (67.7478%) -- errors = 3331 , logical error rate = 4.91676e-05
+[67829760 / 100000000] (67.8298%) -- errors = 3334 , logical error rate = 4.91525e-05
+[67911680 / 100000000] (67.9117%) -- errors = 3339 , logical error rate = 4.91668e-05
+[67993600 / 100000000] (67.9936%) -- errors = 3341 , logical error rate = 4.9137e-05
+[68075520 / 100000000] (68.0755%) -- errors = 3347 , logical error rate = 4.9166e-05
+[68157440 / 100000000] (68.1574%) -- errors = 3351 , logical error rate = 4.91656e-05
+[68239360 / 100000000] (68.2394%) -- errors = 3359 , logical error rate = 4.92238e-05
+[68321280 / 100000000] (68.3213%) -- errors = 3361 , logical error rate = 4.9194e-05
+[68403200 / 100000000] (68.4032%) -- errors = 3371 , logical error rate = 4.92813e-05
+[68485120 / 100000000] (68.4851%) -- errors = 3374 , logical error rate = 4.92662e-05
+[68567040 / 100000000] (68.567%) -- errors = 3379 , logical error rate = 4.92802e-05
+[68648960 / 100000000] (68.649%) -- errors = 3385 , logical error rate = 4.93088e-05
+[68730880 / 100000000] (68.7309%) -- errors = 3393 , logical error rate = 4.93665e-05
+[68812800 / 100000000] (68.8128%) -- errors = 3397 , logical error rate = 4.93658e-05
+[68894720 / 100000000] (68.8947%) -- errors = 3401 , logical error rate = 4.93652e-05
+[68976640 / 100000000] (68.9766%) -- errors = 3406 , logical error rate = 4.9379e-05
+[69058560 / 100000000] (69.0586%) -- errors = 3411 , logical error rate = 4.93929e-05
+[69140480 / 100000000] (69.1405%) -- errors = 3418 , logical error rate = 4.94356e-05
+[69222400 / 100000000] (69.2224%) -- errors = 3422 , logical error rate = 4.94349e-05
+[69304320 / 100000000] (69.3043%) -- errors = 3426 , logical error rate = 4.94341e-05
+[69386240 / 100000000] (69.3862%) -- errors = 3434 , logical error rate = 4.94911e-05
+[69468160 / 100000000] (69.4682%) -- errors = 3440 , logical error rate = 4.95191e-05
+[69550080 / 100000000] (69.5501%) -- errors = 3444 , logical error rate = 4.95183e-05
+[69632000 / 100000000] (69.632%) -- errors = 3446 , logical error rate = 4.94887e-05
+[69713920 / 100000000] (69.7139%) -- errors = 3449 , logical error rate = 4.94736e-05
+[69795840 / 100000000] (69.7958%) -- errors = 3455 , logical error rate = 4.95015e-05
+[69877760 / 100000000] (69.8778%) -- errors = 3456 , logical error rate = 4.94578e-05
+[69959680 / 100000000] (69.9597%) -- errors = 3458 , logical error rate = 4.94285e-05
+[70041600 / 100000000] (70.0416%) -- errors = 3462 , logical error rate = 4.94278e-05
+[70123520 / 100000000] (70.1235%) -- errors = 3467 , logical error rate = 4.94413e-05
+[70205440 / 100000000] (70.2054%) -- errors = 3469 , logical error rate = 4.94121e-05
+[70287360 / 100000000] (70.2874%) -- errors = 3471 , logical error rate = 4.9383e-05
+[70369280 / 100000000] (70.3693%) -- errors = 3478 , logical error rate = 4.9425e-05
+[70451200 / 100000000] (70.4512%) -- errors = 3481 , logical error rate = 4.94101e-05
+[70533120 / 100000000] (70.5331%) -- errors = 3483 , logical error rate = 4.93811e-05
+[70615040 / 100000000] (70.615%) -- errors = 3485 , logical error rate = 4.93521e-05
+[70696960 / 100000000] (70.697%) -- errors = 3488 , logical error rate = 4.93373e-05
+[70778880 / 100000000] (70.7789%) -- errors = 3492 , logical error rate = 4.93368e-05
+[70860800 / 100000000] (70.8608%) -- errors = 3494 , logical error rate = 4.93079e-05
+[70942720 / 100000000] (70.9427%) -- errors = 3499 , logical error rate = 4.93215e-05
+[71024640 / 100000000] (71.0246%) -- errors = 3507 , logical error rate = 4.93772e-05
+[71106560 / 100000000] (71.1066%) -- errors = 3512 , logical error rate = 4.93907e-05
+[71188480 / 100000000] (71.1885%) -- errors = 3515 , logical error rate = 4.9376e-05
+[71270400 / 100000000] (71.2704%) -- errors = 3528 , logical error rate = 4.95016e-05
+[71352320 / 100000000] (71.3523%) -- errors = 3533 , logical error rate = 4.95149e-05
+[71434240 / 100000000] (71.4342%) -- errors = 3537 , logical error rate = 4.95141e-05
+[71516160 / 100000000] (71.5162%) -- errors = 3540 , logical error rate = 4.94993e-05
+[71598080 / 100000000] (71.5981%) -- errors = 3543 , logical error rate = 4.94846e-05
+[71680000 / 100000000] (71.68%) -- errors = 3551 , logical error rate = 4.95396e-05
+[71761920 / 100000000] (71.7619%) -- errors = 3556 , logical error rate = 4.95527e-05
+[71843840 / 100000000] (71.8438%) -- errors = 3560 , logical error rate = 4.95519e-05
+[71925760 / 100000000] (71.9258%) -- errors = 3566 , logical error rate = 4.95789e-05
+[72007680 / 100000000] (72.0077%) -- errors = 3574 , logical error rate = 4.96336e-05
+[72089600 / 100000000] (72.0896%) -- errors = 3576 , logical error rate = 4.96049e-05
+[72171520 / 100000000] (72.1715%) -- errors = 3583 , logical error rate = 4.96456e-05
+[72253440 / 100000000] (72.2534%) -- errors = 3585 , logical error rate = 4.9617e-05
+[72335360 / 100000000] (72.3354%) -- errors = 3587 , logical error rate = 4.95885e-05
+[72417280 / 100000000] (72.4173%) -- errors = 3591 , logical error rate = 4.95876e-05
+[72499200 / 100000000] (72.4992%) -- errors = 3598 , logical error rate = 4.96281e-05
+[72581120 / 100000000] (72.5811%) -- errors = 3600 , logical error rate = 4.95997e-05
+[72663040 / 100000000] (72.663%) -- errors = 3605 , logical error rate = 4.96126e-05
+[72744960 / 100000000] (72.745%) -- errors = 3607 , logical error rate = 4.95842e-05
+[72826880 / 100000000] (72.8269%) -- errors = 3613 , logical error rate = 4.96108e-05
+[72908800 / 100000000] (72.9088%) -- errors = 3615 , logical error rate = 4.95825e-05
+[72990720 / 100000000] (72.9907%) -- errors = 3623 , logical error rate = 4.96364e-05
+[73072640 / 100000000] (73.0726%) -- errors = 3624 , logical error rate = 4.95945e-05
+[73154560 / 100000000] (73.1546%) -- errors = 3629 , logical error rate = 4.96073e-05
+[73236480 / 100000000] (73.2365%) -- errors = 3631 , logical error rate = 4.95791e-05
+[73318400 / 100000000] (73.3184%) -- errors = 3635 , logical error rate = 4.95783e-05
+[73400320 / 100000000] (73.4003%) -- errors = 3642 , logical error rate = 4.96183e-05
+[73482240 / 100000000] (73.4822%) -- errors = 3644 , logical error rate = 4.95902e-05
+[73564160 / 100000000] (73.5642%) -- errors = 3647 , logical error rate = 4.95758e-05
+[73646080 / 100000000] (73.6461%) -- errors = 3652 , logical error rate = 4.95885e-05
+[73728000 / 100000000] (73.728%) -- errors = 3656 , logical error rate = 4.95877e-05
+[73809920 / 100000000] (73.8099%) -- errors = 3662 , logical error rate = 4.96139e-05
+[73891840 / 100000000] (73.8918%) -- errors = 3665 , logical error rate = 4.95995e-05
+[73973760 / 100000000] (73.9738%) -- errors = 3670 , logical error rate = 4.96122e-05
+[74055680 / 100000000] (74.0557%) -- errors = 3675 , logical error rate = 4.96248e-05
+[74137600 / 100000000] (74.1376%) -- errors = 3679 , logical error rate = 4.96239e-05
+[74219520 / 100000000] (74.2195%) -- errors = 3680 , logical error rate = 4.95826e-05
+[74301440 / 100000000] (74.3014%) -- errors = 3682 , logical error rate = 4.95549e-05
+[74383360 / 100000000] (74.3834%) -- errors = 3683 , logical error rate = 4.95138e-05
+[74465280 / 100000000] (74.4653%) -- errors = 3686 , logical error rate = 4.94996e-05
+[74547200 / 100000000] (74.5472%) -- errors = 3689 , logical error rate = 4.94854e-05
+[74629120 / 100000000] (74.6291%) -- errors = 3694 , logical error rate = 4.94981e-05
+[74711040 / 100000000] (74.711%) -- errors = 3696 , logical error rate = 4.94706e-05
+[74792960 / 100000000] (74.793%) -- errors = 3697 , logical error rate = 4.94298e-05
+[74874880 / 100000000] (74.8749%) -- errors = 3701 , logical error rate = 4.94291e-05
+[74956800 / 100000000] (74.9568%) -- errors = 3710 , logical error rate = 4.94952e-05
+[75038720 / 100000000] (75.0387%) -- errors = 3716 , logical error rate = 4.95211e-05
+[75120640 / 100000000] (75.1206%) -- errors = 3723 , logical error rate = 4.95603e-05
+[75202560 / 100000000] (75.2026%) -- errors = 3728 , logical error rate = 4.95728e-05
+[75284480 / 100000000] (75.2845%) -- errors = 3733 , logical error rate = 4.95853e-05
+[75366400 / 100000000] (75.3664%) -- errors = 3733 , logical error rate = 4.95314e-05
+[75448320 / 100000000] (75.4483%) -- errors = 3736 , logical error rate = 4.95173e-05
+[75530240 / 100000000] (75.5302%) -- errors = 3741 , logical error rate = 4.95298e-05
+[75612160 / 100000000] (75.6122%) -- errors = 3746 , logical error rate = 4.95423e-05
+[75694080 / 100000000] (75.6941%) -- errors = 3750 , logical error rate = 4.95415e-05
+[75776000 / 100000000] (75.776%) -- errors = 3757 , logical error rate = 4.95803e-05
+[75857920 / 100000000] (75.8579%) -- errors = 3764 , logical error rate = 4.96191e-05
+[75939840 / 100000000] (75.9398%) -- errors = 3769 , logical error rate = 4.96314e-05
+[76021760 / 100000000] (76.0218%) -- errors = 3773 , logical error rate = 4.96305e-05
+[76103680 / 100000000] (76.1037%) -- errors = 3778 , logical error rate = 4.96428e-05
+[76185600 / 100000000] (76.1856%) -- errors = 3781 , logical error rate = 4.96288e-05
+[76267520 / 100000000] (76.2675%) -- errors = 3785 , logical error rate = 4.96279e-05
+[76349440 / 100000000] (76.3494%) -- errors = 3787 , logical error rate = 4.96009e-05
+[76431360 / 100000000] (76.4314%) -- errors = 3789 , logical error rate = 4.95739e-05
+[76513280 / 100000000] (76.5133%) -- errors = 3792 , logical error rate = 4.956e-05
+[76595200 / 100000000] (76.5952%) -- errors = 3795 , logical error rate = 4.95462e-05
+[76677120 / 100000000] (76.6771%) -- errors = 3800 , logical error rate = 4.95585e-05
+[76759040 / 100000000] (76.759%) -- errors = 3800 , logical error rate = 4.95056e-05
+[76840960 / 100000000] (76.841%) -- errors = 3801 , logical error rate = 4.94658e-05
+[76922880 / 100000000] (76.9229%) -- errors = 3804 , logical error rate = 4.94521e-05
+[77004800 / 100000000] (77.0048%) -- errors = 3807 , logical error rate = 4.94385e-05
+[77086720 / 100000000] (77.0867%) -- errors = 3814 , logical error rate = 4.94767e-05
+[77168640 / 100000000] (77.1686%) -- errors = 3817 , logical error rate = 4.94631e-05
+[77250560 / 100000000] (77.2506%) -- errors = 3821 , logical error rate = 4.94624e-05
+[77332480 / 100000000] (77.3325%) -- errors = 3825 , logical error rate = 4.94618e-05
+[77414400 / 100000000] (77.4144%) -- errors = 3828 , logical error rate = 4.94482e-05
+[77496320 / 100000000] (77.4963%) -- errors = 3832 , logical error rate = 4.94475e-05
+[77578240 / 100000000] (77.5782%) -- errors = 3834 , logical error rate = 4.94211e-05
+[77660160 / 100000000] (77.6602%) -- errors = 3838 , logical error rate = 4.94204e-05
+[77742080 / 100000000] (77.7421%) -- errors = 3841 , logical error rate = 4.9407e-05
+[77824000 / 100000000] (77.824%) -- errors = 3844 , logical error rate = 4.93935e-05
+[77905920 / 100000000] (77.9059%) -- errors = 3848 , logical error rate = 4.93929e-05
+[77987840 / 100000000] (77.9878%) -- errors = 3849 , logical error rate = 4.93538e-05
+[78069760 / 100000000] (78.0698%) -- errors = 3851 , logical error rate = 4.93277e-05
+[78151680 / 100000000] (78.1517%) -- errors = 3856 , logical error rate = 4.934e-05
+[78233600 / 100000000] (78.2336%) -- errors = 3861 , logical error rate = 4.93522e-05
+[78315520 / 100000000] (78.3155%) -- errors = 3865 , logical error rate = 4.93516e-05
+[78397440 / 100000000] (78.3974%) -- errors = 3866 , logical error rate = 4.93128e-05
+[78479360 / 100000000] (78.4794%) -- errors = 3875 , logical error rate = 4.9376e-05
+[78561280 / 100000000] (78.5613%) -- errors = 3875 , logical error rate = 4.93246e-05
+[78643200 / 100000000] (78.6432%) -- errors = 3876 , logical error rate = 4.92859e-05
+[78725120 / 100000000] (78.7251%) -- errors = 3879 , logical error rate = 4.92727e-05
+[78807040 / 100000000] (78.807%) -- errors = 3881 , logical error rate = 4.92469e-05
+[78888960 / 100000000] (78.889%) -- errors = 3881 , logical error rate = 4.91957e-05
+[78970880 / 100000000] (78.9709%) -- errors = 3884 , logical error rate = 4.91827e-05
+[79052800 / 100000000] (79.0528%) -- errors = 3890 , logical error rate = 4.92076e-05
+[79134720 / 100000000] (79.1347%) -- errors = 3890 , logical error rate = 4.91567e-05
+[79216640 / 100000000] (79.2166%) -- errors = 3897 , logical error rate = 4.91942e-05
+[79298560 / 100000000] (79.2986%) -- errors = 3900 , logical error rate = 4.91812e-05
+[79380480 / 100000000] (79.3805%) -- errors = 3902 , logical error rate = 4.91557e-05
+[79462400 / 100000000] (79.4624%) -- errors = 3909 , logical error rate = 4.91931e-05
+[79544320 / 100000000] (79.5443%) -- errors = 3912 , logical error rate = 4.91801e-05
+[79626240 / 100000000] (79.6262%) -- errors = 3916 , logical error rate = 4.91798e-05
+[79708160 / 100000000] (79.7082%) -- errors = 3923 , logical error rate = 4.9217e-05
+[79790080 / 100000000] (79.7901%) -- errors = 3926 , logical error rate = 4.92041e-05
+[79872000 / 100000000] (79.872%) -- errors = 3930 , logical error rate = 4.92037e-05
+[79953920 / 100000000] (79.9539%) -- errors = 3931 , logical error rate = 4.91658e-05
+[80035840 / 100000000] (80.0358%) -- errors = 3934 , logical error rate = 4.9153e-05
+[80117760 / 100000000] (80.1178%) -- errors = 3936 , logical error rate = 4.91277e-05
+[80199680 / 100000000] (80.1997%) -- errors = 3938 , logical error rate = 4.91024e-05
+[80281600 / 100000000] (80.2816%) -- errors = 3941 , logical error rate = 4.90897e-05
+[80363520 / 100000000] (80.3635%) -- errors = 3944 , logical error rate = 4.9077e-05
+[80445440 / 100000000] (80.4454%) -- errors = 3952 , logical error rate = 4.91265e-05
+[80527360 / 100000000] (80.5274%) -- errors = 3956 , logical error rate = 4.91262e-05
+[80609280 / 100000000] (80.6093%) -- errors = 3960 , logical error rate = 4.91259e-05
+[80691200 / 100000000] (80.6912%) -- errors = 3962 , logical error rate = 4.91008e-05
+[80773120 / 100000000] (80.7731%) -- errors = 3966 , logical error rate = 4.91005e-05
+[80855040 / 100000000] (80.855%) -- errors = 3969 , logical error rate = 4.90878e-05
+[80936960 / 100000000] (80.937%) -- errors = 3976 , logical error rate = 4.91247e-05
+[81018880 / 100000000] (81.0189%) -- errors = 3978 , logical error rate = 4.90997e-05
+[81100800 / 100000000] (81.1008%) -- errors = 3979 , logical error rate = 4.90624e-05
+[81182720 / 100000000] (81.1827%) -- errors = 3983 , logical error rate = 4.90622e-05
+[81264640 / 100000000] (81.2646%) -- errors = 3990 , logical error rate = 4.90988e-05
+[81346560 / 100000000] (81.3466%) -- errors = 3995 , logical error rate = 4.91109e-05
+[81428480 / 100000000] (81.4285%) -- errors = 3999 , logical error rate = 4.91106e-05
+[81510400 / 100000000] (81.5104%) -- errors = 4002 , logical error rate = 4.9098e-05
+[81592320 / 100000000] (81.5923%) -- errors = 4010 , logical error rate = 4.91468e-05
+[81674240 / 100000000] (81.6742%) -- errors = 4013 , logical error rate = 4.91342e-05
+[81756160 / 100000000] (81.7562%) -- errors = 4017 , logical error rate = 4.91339e-05
+[81838080 / 100000000] (81.8381%) -- errors = 4019 , logical error rate = 4.91092e-05
+[81920000 / 100000000] (81.92%) -- errors = 4028 , logical error rate = 4.91699e-05
+[82001920 / 100000000] (82.0019%) -- errors = 4033 , logical error rate = 4.91818e-05
+[82083840 / 100000000] (82.0838%) -- errors = 4036 , logical error rate = 4.91692e-05
+[82165760 / 100000000] (82.1658%) -- errors = 4038 , logical error rate = 4.91446e-05
+[82247680 / 100000000] (82.2477%) -- errors = 4041 , logical error rate = 4.91321e-05
+[82329600 / 100000000] (82.3296%) -- errors = 4045 , logical error rate = 4.91318e-05
+[82411520 / 100000000] (82.4115%) -- errors = 4052 , logical error rate = 4.91679e-05
+[82493440 / 100000000] (82.4934%) -- errors = 4057 , logical error rate = 4.91797e-05
+[82575360 / 100000000] (82.5754%) -- errors = 4059 , logical error rate = 4.91551e-05
+[82657280 / 100000000] (82.6573%) -- errors = 4062 , logical error rate = 4.91427e-05
+[82739200 / 100000000] (82.7392%) -- errors = 4067 , logical error rate = 4.91545e-05
+[82821120 / 100000000] (82.8211%) -- errors = 4069 , logical error rate = 4.913e-05
+[82903040 / 100000000] (82.903%) -- errors = 4070 , logical error rate = 4.90935e-05
+[82984960 / 100000000] (82.985%) -- errors = 4074 , logical error rate = 4.90932e-05
+[83066880 / 100000000] (83.0669%) -- errors = 4077 , logical error rate = 4.90809e-05
+[83148800 / 100000000] (83.1488%) -- errors = 4082 , logical error rate = 4.90927e-05
+[83230720 / 100000000] (83.2307%) -- errors = 4085 , logical error rate = 4.90804e-05
+[83312640 / 100000000] (83.3126%) -- errors = 4089 , logical error rate = 4.90802e-05
+[83394560 / 100000000] (83.3946%) -- errors = 4094 , logical error rate = 4.90919e-05
+[83476480 / 100000000] (83.4765%) -- errors = 4096 , logical error rate = 4.90677e-05
+[83558400 / 100000000] (83.5584%) -- errors = 4101 , logical error rate = 4.90794e-05
+[83640320 / 100000000] (83.6403%) -- errors = 4103 , logical error rate = 4.90553e-05
+[83722240 / 100000000] (83.7222%) -- errors = 4106 , logical error rate = 4.90431e-05
+[83804160 / 100000000] (83.8042%) -- errors = 4111 , logical error rate = 4.90548e-05
+[83886080 / 100000000] (83.8861%) -- errors = 4112 , logical error rate = 4.90189e-05
+[83968000 / 100000000] (83.968%) -- errors = 4113 , logical error rate = 4.89829e-05
+[84049920 / 100000000] (84.0499%) -- errors = 4118 , logical error rate = 4.89947e-05
+[84131840 / 100000000] (84.1318%) -- errors = 4121 , logical error rate = 4.89826e-05
+[84213760 / 100000000] (84.2138%) -- errors = 4126 , logical error rate = 4.89944e-05
+[84295680 / 100000000] (84.2957%) -- errors = 4129 , logical error rate = 4.89823e-05
+[84377600 / 100000000] (84.3776%) -- errors = 4129 , logical error rate = 4.89348e-05
+[84459520 / 100000000] (84.4595%) -- errors = 4132 , logical error rate = 4.89228e-05
+[84541440 / 100000000] (84.5414%) -- errors = 4138 , logical error rate = 4.89464e-05
+[84623360 / 100000000] (84.6234%) -- errors = 4139 , logical error rate = 4.89108e-05
+[84705280 / 100000000] (84.7053%) -- errors = 4144 , logical error rate = 4.89226e-05
+[84787200 / 100000000] (84.7872%) -- errors = 4149 , logical error rate = 4.89343e-05
+[84869120 / 100000000] (84.8691%) -- errors = 4152 , logical error rate = 4.89224e-05
+[84951040 / 100000000] (84.951%) -- errors = 4158 , logical error rate = 4.89458e-05
+[85032960 / 100000000] (85.033%) -- errors = 4161 , logical error rate = 4.8934e-05
+[85114880 / 100000000] (85.1149%) -- errors = 4167 , logical error rate = 4.89574e-05
+[85196800 / 100000000] (85.1968%) -- errors = 4170 , logical error rate = 4.89455e-05
+[85278720 / 100000000] (85.2787%) -- errors = 4172 , logical error rate = 4.89219e-05
+[85360640 / 100000000] (85.3606%) -- errors = 4173 , logical error rate = 4.88867e-05
+[85442560 / 100000000] (85.4426%) -- errors = 4177 , logical error rate = 4.88866e-05
+[85524480 / 100000000] (85.5245%) -- errors = 4181 , logical error rate = 4.88866e-05
+[85606400 / 100000000] (85.6064%) -- errors = 4183 , logical error rate = 4.88632e-05
+[85688320 / 100000000] (85.6883%) -- errors = 4188 , logical error rate = 4.88748e-05
+[85770240 / 100000000] (85.7702%) -- errors = 4195 , logical error rate = 4.89097e-05
+[85852160 / 100000000] (85.8522%) -- errors = 4198 , logical error rate = 4.8898e-05
+[85934080 / 100000000] (85.9341%) -- errors = 4205 , logical error rate = 4.89329e-05
+[86016000 / 100000000] (86.016%) -- errors = 4207 , logical error rate = 4.89095e-05
+[86097920 / 100000000] (86.0979%) -- errors = 4210 , logical error rate = 4.88978e-05
+[86179840 / 100000000] (86.1798%) -- errors = 4212 , logical error rate = 4.88745e-05
+[86261760 / 100000000] (86.2618%) -- errors = 4217 , logical error rate = 4.88861e-05
+[86343680 / 100000000] (86.3437%) -- errors = 4220 , logical error rate = 4.88745e-05
+[86425600 / 100000000] (86.4256%) -- errors = 4223 , logical error rate = 4.88628e-05
+[86507520 / 100000000] (86.5075%) -- errors = 4230 , logical error rate = 4.88975e-05
+[86589440 / 100000000] (86.5894%) -- errors = 4231 , logical error rate = 4.88628e-05
+[86671360 / 100000000] (86.6714%) -- errors = 4234 , logical error rate = 4.88512e-05
+[86753280 / 100000000] (86.7533%) -- errors = 4238 , logical error rate = 4.88512e-05
+[86835200 / 100000000] (86.8352%) -- errors = 4243 , logical error rate = 4.88627e-05
+[86917120 / 100000000] (86.9171%) -- errors = 4244 , logical error rate = 4.88281e-05
+[86999040 / 100000000] (86.999%) -- errors = 4248 , logical error rate = 4.88281e-05
+[87080960 / 100000000] (87.081%) -- errors = 4250 , logical error rate = 4.88052e-05
+[87162880 / 100000000] (87.1629%) -- errors = 4259 , logical error rate = 4.88625e-05
+[87244800 / 100000000] (87.2448%) -- errors = 4268 , logical error rate = 4.89198e-05
+[87326720 / 100000000] (87.3267%) -- errors = 4276 , logical error rate = 4.89655e-05
+[87408640 / 100000000] (87.4086%) -- errors = 4277 , logical error rate = 4.89311e-05
+[87490560 / 100000000] (87.4906%) -- errors = 4282 , logical error rate = 4.89424e-05
+[87572480 / 100000000] (87.5725%) -- errors = 4285 , logical error rate = 4.89309e-05
+[87654400 / 100000000] (87.6544%) -- errors = 4288 , logical error rate = 4.89194e-05
+[87736320 / 100000000] (87.7363%) -- errors = 4290 , logical error rate = 4.88965e-05
+[87818240 / 100000000] (87.8182%) -- errors = 4296 , logical error rate = 4.89192e-05
+[87900160 / 100000000] (87.9002%) -- errors = 4303 , logical error rate = 4.89533e-05
+[87982080 / 100000000] (87.9821%) -- errors = 4307 , logical error rate = 4.89532e-05
+[88064000 / 100000000] (88.064%) -- errors = 4308 , logical error rate = 4.8919e-05
+[88145920 / 100000000] (88.1459%) -- errors = 4310 , logical error rate = 4.88962e-05
+[88227840 / 100000000] (88.2278%) -- errors = 4313 , logical error rate = 4.88848e-05
+[88309760 / 100000000] (88.3098%) -- errors = 4314 , logical error rate = 4.88508e-05
+[88391680 / 100000000] (88.3917%) -- errors = 4317 , logical error rate = 4.88394e-05
+[88473600 / 100000000] (88.4736%) -- errors = 4319 , logical error rate = 4.88168e-05
+[88555520 / 100000000] (88.5555%) -- errors = 4326 , logical error rate = 4.88507e-05
+[88637440 / 100000000] (88.6374%) -- errors = 4331 , logical error rate = 4.8862e-05
+[88719360 / 100000000] (88.7194%) -- errors = 4333 , logical error rate = 4.88394e-05
+[88801280 / 100000000] (88.8013%) -- errors = 4336 , logical error rate = 4.88281e-05
+[88883200 / 100000000] (88.8832%) -- errors = 4339 , logical error rate = 4.88169e-05
+[88965120 / 100000000] (88.9651%) -- errors = 4344 , logical error rate = 4.88281e-05
+[89047040 / 100000000] (89.047%) -- errors = 4347 , logical error rate = 4.88169e-05
+[89128960 / 100000000] (89.129%) -- errors = 4353 , logical error rate = 4.88393e-05
+[89210880 / 100000000] (89.2109%) -- errors = 4356 , logical error rate = 4.88281e-05
+[89292800 / 100000000] (89.2928%) -- errors = 4359 , logical error rate = 4.88169e-05
+[89374720 / 100000000] (89.3747%) -- errors = 4367 , logical error rate = 4.88617e-05
+[89456640 / 100000000] (89.4566%) -- errors = 4372 , logical error rate = 4.88728e-05
+[89538560 / 100000000] (89.5386%) -- errors = 4373 , logical error rate = 4.88393e-05
+[89620480 / 100000000] (89.6205%) -- errors = 4375 , logical error rate = 4.8817e-05
+[89702400 / 100000000] (89.7024%) -- errors = 4382 , logical error rate = 4.88504e-05
+[89784320 / 100000000] (89.7843%) -- errors = 4387 , logical error rate = 4.88615e-05
+[89866240 / 100000000] (89.8662%) -- errors = 4390 , logical error rate = 4.88504e-05
+[89948160 / 100000000] (89.9482%) -- errors = 4397 , logical error rate = 4.88837e-05
+[90030080 / 100000000] (90.0301%) -- errors = 4401 , logical error rate = 4.88837e-05
+[90112000 / 100000000] (90.112%) -- errors = 4405 , logical error rate = 4.88836e-05
+[90193920 / 100000000] (90.1939%) -- errors = 4410 , logical error rate = 4.88946e-05
+[90275840 / 100000000] (90.2758%) -- errors = 4417 , logical error rate = 4.89278e-05
+[90357760 / 100000000] (90.3578%) -- errors = 4421 , logical error rate = 4.89277e-05
+[90439680 / 100000000] (90.4397%) -- errors = 4422 , logical error rate = 4.88945e-05
+[90521600 / 100000000] (90.5216%) -- errors = 4423 , logical error rate = 4.88613e-05
+[90603520 / 100000000] (90.6035%) -- errors = 4426 , logical error rate = 4.88502e-05
+[90685440 / 100000000] (90.6854%) -- errors = 4429 , logical error rate = 4.88392e-05
+[90767360 / 100000000] (90.7674%) -- errors = 4432 , logical error rate = 4.88281e-05
+[90849280 / 100000000] (90.8493%) -- errors = 4435 , logical error rate = 4.88171e-05
+[90931200 / 100000000] (90.9312%) -- errors = 4439 , logical error rate = 4.88171e-05
+[91013120 / 100000000] (91.0131%) -- errors = 4444 , logical error rate = 4.88281e-05
+[91095040 / 100000000] (91.095%) -- errors = 4445 , logical error rate = 4.87952e-05
+[91176960 / 100000000] (91.177%) -- errors = 4450 , logical error rate = 4.88062e-05
+[91258880 / 100000000] (91.2589%) -- errors = 4456 , logical error rate = 4.88281e-05
+[91340800 / 100000000] (91.3408%) -- errors = 4458 , logical error rate = 4.88062e-05
+[91422720 / 100000000] (91.4227%) -- errors = 4461 , logical error rate = 4.87953e-05
+[91504640 / 100000000] (91.5046%) -- errors = 4464 , logical error rate = 4.87844e-05
+[91586560 / 100000000] (91.5866%) -- errors = 4468 , logical error rate = 4.87845e-05
+[91668480 / 100000000] (91.6685%) -- errors = 4474 , logical error rate = 4.88063e-05
+[91750400 / 100000000] (91.7504%) -- errors = 4477 , logical error rate = 4.87954e-05
+[91832320 / 100000000] (91.8323%) -- errors = 4480 , logical error rate = 4.87846e-05
+[91914240 / 100000000] (91.9142%) -- errors = 4483 , logical error rate = 4.87737e-05
+[91996160 / 100000000] (91.9962%) -- errors = 4487 , logical error rate = 4.87738e-05
+[92078080 / 100000000] (92.0781%) -- errors = 4490 , logical error rate = 4.8763e-05
+[92160000 / 100000000] (92.16%) -- errors = 4492 , logical error rate = 4.87413e-05
+[92241920 / 100000000] (92.2419%) -- errors = 4498 , logical error rate = 4.87631e-05
+[92323840 / 100000000] (92.3238%) -- errors = 4501 , logical error rate = 4.87523e-05
+[92405760 / 100000000] (92.4058%) -- errors = 4507 , logical error rate = 4.8774e-05
+[92487680 / 100000000] (92.4877%) -- errors = 4510 , logical error rate = 4.87633e-05
+[92569600 / 100000000] (92.5696%) -- errors = 4513 , logical error rate = 4.87525e-05
+[92651520 / 100000000] (92.6515%) -- errors = 4516 , logical error rate = 4.87418e-05
+[92733440 / 100000000] (92.7334%) -- errors = 4519 , logical error rate = 4.87311e-05
+[92815360 / 100000000] (92.8154%) -- errors = 4523 , logical error rate = 4.87312e-05
+[92897280 / 100000000] (92.8973%) -- errors = 4527 , logical error rate = 4.87312e-05
+[92979200 / 100000000] (92.9792%) -- errors = 4530 , logical error rate = 4.87206e-05
+[93061120 / 100000000] (93.0611%) -- errors = 4535 , logical error rate = 4.87314e-05
+[93143040 / 100000000] (93.143%) -- errors = 4537 , logical error rate = 4.871e-05
+[93224960 / 100000000] (93.225%) -- errors = 4543 , logical error rate = 4.87316e-05
+[93306880 / 100000000] (93.3069%) -- errors = 4548 , logical error rate = 4.87424e-05
+[93388800 / 100000000] (93.3888%) -- errors = 4555 , logical error rate = 4.87746e-05
+[93470720 / 100000000] (93.4707%) -- errors = 4556 , logical error rate = 4.87425e-05
+[93552640 / 100000000] (93.5526%) -- errors = 4560 , logical error rate = 4.87426e-05
+[93634560 / 100000000] (93.6346%) -- errors = 4563 , logical error rate = 4.8732e-05
+[93716480 / 100000000] (93.7165%) -- errors = 4571 , logical error rate = 4.87748e-05
+[93798400 / 100000000] (93.7984%) -- errors = 4577 , logical error rate = 4.87961e-05
+[93880320 / 100000000] (93.8803%) -- errors = 4580 , logical error rate = 4.87855e-05
+[93962240 / 100000000] (93.9622%) -- errors = 4584 , logical error rate = 4.87856e-05
+[94044160 / 100000000] (94.0442%) -- errors = 4588 , logical error rate = 4.87856e-05
+[94126080 / 100000000] (94.1261%) -- errors = 4592 , logical error rate = 4.87856e-05
+[94208000 / 100000000] (94.208%) -- errors = 4595 , logical error rate = 4.87751e-05
+[94289920 / 100000000] (94.2899%) -- errors = 4598 , logical error rate = 4.87645e-05
+[94371840 / 100000000] (94.3718%) -- errors = 4599 , logical error rate = 4.87328e-05
+[94453760 / 100000000] (94.4538%) -- errors = 4602 , logical error rate = 4.87223e-05
+[94535680 / 100000000] (94.5357%) -- errors = 4608 , logical error rate = 4.87435e-05
+[94617600 / 100000000] (94.6176%) -- errors = 4615 , logical error rate = 4.87753e-05
+[94699520 / 100000000] (94.6995%) -- errors = 4622 , logical error rate = 4.8807e-05
+[94781440 / 100000000] (94.7814%) -- errors = 4625 , logical error rate = 4.87965e-05
+[94863360 / 100000000] (94.8634%) -- errors = 4631 , logical error rate = 4.88176e-05
+[94945280 / 100000000] (94.9453%) -- errors = 4633 , logical error rate = 4.87965e-05
+[95027200 / 100000000] (95.0272%) -- errors = 4637 , logical error rate = 4.87966e-05
+[95109120 / 100000000] (95.1091%) -- errors = 4642 , logical error rate = 4.88071e-05
+[95191040 / 100000000] (95.191%) -- errors = 4646 , logical error rate = 4.88071e-05
+[95272960 / 100000000] (95.273%) -- errors = 4653 , logical error rate = 4.88386e-05
+[95354880 / 100000000] (95.3549%) -- errors = 4655 , logical error rate = 4.88176e-05
+[95436800 / 100000000] (95.4368%) -- errors = 4662 , logical error rate = 4.88491e-05
+[95518720 / 100000000] (95.5187%) -- errors = 4664 , logical error rate = 4.88281e-05
+[95600640 / 100000000] (95.6006%) -- errors = 4666 , logical error rate = 4.88072e-05
+[95682560 / 100000000] (95.6826%) -- errors = 4671 , logical error rate = 4.88177e-05
+[95764480 / 100000000] (95.7645%) -- errors = 4672 , logical error rate = 4.87864e-05
+[95846400 / 100000000] (95.8464%) -- errors = 4677 , logical error rate = 4.87968e-05
+[95928320 / 100000000] (95.9283%) -- errors = 4678 , logical error rate = 4.87656e-05
+[96010240 / 100000000] (96.0102%) -- errors = 4683 , logical error rate = 4.8776e-05
+[96092160 / 100000000] (96.0922%) -- errors = 4691 , logical error rate = 4.88177e-05
+[96174080 / 100000000] (96.1741%) -- errors = 4691 , logical error rate = 4.87761e-05
+[96256000 / 100000000] (96.256%) -- errors = 4695 , logical error rate = 4.87762e-05
+[96337920 / 100000000] (96.3379%) -- errors = 4697 , logical error rate = 4.87555e-05
+[96419840 / 100000000] (96.4198%) -- errors = 4698 , logical error rate = 4.87244e-05
+[96501760 / 100000000] (96.5018%) -- errors = 4705 , logical error rate = 4.87556e-05
+[96583680 / 100000000] (96.5837%) -- errors = 4711 , logical error rate = 4.87764e-05
+[96665600 / 100000000] (96.6656%) -- errors = 4715 , logical error rate = 4.87764e-05
+[96747520 / 100000000] (96.7475%) -- errors = 4718 , logical error rate = 4.87661e-05
+[96829440 / 100000000] (96.8294%) -- errors = 4724 , logical error rate = 4.87868e-05
+[96911360 / 100000000] (96.9114%) -- errors = 4729 , logical error rate = 4.87972e-05
+[96993280 / 100000000] (96.9933%) -- errors = 4734 , logical error rate = 4.88075e-05
+[97075200 / 100000000] (97.0752%) -- errors = 4737 , logical error rate = 4.87972e-05
+[97157120 / 100000000] (97.1571%) -- errors = 4741 , logical error rate = 4.87972e-05
+[97239040 / 100000000] (97.239%) -- errors = 4746 , logical error rate = 4.88076e-05
+[97320960 / 100000000] (97.321%) -- errors = 4752 , logical error rate = 4.88281e-05
+[97402880 / 100000000] (97.4029%) -- errors = 4755 , logical error rate = 4.88179e-05
+[97484800 / 100000000] (97.4848%) -- errors = 4760 , logical error rate = 4.88281e-05
+[97566720 / 100000000] (97.5667%) -- errors = 4765 , logical error rate = 4.88384e-05
+[97648640 / 100000000] (97.6486%) -- errors = 4767 , logical error rate = 4.88179e-05
+[97730560 / 100000000] (97.7306%) -- errors = 4772 , logical error rate = 4.88281e-05
+[97812480 / 100000000] (97.8125%) -- errors = 4774 , logical error rate = 4.88077e-05
+[97894400 / 100000000] (97.8944%) -- errors = 4784 , logical error rate = 4.8869e-05
+[97976320 / 100000000] (97.9763%) -- errors = 4788 , logical error rate = 4.8869e-05
+[98058240 / 100000000] (98.0582%) -- errors = 4792 , logical error rate = 4.88689e-05
+[98140160 / 100000000] (98.1402%) -- errors = 4797 , logical error rate = 4.88791e-05
+[98222080 / 100000000] (98.2221%) -- errors = 4800 , logical error rate = 4.88688e-05
+[98304000 / 100000000] (98.304%) -- errors = 4805 , logical error rate = 4.8879e-05
+[98385920 / 100000000] (98.3859%) -- errors = 4810 , logical error rate = 4.88891e-05
+[98467840 / 100000000] (98.4678%) -- errors = 4816 , logical error rate = 4.89094e-05
+[98549760 / 100000000] (98.5498%) -- errors = 4820 , logical error rate = 4.89093e-05
+[98631680 / 100000000] (98.6317%) -- errors = 4823 , logical error rate = 4.88991e-05
+[98713600 / 100000000] (98.7136%) -- errors = 4828 , logical error rate = 4.89092e-05
+[98795520 / 100000000] (98.7955%) -- errors = 4833 , logical error rate = 4.89192e-05
+[98877440 / 100000000] (98.8774%) -- errors = 4840 , logical error rate = 4.89495e-05
+[98959360 / 100000000] (98.9594%) -- errors = 4846 , logical error rate = 4.89696e-05
+[99041280 / 100000000] (99.0413%) -- errors = 4851 , logical error rate = 4.89796e-05
+[99123200 / 100000000] (99.1232%) -- errors = 4855 , logical error rate = 4.89795e-05
+[99205120 / 100000000] (99.2051%) -- errors = 4863 , logical error rate = 4.90196e-05
+[99287040 / 100000000] (99.287%) -- errors = 4869 , logical error rate = 4.90396e-05
+[99368960 / 100000000] (99.369%) -- errors = 4874 , logical error rate = 4.90495e-05
+[99450880 / 100000000] (99.4509%) -- errors = 4879 , logical error rate = 4.90594e-05
+[99532800 / 100000000] (99.5328%) -- errors = 4886 , logical error rate = 4.90893e-05
+[99614720 / 100000000] (99.6147%) -- errors = 4891 , logical error rate = 4.90992e-05
+[99696640 / 100000000] (99.6966%) -- errors = 4895 , logical error rate = 4.90989e-05
+[99778560 / 100000000] (99.7786%) -- errors = 4897 , logical error rate = 4.90787e-05
+[99860480 / 100000000] (99.8605%) -- errors = 4902 , logical error rate = 4.90885e-05
+[99942400 / 100000000] (99.9424%) -- errors = 4906 , logical error rate = 4.90883e-05
+[100024320 / 100000000] (100.024%) -- errors = 4916 , logical error rate = 4.9148e-05
+Logical error rate: 4.9148e-05
+SIGNED_GAP =================================
+mean = 113.082, std = 21.3889, min = -69.5342, max = 185.572, count = 100024320
+<-128:	0
+-128 <= X < -127:	0
+-127 <= X < -126:	0
+-126 <= X < -125:	0
+-125 <= X < -124:	0
+-124 <= X < -123:	0
+-123 <= X < -122:	0
+-122 <= X < -121:	0
+-121 <= X < -120:	0
+-120 <= X < -119:	0
+-119 <= X < -118:	0
+-118 <= X < -117:	0
+-117 <= X < -116:	0
+-116 <= X < -115:	0
+-115 <= X < -114:	0
+-114 <= X < -113:	0
+-113 <= X < -112:	0
+-112 <= X < -111:	0
+-111 <= X < -110:	0
+-110 <= X < -109:	0
+-109 <= X < -108:	0
+-108 <= X < -107:	0
+-107 <= X < -106:	0
+-106 <= X < -105:	0
+-105 <= X < -104:	0
+-104 <= X < -103:	0
+-103 <= X < -102:	0
+-102 <= X < -101:	0
+-101 <= X < -100:	0
+-100 <= X < -99:	0
+-99 <= X < -98:	0
+-98 <= X < -97:	0
+-97 <= X < -96:	0
+-96 <= X < -95:	0
+-95 <= X < -94:	0
+-94 <= X < -93:	0
+-93 <= X < -92:	0
+-92 <= X < -91:	0
+-91 <= X < -90:	0
+-90 <= X < -89:	0
+-89 <= X < -88:	0
+-88 <= X < -87:	0
+-87 <= X < -86:	0
+-86 <= X < -85:	0
+-85 <= X < -84:	0
+-84 <= X < -83:	0
+-83 <= X < -82:	0
+-82 <= X < -81:	0
+-81 <= X < -80:	0
+-80 <= X < -79:	0
+-79 <= X < -78:	0
+-78 <= X < -77:	0
+-77 <= X < -76:	0
+-76 <= X < -75:	0
+-75 <= X < -74:	0
+-74 <= X < -73:	0
+-73 <= X < -72:	0
+-72 <= X < -71:	0
+-71 <= X < -70:	0
+-70 <= X < -69:	1
+-69 <= X < -68:	0
+-68 <= X < -67:	0
+-67 <= X < -66:	0
+-66 <= X < -65:	0
+-65 <= X < -64:	0
+-64 <= X < -63:	0
+-63 <= X < -62:	0
+-62 <= X < -61:	0
+-61 <= X < -60:	1
+-60 <= X < -59:	1
+-59 <= X < -58:	1
+-58 <= X < -57:	1
+-57 <= X < -56:	0
+-56 <= X < -55:	0
+-55 <= X < -54:	0
+-54 <= X < -53:	0
+-53 <= X < -52:	5
+-52 <= X < -51:	0
+-51 <= X < -50:	0
+-50 <= X < -49:	2
+-49 <= X < -48:	3
+-48 <= X < -47:	0
+-47 <= X < -46:	3
+-46 <= X < -45:	3
+-45 <= X < -44:	3
+-44 <= X < -43:	8
+-43 <= X < -42:	3
+-42 <= X < -41:	5
+-41 <= X < -40:	3
+-40 <= X < -39:	12
+-39 <= X < -38:	8
+-38 <= X < -37:	11
+-37 <= X < -36:	12
+-36 <= X < -35:	10
+-35 <= X < -34:	16
+-34 <= X < -33:	9
+-33 <= X < -32:	16
+-32 <= X < -31:	12
+-31 <= X < -30:	16
+-30 <= X < -29:	24
+-29 <= X < -28:	18
+-28 <= X < -27:	27
+-27 <= X < -26:	25
+-26 <= X < -25:	25
+-25 <= X < -24:	54
+-24 <= X < -23:	24
+-23 <= X < -22:	61
+-22 <= X < -21:	68
+-21 <= X < -20:	42
+-20 <= X < -19:	92
+-19 <= X < -18:	49
+-18 <= X < -17:	77
+-17 <= X < -16:	111
+-16 <= X < -15:	76
+-15 <= X < -14:	147
+-14 <= X < -13:	148
+-13 <= X < -12:	115
+-12 <= X < -11:	165
+-11 <= X < -10:	134
+-10 <= X < -9:	228
+-9 <= X < -8:	249
+-8 <= X < -7:	240
+-7 <= X < -6:	316
+-6 <= X < -5:	243
+-5 <= X < -4:	302
+-4 <= X < -3:	439
+-3 <= X < -2:	340
+-2 <= X < -1:	448
+-1 <= X < 0:	458
+0 <= X < 1:	527
+1 <= X < 2:	588
+2 <= X < 3:	538
+3 <= X < 4:	855
+4 <= X < 5:	738
+5 <= X < 6:	794
+6 <= X < 7:	1158
+7 <= X < 8:	864
+8 <= X < 9:	1531
+9 <= X < 10:	1359
+10 <= X < 11:	1183
+11 <= X < 12:	2257
+12 <= X < 13:	1512
+13 <= X < 14:	2450
+14 <= X < 15:	3016
+15 <= X < 16:	2100
+16 <= X < 17:	3656
+17 <= X < 18:	2656
+18 <= X < 19:	3081
+19 <= X < 20:	4842
+20 <= X < 21:	3599
+21 <= X < 22:	7042
+22 <= X < 23:	5843
+23 <= X < 24:	4211
+24 <= X < 25:	8695
+25 <= X < 26:	5178
+26 <= X < 27:	6633
+27 <= X < 28:	10667
+28 <= X < 29:	6927
+29 <= X < 30:	12213
+30 <= X < 31:	10290
+31 <= X < 32:	9269
+32 <= X < 33:	15925
+33 <= X < 34:	10144
+34 <= X < 35:	15328
+35 <= X < 36:	17083
+36 <= X < 37:	13848
+37 <= X < 38:	21924
+38 <= X < 39:	18361
+39 <= X < 40:	22437
+40 <= X < 41:	27276
+41 <= X < 42:	21401
+42 <= X < 43:	32630
+43 <= X < 44:	29422
+44 <= X < 45:	33133
+45 <= X < 46:	41130
+46 <= X < 47:	32436
+47 <= X < 48:	49079
+48 <= X < 49:	45369
+49 <= X < 50:	45224
+50 <= X < 51:	63551
+51 <= X < 52:	50382
+52 <= X < 53:	73777
+53 <= X < 54:	67770
+54 <= X < 55:	65157
+55 <= X < 56:	102407
+56 <= X < 57:	90830
+57 <= X < 58:	143577
+58 <= X < 59:	121785
+59 <= X < 60:	90965
+60 <= X < 61:	178406
+61 <= X < 62:	118205
+62 <= X < 63:	130020
+63 <= X < 64:	232135
+64 <= X < 65:	176591
+65 <= X < 66:	277926
+66 <= X < 67:	192655
+67 <= X < 68:	162739
+68 <= X < 69:	332762
+69 <= X < 70:	190259
+70 <= X < 71:	270770
+71 <= X < 72:	365782
+72 <= X < 73:	228608
+73 <= X < 74:	425101
+74 <= X < 75:	300623
+75 <= X < 76:	303886
+76 <= X < 77:	541421
+77 <= X < 78:	299109
+78 <= X < 79:	498107
+79 <= X < 80:	515921
+80 <= X < 81:	376976
+81 <= X < 82:	718676
+82 <= X < 83:	440611
+83 <= X < 84:	525670
+84 <= X < 85:	766341
+85 <= X < 86:	471089
+86 <= X < 87:	751070
+87 <= X < 88:	711789
+88 <= X < 89:	684304
+89 <= X < 90:	886433
+90 <= X < 91:	697427
+91 <= X < 92:	960805
+92 <= X < 93:	887740
+93 <= X < 94:	993597
+94 <= X < 95:	1079636
+95 <= X < 96:	901847
+96 <= X < 97:	1364433
+97 <= X < 98:	1100284
+98 <= X < 99:	1061402
+99 <= X < 100:	2071668
+100 <= X < 101:	1749294
+101 <= X < 102:	1466127
+102 <= X < 103:	1516788
+103 <= X < 104:	1168284
+104 <= X < 105:	1812550
+105 <= X < 106:	1242859
+106 <= X < 107:	1546162
+107 <= X < 108:	2472154
+108 <= X < 109:	1449980
+109 <= X < 110:	2237490
+110 <= X < 111:	1530466
+111 <= X < 112:	1379881
+112 <= X < 113:	2871627
+113 <= X < 114:	1378129
+114 <= X < 115:	2397519
+115 <= X < 116:	2093867
+116 <= X < 117:	1336791
+117 <= X < 118:	3167883
+118 <= X < 119:	1399497
+119 <= X < 120:	1385028
+120 <= X < 121:	2997991
+121 <= X < 122:	1329665
+122 <= X < 123:	2298041
+123 <= X < 124:	1709000
+124 <= X < 125:	1522068
+125 <= X < 126:	2559101
+126 <= X < 127:	1167890
+127 <= X < 128:	1600364
+>=128:	24551467
+
+UNSIGNED_GAP =================================
+mean = 113.083, std = 21.3841, min = 0, max = 185.572, count = 100024320
+<0:	0
+0 <= X < 1:	985
+1 <= X < 2:	1036
+2 <= X < 3:	878
+3 <= X < 4:	1294
+4 <= X < 5:	1040
+5 <= X < 6:	1037
+6 <= X < 7:	1474
+7 <= X < 8:	1104
+8 <= X < 9:	1780
+9 <= X < 10:	1587
+10 <= X < 11:	1317
+11 <= X < 12:	2422
+12 <= X < 13:	1627
+13 <= X < 14:	2598
+14 <= X < 15:	3163
+15 <= X < 16:	2176
+16 <= X < 17:	3767
+17 <= X < 18:	2733
+18 <= X < 19:	3130
+19 <= X < 20:	4934
+20 <= X < 21:	3641
+21 <= X < 22:	7110
+22 <= X < 23:	5904
+23 <= X < 24:	4235
+24 <= X < 25:	8749
+25 <= X < 26:	5203
+26 <= X < 27:	6658
+27 <= X < 28:	10694
+28 <= X < 29:	6945
+29 <= X < 30:	12237
+30 <= X < 31:	10306
+31 <= X < 32:	9281
+32 <= X < 33:	15941
+33 <= X < 34:	10153
+34 <= X < 35:	15344
+35 <= X < 36:	17093
+36 <= X < 37:	13860
+37 <= X < 38:	21935
+38 <= X < 39:	18369
+39 <= X < 40:	22449
+40 <= X < 41:	27279
+41 <= X < 42:	21406
+42 <= X < 43:	32633
+43 <= X < 44:	29430
+44 <= X < 45:	33136
+45 <= X < 46:	41133
+46 <= X < 47:	32439
+47 <= X < 48:	49079
+48 <= X < 49:	45372
+49 <= X < 50:	45226
+50 <= X < 51:	63551
+51 <= X < 52:	50382
+52 <= X < 53:	73782
+53 <= X < 54:	67770
+54 <= X < 55:	65157
+55 <= X < 56:	102407
+56 <= X < 57:	90830
+57 <= X < 58:	143578
+58 <= X < 59:	121786
+59 <= X < 60:	90966
+60 <= X < 61:	178407
+61 <= X < 62:	118205
+62 <= X < 63:	130020
+63 <= X < 64:	232135
+64 <= X < 65:	176591
+65 <= X < 66:	277926
+66 <= X < 67:	192655
+67 <= X < 68:	162739
+68 <= X < 69:	332762
+69 <= X < 70:	190260
+70 <= X < 71:	270770
+71 <= X < 72:	365782
+72 <= X < 73:	228608
+73 <= X < 74:	425101
+74 <= X < 75:	300623
+75 <= X < 76:	303886
+76 <= X < 77:	541421
+77 <= X < 78:	299109
+78 <= X < 79:	498107
+79 <= X < 80:	515921
+80 <= X < 81:	376976
+81 <= X < 82:	718676
+82 <= X < 83:	440611
+83 <= X < 84:	525670
+84 <= X < 85:	766341
+85 <= X < 86:	471089
+86 <= X < 87:	751070
+87 <= X < 88:	711789
+88 <= X < 89:	684304
+89 <= X < 90:	886433
+90 <= X < 91:	697427
+91 <= X < 92:	960805
+92 <= X < 93:	887740
+93 <= X < 94:	993597
+94 <= X < 95:	1079636
+95 <= X < 96:	901847
+96 <= X < 97:	1364433
+97 <= X < 98:	1100284
+98 <= X < 99:	1061402
+99 <= X < 100:	2071668
+100 <= X < 101:	1749294
+101 <= X < 102:	1466127
+102 <= X < 103:	1516788
+103 <= X < 104:	1168284
+104 <= X < 105:	1812550
+105 <= X < 106:	1242859
+106 <= X < 107:	1546162
+107 <= X < 108:	2472154
+108 <= X < 109:	1449980
+109 <= X < 110:	2237490
+110 <= X < 111:	1530466
+111 <= X < 112:	1379881
+112 <= X < 113:	2871627
+113 <= X < 114:	1378129
+114 <= X < 115:	2397519
+115 <= X < 116:	2093867
+116 <= X < 117:	1336791
+117 <= X < 118:	3167883
+118 <= X < 119:	1399497
+119 <= X < 120:	1385028
+120 <= X < 121:	2997991
+121 <= X < 122:	1329665
+122 <= X < 123:	2298041
+123 <= X < 124:	1709000
+124 <= X < 125:	1522068
+125 <= X < 126:	2559101
+126 <= X < 127:	1167890
+127 <= X < 128:	1600364
+>=128:	24551467
+
+UNSIGNED_GAP_ERRORS =================================
+mean = 9.17399, std = 8.66714, min = 0, max = 69.5342, count = 4916
+<0:	0
+0 <= X < 1:	464
+1 <= X < 2:	448
+2 <= X < 3:	340
+3 <= X < 4:	439
+4 <= X < 5:	302
+5 <= X < 6:	243
+6 <= X < 7:	316
+7 <= X < 8:	240
+8 <= X < 9:	249
+9 <= X < 10:	228
+10 <= X < 11:	134
+11 <= X < 12:	165
+12 <= X < 13:	115
+13 <= X < 14:	148
+14 <= X < 15:	147
+15 <= X < 16:	76
+16 <= X < 17:	111
+17 <= X < 18:	77
+18 <= X < 19:	49
+19 <= X < 20:	92
+20 <= X < 21:	42
+21 <= X < 22:	68
+22 <= X < 23:	61
+23 <= X < 24:	24
+24 <= X < 25:	54
+25 <= X < 26:	25
+26 <= X < 27:	25
+27 <= X < 28:	27
+28 <= X < 29:	18
+29 <= X < 30:	24
+30 <= X < 31:	16
+31 <= X < 32:	12
+32 <= X < 33:	16
+33 <= X < 34:	9
+34 <= X < 35:	16
+35 <= X < 36:	10
+36 <= X < 37:	12
+37 <= X < 38:	11
+38 <= X < 39:	8
+39 <= X < 40:	12
+40 <= X < 41:	3
+41 <= X < 42:	5
+42 <= X < 43:	3
+43 <= X < 44:	8
+44 <= X < 45:	3
+45 <= X < 46:	3
+46 <= X < 47:	3
+47 <= X < 48:	0
+48 <= X < 49:	3
+49 <= X < 50:	2
+50 <= X < 51:	0
+51 <= X < 52:	0
+52 <= X < 53:	5
+53 <= X < 54:	0
+54 <= X < 55:	0
+55 <= X < 56:	0
+56 <= X < 57:	0
+57 <= X < 58:	1
+58 <= X < 59:	1
+59 <= X < 60:	1
+60 <= X < 61:	1
+61 <= X < 62:	0
+62 <= X < 63:	0
+63 <= X < 64:	0
+64 <= X < 65:	0
+65 <= X < 66:	0
+66 <= X < 67:	0
+67 <= X < 68:	0
+68 <= X < 69:	0
+69 <= X < 70:	1
+70 <= X < 71:	0
+71 <= X < 72:	0
+72 <= X < 73:	0
+73 <= X < 74:	0
+74 <= X < 75:	0
+75 <= X < 76:	0
+76 <= X < 77:	0
+77 <= X < 78:	0
+78 <= X < 79:	0
+79 <= X < 80:	0
+80 <= X < 81:	0
+81 <= X < 82:	0
+82 <= X < 83:	0
+83 <= X < 84:	0
+84 <= X < 85:	0
+85 <= X < 86:	0
+86 <= X < 87:	0
+87 <= X < 88:	0
+88 <= X < 89:	0
+89 <= X < 90:	0
+90 <= X < 91:	0
+91 <= X < 92:	0
+92 <= X < 93:	0
+93 <= X < 94:	0
+94 <= X < 95:	0
+95 <= X < 96:	0
+96 <= X < 97:	0
+97 <= X < 98:	0
+98 <= X < 99:	0
+99 <= X < 100:	0
+100 <= X < 101:	0
+101 <= X < 102:	0
+102 <= X < 103:	0
+103 <= X < 104:	0
+104 <= X < 105:	0
+105 <= X < 106:	0
+106 <= X < 107:	0
+107 <= X < 108:	0
+108 <= X < 109:	0
+109 <= X < 110:	0
+110 <= X < 111:	0
+111 <= X < 112:	0
+112 <= X < 113:	0
+113 <= X < 114:	0
+114 <= X < 115:	0
+115 <= X < 116:	0
+116 <= X < 117:	0
+117 <= X < 118:	0
+118 <= X < 119:	0
+119 <= X < 120:	0
+120 <= X < 121:	0
+121 <= X < 122:	0
+122 <= X < 123:	0
+123 <= X < 124:	0
+124 <= X < 125:	0
+125 <= X < 126:	0
+126 <= X < 127:	0
+127 <= X < 128:	0
+>=128:	0
+
+normalization constant = 4.07759e+06
+decibels per weight = 1.06508e-06

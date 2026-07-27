@@ -41,7 +41,9 @@ monte_carlo_sampler(const stim::DetectorErrorModel& dem,
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 #endif
 
-    constexpr size_t SHOTS_PER_BATCH{16384};
+    const bool can_print_progress = (conf.print_progress && conf.verbosity == 0 && world_rank == 0);
+
+    constexpr size_t SHOTS_PER_BATCH{1024};
 
     // initialize sampler:
     std::mt19937_64 rng;
@@ -77,6 +79,16 @@ monte_carlo_sampler(const stim::DetectorErrorModel& dem,
 #endif
         errors += new_errors;
         t += world_size*SHOTS_PER_BATCH;
+
+        if (can_print_progress)
+        {
+            double progress_percent = 100.0 * static_cast<double>(t) / static_cast<double>(conf.monte_carlo.max_samples);
+            double logical_error_rate = static_cast<double>(errors) / static_cast<double>(t);
+            std::cout << "[" << t << " / " << conf.monte_carlo.max_samples << "] (" << progress_percent << "%)"
+                        << " -- errors = " << errors
+                        << " , logical error rate = " << logical_error_rate
+                        << "\n";
+        }
     }
 
     double logical_error_rate = static_cast<double>(errors) / static_cast<double>(t);
