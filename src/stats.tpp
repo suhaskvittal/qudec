@@ -6,18 +6,26 @@
 #define TEMPL_PARAM template <class T>
 #define TEMPL_CLASS StatsHistogram<T>
 
+#include "globals.h"
+
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+
+#if defined(ENABLE_MPI)
+#include <mpi.h>
+#endif
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
 TEMPL_PARAM
-TEMPL_CLASS::StatsHistogram(T _range_min,
+TEMPL_CLASS::StatsHistogram(std::string_view _name, 
+                             T _range_min,
                              T _range_max,
                              size_t _num_buckets)
-    :range_min(_range_min),
+    :name(_name),
+    range_min(_range_min),
     range_max(_range_max),
     bucket_width((range_max-range_min) / _num_buckets),
     num_buckets(_num_buckets),
@@ -54,6 +62,29 @@ TEMPL_CLASS::add(U _x)
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
+TEMPL_PARAM void
+TEMPL_CLASS::mpi_accumulate()
+{
+#if defined(ENABLE_MPI)
+    const MPI_Datatype t_dtype = mpi_datatype<T>();
+    const MPI_Datatype count_dtype = mpi_datatype<size_t>();
+
+    // Sum per-bucket counts (including the underflow/overflow slots) across all ranks.
+    MPI_Allreduce(MPI_IN_PLACE, buckets_.data(), static_cast<int>(buckets_.size()),
+                    count_dtype, MPI_SUM, MPI_COMM_WORLD);
+
+    // Reduce the running accumulators: min/max are global extrema, the rest are sums.
+    MPI_Allreduce(MPI_IN_PLACE, &min_,       1, t_dtype,     MPI_MIN, MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, &max_,       1, t_dtype,     MPI_MAX, MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, &sum_,       1, t_dtype,     MPI_SUM, MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, &sum_of_sq_, 1, t_dtype,     MPI_SUM, MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, &count_,     1, count_dtype, MPI_SUM, MPI_COMM_WORLD);
+#endif
+}
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
 TEMPL_PARAM double
 TEMPL_CLASS::mean() const
 {
@@ -64,7 +95,7 @@ TEMPL_PARAM double
 TEMPL_CLASS::std() const
 {
     double mean_of_sq = static_cast<double>(sum_of_sq_) / static_cast<double>(count_);
-    return std::sqrt(mean_of_sq - mean());
+    return std::sqrt(mean_of_sq - mean()*mean());
 }
 
 ////////////////////////////////////////////////////////////////
@@ -74,14 +105,31 @@ TEMPL_PARAM std::string
 TEMPL_CLASS::to_string_some() const
 {
     std::stringstream strm;
-    strm << "mean=" << mean() << ", std=" << std() << ", min=" << min() << ", max=" << max();
+    strm << name << " : mean=" << mean() << ", std=" << std() << ", min=" << min() << ", max=" << max();
     return strm.str();
 }
 
 TEMPL_PARAM std::string
 TEMPL_CLASS::to_string_full() const
 {
-    return "";
+    std::stringstream strm;
+    strm << name << " =================================\n"
+            << "mean = " << mean() 
+            << ", std = " << std() 
+            << ", min = " << min() 
+            << ", max = " << max() 
+            << ", count = " << count_
+            << "\n";
+
+    strm << "<" << range_min << ":\t" << underflow_count() << "\n";
+    for (size_t i = 0; i < num_buckets; i++)
+    {
+        T from = range_min + bucket_width*i,
+          to = range_min + bucket_width*(i+1);
+        strm << from << " <= X < " << to << ":\t" << buckets_[i] << "\n";
+    }
+    strm << ">=" << range_max << ":\t" << overflow_count() << "\n";
+    return strm.str();
 }
 
 ////////////////////////////////////////////////////////////////

@@ -6,10 +6,14 @@
 #ifndef SAMPLER_h
 #define SAMPLER_h
 
+#include "globals.h"
+
 #include <stim.h>
 
 #include <cstddef>
+#include <iostream>
 #include <random>
+#include <string>
 #include <utility>
 
 ////////////////////////////////////////////////////////////////
@@ -18,16 +22,25 @@
 struct ExperimentConfig
 {
     int64_t verbosity{0};
-    int64_t samples_per_level{10'000};
-    int64_t max_errors_per_level{25};
-    int64_t start_level{1};
-    int64_t max_level{128};
-
     int64_t seed{0};
-
     bool print_progress{false};
 
-    int64_t skip_levels_after_no_errors_found{0};
+    std::string method{"monte_carlo"};
+
+    struct
+    {
+        int64_t max_samples{1'000'000};
+        int64_t stop_at_error_count{25};
+    } monte_carlo;
+
+    struct
+    {
+        int64_t samples_per_level{10'000};
+        int64_t max_errors_per_level{25};
+        int64_t start_level{1};
+        int64_t max_level{128};
+        int64_t skip_levels_after_no_errors_found{0};
+    } rare_event;
 };
 
 /*
@@ -46,6 +59,25 @@ estimate_logical_error_rate(const stim::DetectorErrorModel& dem, DType& dec, Exp
 {
     return estimate_logical_error_rate(dem, dec, conf, [] (auto, auto, auto) {});
 }
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
+/*
+ * Two types of samplers: Monte carlo and rare event sampler:
+ * */
+
+template <class DType, class ErrorCallback> 
+double monte_carlo_sampler(const stim::DetectorErrorModel&, DType&, ExperimentConfig, const ErrorCallback&);
+
+template <class DType, class ErrorCallback>
+double rare_event_sampler(const stim::DetectorErrorModel&, DType&, ExperimentConfig, const ErrorCallback&);
+
+/*
+ * General decode function:
+ * */
+template <class ResultType, class ObsRefType>
+bool is_decoding_error(const ResultType&, ObsRefType, size_t observable_count);
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////

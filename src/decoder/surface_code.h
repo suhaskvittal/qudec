@@ -7,6 +7,7 @@
 #define DECODER_SURFACE_CODE_h
 
 #include "decoder/common.h"
+#include "stats.h"
 
 #include <stim.h>
 #include <pymatching/sparse_blossom/driver/mwpm_decoding.h>
@@ -25,14 +26,47 @@ class PyMatching
 public:
     const size_t num_detectors;
     const size_t num_observables;
+
+    const bool estimate_complementary_gap;
+
+    /*
+     * Statistics
+     * */
+    StatsHistogram<double> s_gap{"GAP", -128, 128, 16};
 private:
+    /*
+     * When `estimate_complementary_gap` is set, the matching graph is built from an
+     * augmented DEM in which the single logical observable is folded into an explicit
+     * boundary node at index `obs_det_id_` (= `num_detectors`). The node's parity equals
+     * the logical class, so decoding with it unfired vs. fired yields the two parity
+     * classes and their weight margin is the gap (see `_build_gap_dem` in the .cpp).
+     * */
+    const size_t obs_det_id_;
+
     pm::Mwpm mwpm_;
+
+    /*
+     * Weight->decibel conversion factor read from the matching graph's normalising
+     * constant `C`: an integer edge weight equals `round(-ln(p/(1-p)) * C)`, so
+     * `decibels_per_w_ = 10 / (ln(10) * C)` and a natural-log weight is `w_qu / C`.
+     * */
+    double norm_const_{1.0};
+    double decibels_per_w_{1.0};
+
 public:
-    PyMatching(const stim::DetectorErrorModel&);
+    PyMatching(const stim::DetectorErrorModel&, bool enable_gap_estimation);
 
-    result_type decode(SyndromeRef);
+    result_type decode(SyndromeRef, ObsRef);
 
-    void print_stats(std::ostream&) const {}
+    void print_stats(std::ostream&) const;
+    
+    void 
+    mpi_accumulate()
+    {
+        s_gap.mpi_accumulate();
+    }
+private:
+    result_type internal_decode(SyndromeRef, bool fire_obs_det, pm::total_weight_int& weight_out);
 };
 
 ////////////////////////////////////////////////////////////////
@@ -91,9 +125,10 @@ public:
 public:
     BlossomV(const stim::DetectorErrorModel&);
 
-    result_type decode(SyndromeRef);
+    result_type decode(SyndromeRef, ObsRef);
 
     void print_stats(std::ostream&) const {}
+    void mpi_accumulate() {}
 private:
     /*
      * `collect_detection_events()` gathers all flipped detectors, appending the

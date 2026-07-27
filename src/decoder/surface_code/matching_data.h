@@ -43,6 +43,8 @@ struct MatchingData
     ObsType                      frame_flips{1};
     std::vector<assignment_type> assignments;
 
+    double gap;
+
     void add(const assignment_type&);
     void merge(const MatchingData&);
 };

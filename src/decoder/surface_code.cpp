@@ -22,26 +22,163 @@ namespace decoder
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-PyMatching::PyMatching(const stim::DetectorErrorModel& dem)
+namespace
+{
+
+/*
+ * Builds a DEM that turns the logical observable into an *explicit boundary node*: each
+ * observable target `Lk` is folded into a detector node at index `num_detectors + k`.
+ * pymatching represents observables as edge bit-masks, not graph nodes, so there is
+ * otherwise nothing to flip; this node is the handle. Because the observable is carried
+ * only by boundary (single-detector) edges in a surface-code memory DEM, folding it moves
+ * exactly those edges onto the node, and its parity then equals the logical class:
+ * decoding with the node unfired vs. fired enumerates the two parity classes (see
+ * `PyMatching::decode`).
+ *
+ * Two structural properties of the memory DEM make this correct and safe:
+ *   - Every observable-crossing component is single-detector, so the fold yields clean
+ *     two-detector edges (never a three-detector hyperedge that MWPM cannot match). The
+ *     assert guards other code families where that may not hold.
+ *   - Only the observable-crossing boundary edges are rerouted onto the node; all other
+ *     boundary edges (the opposite boundary and the entire complementary-basis subgraph)
+ *     are left untouched, so the virtual boundary still exists and odd-parity syndromes
+ *     remain matchable. The complementary-basis subgraph never touches the node, so it
+ *     contributes identical weight to both decode passes and cancels in the gap.
+ * */
+stim::DetectorErrorModel
+_build_gap_dem(const stim::DetectorErrorModel& dem)
+{
+    const uint64_t num_detectors = dem.count_detectors();
+    stim::DetectorErrorModel out;
+    std::vector<stim::DemTarget> targets;
+    dem.iter_flatten_error_instructions(
+            [&] (const stim::DemInstruction& inst)
+            {
+                targets.clear();
+                bool first_group = true;
+                inst.for_separated_targets(
+                        [&] (const auto& grp)
+                        {
+                            if (!first_group)
+                                targets.push_back(stim::DemTarget::separator());
+                            first_group = false;
+
+                            size_t num_dets = 0;
+                            for (const auto& t : grp)
+                            {
+                                if (t.is_observable_id())
+                                {
+                                    targets.push_back(stim::DemTarget::relative_detector_id(num_detectors + t.val()));
+                                    num_dets++;
+                                }
+                                else
+                                {
+                                    if (t.is_relative_detector_id())
+                                        num_dets++;
+                                    targets.push_back(t);
+                                }
+                            }
+                            [[ maybe_unused ]] const bool graphlike = (num_dets <= 2);
+                            assert(graphlike && "folding observable into a detector produced a hyperedge");
+                        });
+                out.append_error_instruction(inst.arg_data[0], targets, "");
+            });
+    return out;
+}
+
+} // anon
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
+PyMatching::PyMatching(const stim::DetectorErrorModel& dem, bool enable_gap_estimation)
     :num_detectors(dem.count_detectors()),
     num_observables(dem.count_observables()),
-    mwpm_(pm::detector_error_model_to_mwpm(dem, pm::NUM_DISTINCT_WEIGHTS))
-{}
+    estimate_complementary_gap(enable_gap_estimation),
+    obs_det_id_(dem.count_detectors()),
+    mwpm_(pm::detector_error_model_to_mwpm(
+                enable_gap_estimation ? _build_gap_dem(dem) : dem,
+                pm::NUM_DISTINCT_WEIGHTS))
+{
+    if (enable_gap_estimation)
+        assert(num_observables == 1 && "complementary gap estimation supports exactly one observable");
+
+    norm_const_ = mwpm_.flooder.graph.normalising_constant;
+    if (norm_const_ <= 0.0)
+        norm_const_ = 1.0;
+    // An integer edge weight equals `round(-ln(p/(1-p)) * norm_const_)`, so decibels are
+    // `10 * log10(...) = (10/ln(10)) * (-ln(p/(1-p)))`, i.e. `10/(ln(10)*norm_const_)` per
+    // unit of quantized weight.
+    decibels_per_w_ = 10.0 / (std::log(10.0) * norm_const_);
+}
 
 result_type
-PyMatching::decode(SyndromeRef syn)
+PyMatching::decode(SyndromeRef syn, ObsRef obs)
+{
+    pm::total_weight_int w_primary = 0;
+    auto out = internal_decode(syn, /*fire_obs_det=*/false, w_primary);
+    if (!estimate_complementary_gap)
+        return out;
+
+    // Complementary pass: fire the observable detector to force the opposite parity class.
+    pm::total_weight_int w_complement = 0;
+    internal_decode(syn, /*fire_obs_det=*/true, w_complement);
+
+    // set output observable:
+    const bool predict_flip = (w_complement < w_primary);
+    out.flipped_obs = ObsType(num_observables);
+    out.flipped_obs[0] = predict_flip ? 1 : 0;
+
+    // update gap distributions
+    if (predict_flip)
+        std::swap(w_primary, w_complement);
+    double g = (w_complement-w_primary) * decibels_per_w_;
+    // negate gap if this is an error:
+    if (obs[0] != out.flipped_obs[0])
+        g = -g;
+    out.matching_data.gap = g;
+    s_gap.add(g);
+    return out;
+}
+
+result_type
+PyMatching::internal_decode(SyndromeRef syn, bool fire_obs_det, pm::total_weight_int& weight_out)
 {
     // Collect indices of fired detectors.
     std::vector<uint64_t> det_events;
     for (size_t i = 0; i < num_detectors; i++)
         if (syn[i])
             det_events.push_back(i);
+    // The observable detector has the largest index, so appending keeps `det_events` sorted.
+    if (fire_obs_det)
+        det_events.push_back(obs_det_id_);
+
     // Decode.
     result_type res;
     res.flipped_obs = ObsType(num_observables);
+
     pm::total_weight_int weight = 0;
     pm::decode_detection_events(mwpm_, det_events, res.flipped_obs.u8, weight, false);
+    weight_out = weight;
+    res.matching_data.total_weight = weight;
     return res;
+}
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
+void
+PyMatching::print_stats(std::ostream& ostrm) const
+{
+    // The gap histogram is only populated when complementary-gap estimation is enabled;
+    // otherwise it is empty (and its mean would divide by a zero count).
+    if (estimate_complementary_gap)
+    {
+        ostrm << s_gap.to_string_full() << "\n";
+        ostrm << "normalization constant = " << norm_const_ 
+                << "\ndecibels per weight = " << decibels_per_w_
+                << "\n";
+    }
 }
 
 ////////////////////////////////////////////////////////////////
@@ -170,7 +307,7 @@ BlossomV::adj_matrix(DetIdType d) const
 ////////////////////////////////////////////////////////////////
 
 result_type
-BlossomV::decode(SyndromeRef syndrome)
+BlossomV::decode(SyndromeRef syndrome, ObsRef)
 {
     auto detectors = collect_detection_events(syndrome);
     if (detectors.empty())

@@ -17,22 +17,32 @@ template <class T>
 class StatsHistogram
 {
 public:
+    std::string_view name;
+
     const T range_min;
     const T range_max;
     const T bucket_width;
     const size_t num_buckets;
 private:
     T min_{ std::numeric_limits<T>::max() };
-    T max_{};
+    T max_{ std::numeric_limits<T>::min() };
     T sum_{};
     T sum_of_sq_{};
     
     std::vector<size_t> buckets_;
     size_t count_{0};
 public:
-    StatsHistogram(T range_min, T range_max, size_t num_buckets);
+    StatsHistogram(std::string_view name, T range_min, T range_max, size_t num_buckets);
 
     template <class U> void add(U);
+
+    /*
+     * Reduces this histogram in-place across all MPI ranks (sum of bucket counts and
+     * accumulators, global min/max), leaving every rank with the merged result. Call
+     * once, after sampling completes, before reading stats or printing. No-op when the
+     * build is not MPI-enabled.
+     * */
+    void mpi_accumulate();
 
     /*
      * Getting stats:

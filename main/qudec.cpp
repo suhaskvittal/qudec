@@ -35,28 +35,39 @@ main(int argc, char* argv[])
      * Simulation configuration:
      * */
     std::string decoder_name;
-    int64_t d;
+    int64_t d,
+            r;
     ExperimentConfig conf;
 
     /*
-     * CLUSTER-MATCH parameters:
+     * PyMatching parameters:
      * */
-    int64_t cm_astrea_hw_max;
+    bool enable_gap{false};
 
     ARGPARSE()
         .required("decoder-name", "Decoder to run", decoder_name)
         .required("code-distance", "Code distance of surface code", d)
+        .optional("-r", "--rounds", "Number of rounds (-1 = same as code distance)", r, -1)
         .optional("-v", "--verbose", "Verbosity level", conf.verbosity, 0)
-        .optional("-s", "--samples", "Samples per error level", conf.samples_per_level, 10000)
+        .optional("-m", "--method", "Sampler method: monte_carlo or rare_event", conf.method, "monte_carlo")
         .optional("-pp", "--print-progress", "Print simulation progress", conf.print_progress, false)
-        .optional("", "--cm-astrea-hw-max", "Max HW supported by Astrea decoder", cm_astrea_hw_max, 8)
+        .optional("-g", "--gap", "Enable complementary gap estimation (pymatching only)", enable_gap, false)
+
+        .optional("", "--mc-max-samples", "Monte-carlo: max shots to sample", conf.monte_carlo.max_samples, 1000000)
+        .optional("", "--mc-stop-at-errors", "Monte-carlo: stop after this many logical errors", conf.monte_carlo.stop_at_error_count, 25)
+
+        .optional("", "--rare-samples-per-level", "Rare-event: samples per error level", conf.rare_event.samples_per_level, 10000)
+        .optional("", "--rare-max-errors-per-level", "Rare-event: max errors per error level", conf.rare_event.max_errors_per_level, 25)
+
         .parse(argc, argv);
 
-    conf.start_level = (d-1)/2 - 1;
-    conf.max_level = 128;
+    if (r < 0)
+        r = d;
 
-    // Generate d=11 rotated surface code memory-Z experiment (11 rounds, p=0.1%)
-    stim::CircuitGenParameters params(d, d, "rotated_memory_z");
+    conf.rare_event.start_level = (d-1)/2 - 1;
+    conf.rare_event.max_level = 128;
+
+    stim::CircuitGenParameters params(r, d, "rotated_memory_z");
     double p = 1e-3;
     params.after_clifford_depolarization = p;
     params.before_round_data_depolarization = p;
@@ -71,6 +82,7 @@ main(int argc, char* argv[])
     auto run = [&] (auto&& dec, const auto& error_callback)
     {
         double ler = estimate_logical_error_rate(dem, dec, conf, error_callback);
+        dec.mpi_accumulate();
         if (world_rank == 0)
         {
             std::cout << "Logical error rate: " << ler << "\n";
@@ -80,7 +92,7 @@ main(int argc, char* argv[])
 
     if (decoder_name == "pymatching")
     {
-        run(decoder::PyMatching(dem), [] (auto, auto, auto) {});
+        run(decoder::PyMatching(dem, enable_gap), [] (auto, auto, auto) {});
     }
     else if (decoder_name == "blossom5")
     {
