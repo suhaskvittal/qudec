@@ -116,7 +116,7 @@ struct si1000_model
         c.safe_append_u("MR", targets);
         anti_basis_flip(c, targets, 2.0 * p, 'Z');
         if (!data_qubits.empty())
-            c.safe_append_ua("DEPOLARIZE1", data_qubits, 2.0 * p);
+            c.safe_append_ua("DEPOLARIZE1", data_qubits, 4.0 * p);
     }
 
     // Final destructive data measurement in the memory basis: anti-basis

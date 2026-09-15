@@ -38,6 +38,7 @@ main(int argc, char* argv[])
     std::string decoder_name;
     int64_t d,
             r;
+    double p;
     ExperimentConfig conf;
 
     /*
@@ -48,6 +49,7 @@ main(int argc, char* argv[])
     ARGPARSE()
         .required("decoder-name", "Decoder to run", decoder_name)
         .required("code-distance", "Code distance of surface code", d)
+        .optional("-p", "--physical-error-rate", "Physical error rate", p, 1e-3)
         .optional("-r", "--rounds", "Number of rounds (-1 = same as code distance)", r, -1)
         .optional("-v", "--verbose", "Verbosity level", conf.verbosity, 0)
         .optional("-m", "--method", "Sampler method: monte_carlo or rare_event", conf.method, "monte_carlo")
@@ -68,7 +70,7 @@ main(int argc, char* argv[])
     conf.rare_event.start_level = (d-1)/2 - 1;
     conf.rare_event.max_level = 128;
 
-    auto circuit = si1000(d, r, 1e-3, false);
+    auto circuit = si1000(d, r, p, false);
 
     // Convert to DEM with error decomposition required by PyMatching
     auto dem = stim::circuit_to_dem(circuit, {.decompose_errors = true});
