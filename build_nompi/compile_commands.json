@@ -1,0 +1,122 @@
+[
+{
+  "directory": "/nethome/svittal8/research/q/qudec/build_nompi/deps/PyMatching",
+  "command": "/nethome/svittal8/gcc/bin/g++ -Dlibpymatching_EXPORTS -I/nethome/svittal8/research/q/qudec/deps/PyMatching/src -I/nethome/svittal8/research/q/qudec/deps/stim/src -O3 -DNDEBUG -std=gnu++20 -fPIC -O3 -fPIC -o CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/driver/namespaced_main.cc.o -c /nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/driver/namespaced_main.cc",
+  "file": "/nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/driver/namespaced_main.cc",
+  "output": "deps/PyMatching/CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/driver/namespaced_main.cc.o"
+},
+{
+  "directory": "/nethome/svittal8/research/q/qudec/build_nompi/deps/PyMatching",
+  "command": "/nethome/svittal8/gcc/bin/g++ -Dlibpymatching_EXPORTS -I/nethome/svittal8/research/q/qudec/deps/PyMatching/src -I/nethome/svittal8/research/q/qudec/deps/stim/src -O3 -DNDEBUG -std=gnu++20 -fPIC -O3 -fPIC -o CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/driver/mwpm_decoding.cc.o -c /nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/driver/mwpm_decoding.cc",
+  "file": "/nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/driver/mwpm_decoding.cc",
+  "output": "deps/PyMatching/CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/driver/mwpm_decoding.cc.o"
+},
+{
+  "directory": "/nethome/svittal8/research/q/qudec/build_nompi/deps/PyMatching",
+  "command": "/nethome/svittal8/gcc/bin/g++ -Dlibpymatching_EXPORTS -I/nethome/svittal8/research/q/qudec/deps/PyMatching/src -I/nethome/svittal8/research/q/qudec/deps/stim/src -O3 -DNDEBUG -std=gnu++20 -fPIC -O3 -fPIC -o CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/flooder/graph.cc.o -c /nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/flooder/graph.cc",
+  "file": "/nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/flooder/graph.cc",
+  "output": "deps/PyMatching/CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/flooder/graph.cc.o"
+},
+{
+  "directory": "/nethome/svittal8/research/q/qudec/build_nompi/deps/PyMatching",
+  "command": "/nethome/svittal8/gcc/bin/g++ -Dlibpymatching_EXPORTS -I/nethome/svittal8/research/q/qudec/deps/PyMatching/src -I/nethome/svittal8/research/q/qudec/deps/stim/src -O3 -DNDEBUG -std=gnu++20 -fPIC -O3 -fPIC -o CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/flooder/detector_node.cc.o -c /nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/flooder/detector_node.cc",
+  "file": "/nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/flooder/detector_node.cc",
+  "output": "deps/PyMatching/CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/flooder/detector_node.cc.o"
+},
+{
+  "directory": "/nethome/svittal8/research/q/qudec/build_nompi/deps/PyMatching",
+  "command": "/nethome/svittal8/gcc/bin/g++ -Dlibpymatching_EXPORTS -I/nethome/svittal8/research/q/qudec/deps/PyMatching/src -I/nethome/svittal8/research/q/qudec/deps/stim/src -O3 -DNDEBUG -std=gnu++20 -fPIC -O3 -fPIC -o CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/flooder_matcher_interop/compressed_edge.cc.o -c /nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/flooder_matcher_interop/compressed_edge.cc",
+  "file": "/nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/flooder_matcher_interop/compressed_edge.cc",
+  "output": "deps/PyMatching/CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/flooder_matcher_interop/compressed_edge.cc.o"
+},
+{
+  "directory": "/nethome/svittal8/research/q/qudec/build_nompi/deps/PyMatching",
+  "command": "/nethome/svittal8/gcc/bin/g++ -Dlibpymatching_EXPORTS -I/nethome/svittal8/research/q/qudec/deps/PyMatching/src -I/nethome/svittal8/research/q/qudec/deps/stim/src -O3 -DNDEBUG -std=gnu++20 -fPIC -O3 -fPIC -o CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/flooder/graph_fill_region.cc.o -c /nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/flooder/graph_fill_region.cc",
+  "file": "/nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/flooder/graph_fill_region.cc",
+  "output": "deps/PyMatching/CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/flooder/graph_fill_region.cc.o"
+},
+{
+  "directory": "/nethome/svittal8/research/q/qudec/build_nompi/deps/PyMatching",
+  "command": "/nethome/svittal8/gcc/bin/g++ -Dlibpymatching_EXPORTS -I/nethome/svittal8/research/q/qudec/deps/PyMatching/src -I/nethome/svittal8/research/q/qudec/deps/stim/src -O3 -DNDEBUG -std=gnu++20 -fPIC -O3 -fPIC -o CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/flooder/match.cc.o -c /nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/flooder/match.cc",
+  "file": "/nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/flooder/match.cc",
+  "output": "deps/PyMatching/CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/flooder/match.cc.o"
+},
+{
+  "directory": "/nethome/svittal8/research/q/qudec/build_nompi/deps/PyMatching",
+  "command": "/nethome/svittal8/gcc/bin/g++ -Dlibpymatching_EXPORTS -I/nethome/svittal8/research/q/qudec/deps/PyMatching/src -I/nethome/svittal8/research/q/qudec/deps/stim/src -O3 -DNDEBUG -std=gnu++20 -fPIC -O3 -fPIC -o CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/flooder/graph_flooder.cc.o -c /nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/flooder/graph_flooder.cc",
+  "file": "/nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/flooder/graph_flooder.cc",
+  "output": "deps/PyMatching/CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/flooder/graph_flooder.cc.o"
+},
+{
+  "directory": "/nethome/svittal8/research/q/qudec/build_nompi/deps/PyMatching",
+  "command": "/nethome/svittal8/gcc/bin/g++ -Dlibpymatching_EXPORTS -I/nethome/svittal8/research/q/qudec/deps/PyMatching/src -I/nethome/svittal8/research/q/qudec/deps/stim/src -O3 -DNDEBUG -std=gnu++20 -fPIC -O3 -fPIC -o CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/matcher/alternating_tree.cc.o -c /nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/matcher/alternating_tree.cc",
+  "file": "/nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/matcher/alternating_tree.cc",
+  "output": "deps/PyMatching/CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/matcher/alternating_tree.cc.o"
+},
+{
+  "directory": "/nethome/svittal8/research/q/qudec/build_nompi/deps/PyMatching",
+  "command": "/nethome/svittal8/gcc/bin/g++ -Dlibpymatching_EXPORTS -I/nethome/svittal8/research/q/qudec/deps/PyMatching/src -I/nethome/svittal8/research/q/qudec/deps/stim/src -O3 -DNDEBUG -std=gnu++20 -fPIC -O3 -fPIC -o CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/matcher/mwpm.cc.o -c /nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/matcher/mwpm.cc",
+  "file": "/nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/matcher/mwpm.cc",
+  "output": "deps/PyMatching/CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/matcher/mwpm.cc.o"
+},
+{
+  "directory": "/nethome/svittal8/research/q/qudec/build_nompi/deps/PyMatching",
+  "command": "/nethome/svittal8/gcc/bin/g++ -Dlibpymatching_EXPORTS -I/nethome/svittal8/research/q/qudec/deps/PyMatching/src -I/nethome/svittal8/research/q/qudec/deps/stim/src -O3 -DNDEBUG -std=gnu++20 -fPIC -O3 -fPIC -o CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/flooder_matcher_interop/region_edge.cc.o -c /nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/flooder_matcher_interop/region_edge.cc",
+  "file": "/nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/flooder_matcher_interop/region_edge.cc",
+  "output": "deps/PyMatching/CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/flooder_matcher_interop/region_edge.cc.o"
+},
+{
+  "directory": "/nethome/svittal8/research/q/qudec/build_nompi/deps/PyMatching",
+  "command": "/nethome/svittal8/gcc/bin/g++ -Dlibpymatching_EXPORTS -I/nethome/svittal8/research/q/qudec/deps/PyMatching/src -I/nethome/svittal8/research/q/qudec/deps/stim/src -O3 -DNDEBUG -std=gnu++20 -fPIC -O3 -fPIC -o CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/flooder_matcher_interop/mwpm_event.cc.o -c /nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/flooder_matcher_interop/mwpm_event.cc",
+  "file": "/nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/flooder_matcher_interop/mwpm_event.cc",
+  "output": "deps/PyMatching/CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/flooder_matcher_interop/mwpm_event.cc.o"
+},
+{
+  "directory": "/nethome/svittal8/research/q/qudec/build_nompi/deps/PyMatching",
+  "command": "/nethome/svittal8/gcc/bin/g++ -Dlibpymatching_EXPORTS -I/nethome/svittal8/research/q/qudec/deps/PyMatching/src -I/nethome/svittal8/research/q/qudec/deps/stim/src -O3 -DNDEBUG -std=gnu++20 -fPIC -O3 -fPIC -o CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/tracker/flood_check_event.cc.o -c /nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/tracker/flood_check_event.cc",
+  "file": "/nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/tracker/flood_check_event.cc",
+  "output": "deps/PyMatching/CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/tracker/flood_check_event.cc.o"
+},
+{
+  "directory": "/nethome/svittal8/research/q/qudec/build_nompi/deps/PyMatching",
+  "command": "/nethome/svittal8/gcc/bin/g++ -Dlibpymatching_EXPORTS -I/nethome/svittal8/research/q/qudec/deps/PyMatching/src -I/nethome/svittal8/research/q/qudec/deps/stim/src -O3 -DNDEBUG -std=gnu++20 -fPIC -O3 -fPIC -o CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/diagram/animation_main.cc.o -c /nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/diagram/animation_main.cc",
+  "file": "/nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/diagram/animation_main.cc",
+  "output": "deps/PyMatching/CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/diagram/animation_main.cc.o"
+},
+{
+  "directory": "/nethome/svittal8/research/q/qudec/build_nompi/deps/PyMatching",
+  "command": "/nethome/svittal8/gcc/bin/g++ -Dlibpymatching_EXPORTS -I/nethome/svittal8/research/q/qudec/deps/PyMatching/src -I/nethome/svittal8/research/q/qudec/deps/stim/src -O3 -DNDEBUG -std=gnu++20 -fPIC -O3 -fPIC -o CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/diagram/mwpm_diagram.cc.o -c /nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/diagram/mwpm_diagram.cc",
+  "file": "/nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/diagram/mwpm_diagram.cc",
+  "output": "deps/PyMatching/CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/diagram/mwpm_diagram.cc.o"
+},
+{
+  "directory": "/nethome/svittal8/research/q/qudec/build_nompi/deps/PyMatching",
+  "command": "/nethome/svittal8/gcc/bin/g++ -Dlibpymatching_EXPORTS -I/nethome/svittal8/research/q/qudec/deps/PyMatching/src -I/nethome/svittal8/research/q/qudec/deps/stim/src -O3 -DNDEBUG -std=gnu++20 -fPIC -O3 -fPIC -o CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/search/search_graph.cc.o -c /nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/search/search_graph.cc",
+  "file": "/nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/search/search_graph.cc",
+  "output": "deps/PyMatching/CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/search/search_graph.cc.o"
+},
+{
+  "directory": "/nethome/svittal8/research/q/qudec/build_nompi/deps/PyMatching",
+  "command": "/nethome/svittal8/gcc/bin/g++ -Dlibpymatching_EXPORTS -I/nethome/svittal8/research/q/qudec/deps/PyMatching/src -I/nethome/svittal8/research/q/qudec/deps/stim/src -O3 -DNDEBUG -std=gnu++20 -fPIC -O3 -fPIC -o CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/search/search_detector_node.cc.o -c /nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/search/search_detector_node.cc",
+  "file": "/nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/search/search_detector_node.cc",
+  "output": "deps/PyMatching/CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/search/search_detector_node.cc.o"
+},
+{
+  "directory": "/nethome/svittal8/research/q/qudec/build_nompi/deps/PyMatching",
+  "command": "/nethome/svittal8/gcc/bin/g++ -Dlibpymatching_EXPORTS -I/nethome/svittal8/research/q/qudec/deps/PyMatching/src -I/nethome/svittal8/research/q/qudec/deps/stim/src -O3 -DNDEBUG -std=gnu++20 -fPIC -O3 -fPIC -o CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/search/search_flooder.cc.o -c /nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/search/search_flooder.cc",
+  "file": "/nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/search/search_flooder.cc",
+  "output": "deps/PyMatching/CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/search/search_flooder.cc.o"
+},
+{
+  "directory": "/nethome/svittal8/research/q/qudec/build_nompi/deps/PyMatching",
+  "command": "/nethome/svittal8/gcc/bin/g++ -Dlibpymatching_EXPORTS -I/nethome/svittal8/research/q/qudec/deps/PyMatching/src -I/nethome/svittal8/research/q/qudec/deps/stim/src -O3 -DNDEBUG -std=gnu++20 -fPIC -O3 -fPIC -o CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/driver/user_graph.cc.o -c /nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/driver/user_graph.cc",
+  "file": "/nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/sparse_blossom/driver/user_graph.cc",
+  "output": "deps/PyMatching/CMakeFiles/libpymatching.dir/src/pymatching/sparse_blossom/driver/user_graph.cc.o"
+},
+{
+  "directory": "/nethome/svittal8/research/q/qudec/build_nompi/deps/PyMatching",
+  "command": "/nethome/svittal8/gcc/bin/g++ -Dlibpymatching_EXPORTS -I/nethome/svittal8/research/q/qudec/deps/PyMatching/src -I/nethome/svittal8/research/q/qudec/deps/stim/src -O3 -DNDEBUG -std=gnu++20 -fPIC -O3 -fPIC -o CMakeFiles/libpymatching.dir/src/pymatching/rand/rand_gen.cc.o -c /nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/rand/rand_gen.cc",
+  "file": "/nethome/svittal8/research/q/qudec/deps/PyMatching/src/pymatching/rand/rand_gen.cc",
+  "output": "deps/PyMatching/CMakeFiles/libpymatching.dir/src/pymatching/rand/rand_gen.cc.o"
+}
+]

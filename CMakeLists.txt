@@ -72,4 +72,8 @@ add_executable(qudec main/qudec.cpp)
 target_compile_options(qudec PRIVATE ${COMPILE_OPTIONS})
 target_link_libraries(qudec PRIVATE qudeclib)
 
+add_executable(dem_dump main/dem_dump.cpp)
+target_compile_options(dem_dump PRIVATE ${COMPILE_OPTIONS})
+target_link_libraries(dem_dump PRIVATE qudeclib)
+
 
