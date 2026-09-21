@@ -1,5 +1,5 @@
 /*
- *  author: Suhas Vittal
+ *  author: Claude Sonnet 5.1
  *  date:   26 July 2026
  * */
 
@@ -34,7 +34,38 @@
  *      `p`           -- physical error rate,
  *      `is_memory_x` -- true for an X-memory experiment, false for Z-memory.
  * */
-stim::Circuit si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x);
+stim::Circuit sc_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x);
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
+/*
+ * Generates a toric-code syndrome-extraction circuit (periodic boundaries in
+ * both directions) under the same `SI1000` circuit-level noise model as
+ * `sc_si1000` above:
+ *      (1) single-qubit gates    -> DEPOLARIZE1(p/10) after the gate,
+ *      (2) two-qubit gates       -> DEPOLARIZE2(p) after the gate,
+ *      (3) reset gates           -> X_ERROR(2p) after the gate,
+ *      (4) measurement gates     -> X_ERROR(5p) before the gate (and, for a
+ *                                   pure measurement, DEPOLARIZE1(p) after),
+ *      (5) idle during a CX layer -> DEPOLARIZE1(p),
+ *      (6) idle during measurement -> DEPOLARIZE1(2p).
+ *
+ * `distance` gives the linear size L of the L x L toric lattice, for 2*L^2
+ * data qubits and 2*L^2 ancilla qubits (L^2 X-check vertices, L^2 Z-check
+ * plaquettes). The toric code has two logical qubits; both observables are
+ * emitted (`OBSERVABLE_INCLUDE(0)` and `OBSERVABLE_INCLUDE(1)`). Detection
+ * events are only emitted for the checks relevant to the requested memory
+ * experiment: Z checks (which detect X errors) for a Z-memory experiment,
+ * and X checks for an X-memory experiment.
+ *
+ * Arguments:
+ *      `distance`    -- linear size L of the toric lattice (also its code distance),
+ *      `rounds`      -- number of syndrome-extraction rounds,
+ *      `p`           -- physical error rate,
+ *      `is_memory_x` -- true for an X-memory experiment, false for Z-memory.
+ * */
+stim::Circuit toric_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x);
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////

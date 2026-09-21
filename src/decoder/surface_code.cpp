@@ -159,13 +159,20 @@ PyMatching::internal_decode(SyndromeRef syn, bool fire_obs_det, pm::total_weight
     if (fire_obs_det)
         det_events.push_back(obs_det_id_);
 
-    // Decode.
-    result_type res;
-    res.flipped_obs = ObsType(num_observables);
+    // Decode. `pm::decode_detection_events` writes one *byte* per observable (observable `k`'s
+    // flip goes in `obs_begin_ptr[k]`), which is a different layout from `ObsType`'s bit-packed
+    // storage (where `flipped_obs[k]` is bit `k`) -- so we decode into a byte buffer first and
+    // then translate it into the bit-packed `ObsType` that the rest of the codebase expects.
+    std::vector<uint8_t> obs_bytes(num_observables, 0);
 
     pm::total_weight_int weight = 0;
-    pm::decode_detection_events(mwpm_, det_events, res.flipped_obs.u8, weight, false);
+    pm::decode_detection_events(mwpm_, det_events, obs_bytes.data(), weight, false);
     weight_out = weight;
+
+    result_type res;
+    res.flipped_obs = ObsType(num_observables);
+    for (size_t i = 0; i < num_observables; i++)
+        res.flipped_obs[i] = obs_bytes[i] & 1;
     res.matching_data.total_weight = weight;
     return res;
 }

@@ -3,9 +3,9 @@
  *  date:   16 May 2026
  * */
 
-#include "circuit_generator.h"
-#include "decoder/surface_code.h"
-#include "sampler.h"
+#include <circuit_generator.h>
+#include <decoder/surface_code.h>
+#include <sampler.h>
 
 #include <stim/gen/gen_surface_code.h>
 #include <stim/util_top/circuit_to_dem.h>
@@ -70,7 +70,7 @@ main(int argc, char* argv[])
     conf.rare_event.start_level = (d-1)/2 - 1;
     conf.rare_event.max_level = 128;
 
-    auto circuit = si1000(d, r, p, false);
+    auto circuit = sc_si1000(d, r, p, false);
 
     // Convert to DEM with error decomposition required by PyMatching
     auto dem = stim::circuit_to_dem(circuit, {.decompose_errors = true});
