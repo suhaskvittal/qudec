@@ -2,3 +2,4 @@ build/
 Debug/
 venv/
 .cache/
+build_nompi/
