@@ -6,16 +6,35 @@
 #ifndef DECODER_BAL_HYPERGRAPH_h
 #define DECODER_BAL_HYPERGRAPH_h
 
+#include "globals.h"
+
+#include <stim.h>
+
+#include <algorithm>
 #include <array>
 #include <cstdint>
+#include <iterator>
+#include <string_view>
 #include <type_traits>
+#include <unordered_set>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace decoder
 {
 namespace bal
 {
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
+namespace hg
+{
+
+using id_type = int32_t;
+
+} // namespace hg
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
@@ -29,9 +48,8 @@ template <class VDATA, class EDATA, size_t K>
 class Hypergraph
 {
 public:
-    using id_type = int32_t;
+    using id_type = hg::id_type;
     using edge_support_type = std::array<id_type, K>;
-    
     constexpr static id_type INV{-1};
 
     /*
@@ -69,6 +87,9 @@ private:
 public:
     Hypergraph() =default;
     Hypergraph(const Hypergraph&) =default;
+    Hypergraph(Hypergraph&&) =default;
+    Hypergraph& operator=(const Hypergraph&) =default;
+    Hypergraph& operator=(Hypergraph&&) =default;
 
     /*
      * Graph updates:
@@ -91,7 +112,7 @@ public:
     /*
      * `edges_incident_to()` calls `for_each_edge_incident_to()`.
      * */
-    std::vector<id_type> edges_indicent_to(std::vector<id_type>) const;
+    std::vector<id_type> edges_incident_to(std::vector<id_type>) const;
 
     /*
      * Returns all neighbors of the given vertex and their multiplicity (second argument in pair).
@@ -120,9 +141,87 @@ public:
         }
 
     const edge_support_type& support(id_type x) const { return edge_support_[x]; }
+
+    /*
+     * Constexpr functions:
+     * */
+    constexpr static size_t max_order() { return K; }
 private:
-    void validate_vertex_list(std::string_view caller_id, const std::vector<id_type>&);
+    void validate_vertex_list(std::string_view caller_id, const std::vector<id_type>&) const;
 };
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
+namespace hg
+{
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
+using coord_type = std::tuple<int, int, int>;
+
+struct basic_vdata
+{
+    coord_type loc;
+    bool       is_boundary{false};
+};
+
+struct basic_edata
+{
+    double error_probability{0.0};
+    std::vector<size_t> frame_flips{};
+};
+
+
+/*
+ * Builder functions for each QEC code:
+ * */
+Hypergraph<basic_vdata, basic_edata, 2> from_toric_code_dem(const stim::DetectorErrorModel&);
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
+/*
+ * This is a simple POD.
+ * */
+struct ErrorCube
+{
+    struct dist_type
+    {
+        std::vector<id_type> edges;
+        double pr{1.0};     
+    };
+
+    id_type base;
+    size_t radius;
+    std::vector<id_type> nodes,
+                         edges;
+
+    /*
+     * `dist_map` stores the distances between `base` and a given node.
+     * The information in this map corresponds to the most-likely error chain
+     * between two nodes.
+     * */
+    std::unordered_map<id_type, dist_type> dist_map;
+};
+
+/*
+ * `extract_error_cube()` slices out a portion of the input hypergraph such that all
+ * nodes in the graph are reachable from some root node by `error_count` edges.
+ *
+ * This is called an `error_cube()` as it looks like a cube when looking at a surface code
+ * decoding graph.
+ *
+ * This function returns the list of nodes in the cube.
+ * */ 
+template <class G>
+ErrorCube extract_error_cube(const G&, id_type base, size_t error_count);
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
+} // namespace hg
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////

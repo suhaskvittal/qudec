@@ -1,0 +1,1860 @@
+
+=== PAGE 1 ===
+Accelerating the Tesseract Decoder for Quantum
+Error Correction
+Dragana Grbic1,2, Laleh Aghababaie Beni1, and Noah Shutty1
+1Google Quantum AI, Venice, CA, 90291
+2Department of Computer Science, Rice University, Houston, TX 77005
+Quantum Error Correction (QEC) is essential for building robust, fault-
+tolerant quantum computers; however, the decoding process often presents a
+significant computational bottleneck.Tesseractis a novel Most-Likely-Error
+(MLE) decoder forQECthat employs theA*search algorithm to explore an
+exponentially large graph of error hypotheses, achieving high decoding speed
+and accuracy. This paper presents a systematic approach to optimizing the
+Tesseractdecoder through low-level performance enhancements. Based on ex-
+tensive profiling, we implemented four targeted optimization strategies, includ-
+ing the replacement of inefficient data structures, reorganization of memory
+layouts to improve cache hit rates, and the use of hardware-accelerated bit-
+wise operations. We achieved significant decoding speedups across a wide range
+of code families and configurations, including Color Codes, Bivariate-Bicycle
+Codes, Surface Codes, and Transversal CNOT Protocols. Our results demon-
+strate consistent speedups of approximately 2×for most code families, often
+exceeding 2.5×. Notably, we achieved a peak performance gain of over 5×
+for the most computationally demanding configurations of Bivariate-Bicycle
+Codes. These improvements make theTesseractdecoder more efficient and
+scalable, serving as a practical case study that highlights the importance of
+high-performance software engineering inQECand providing a strong founda-
+tion for future research.
+1 Introduction
+Quantum computing represents a significant paradigm shift in high-performance comput-
+ing, as quantum computers can solve problems that even the most powerful classical su-
+percomputers cannot. Their immense power stems fromqubits, which, unlike classical
+bits restricted to states of 0 or 1, can exist in a superposition of both. This enables them
+to store and process significantly more information, but introduces a critical vulnerabil-
+ity: qubits are fragile and susceptible to noise and unwanted environmental interactions.
+These factors lead to a rapid accumulation of errors, such as decoherence and gate errors.
+To overcome this, Quantum Error Correction (QEC) algorithms are executed on classical
+computers to constantly detect and fix errors on quantum machines. This prevents error
+accumulation over time and enables the construction of robust and fault-tolerant quantum
+machines.
+Dragana Grbic: dg76@rice.edu
+Laleh Aghababaie Beni: lalehbeni@google.com
+Noah Shutty: shutty@google.com
+1
+arXiv:2602.02985v2  [quant-ph]  4 Feb 2026
+=== PAGE 2 ===
+TheQECprocess operates by collectingsyndromes, which are measurements that indi-
+cate the presence and location of errors that occurred in the quantum system. The primary
+goal of aQECdecoder is to identify the most probable error configuration consistent with
+the input measurement syndrome. This task can be computationally intensive, especially
+when decoding large and complex quantum codes, as decoders must explore a vast space
+of error configurations to identify the most probable one. Therefore, enhancing both the
+speed and accuracy ofQECdecoders is essential for building robust and fault-tolerant
+quantum computers.
+This paper focuses on accelerating the decoding speed of several quantum code fami-
+lies: Surface Codes [8, 9, 36] (2D topological codes known for their high error thresholds
+and local qubit connectivity), Color Codes [2, 4, 10, 21, 22] (a generalization of topologi-
+cal codes defined on tri-colorable lattices, offering higher encoding rates), Bivariate-Bicycle
+Codes [5, 35] (a code family that leverages algebraic constructions to achieve high encoding
+rates), and Transversal CNOT Protocols for Surface Codes [19, 30] (fault-tolerant methods
+for implementing logical CNOT gates on Surface Codes). Our work specifically improves
+theTesseract[3] decoder, a search-based decoder that employs theA*[17] algorithm to
+efficiently explore an exponentially large graph of error configurations and identify the
+most probable configuration consistent with the input measurement syndrome. The orig-
+inal authors ofTesseracthave shown that this decoder can decode various quantum code
+families; in this paper, we introduce novel optimizations to significantly boost its decoding
+speed while maintaining its high accuracy.
+1.1 Major Contributions
+We present a systematic optimization of theTesseractdecoder by identifying and address-
+ing low-level computational bottlenecks through extensive profiling. Our work achieves
+significant performance gains across diverse code families without compromising decoding
+accuracy. The primary contributions of our work are as follows:
+•Significant and Scalable Decoding Speedups:We demonstrate consistent speedups of
+approximately 2×across most tested code families, frequently exceeding 2.5×. No-
+tably, we achieved a peak performance gain of over 5×for the most computationally
+demanding configurations of Bivariate-Bicycle codes, reducing the decoding time for
+1,000 simulations from over 36,000 seconds to approximately 7,000 seconds.
+•Architectural Optimizations for Data Locality:We identify and mitigate critical
+hardware-level bottlenecks, specifically addressing high cache miss rates by opti-
+mizing memory layouts for core heuristic functions. Furthermore, we eliminate the
+overhead of bit-packed data structures by utilizing hardware-accelerated bit-wise op-
+erations, significantly improving instruction-level parallelism.
+•Comprehensive Dataset and Step-by-Step Evaluation:We provide a rigorous perfor-
+mance dataset across a vast parameter space. We employ a fine-grained, incremental
+evaluation strategy to quantify the individual impact of each optimization, providing
+an in-depth analysis of how specific code-level inefficiencies affect overall decoding
+throughput.
+•Robustness Across Diverse Code Families and Architectures:Our evaluation spans a
+wide array of code families, including Surface Codes, Color Codes, Bivariate-Bicycle
+Codes, and Transversal CNOT Protocols. We validated these results across multiple
+noise models, variousA*search parameters, and three distinct hardware generations
+(Intel Xeon W-2135, Cascade Lake, and Sapphire Rapids).
+2
+=== PAGE 3 ===
+2 Related Work
+QECdecoders operate by processing the input measurement syndrome and converting it
+into an internal representation suitable for decoding the most probable error configuration.
+These internal representations often utilize graph-based structures that model errors in the
+system and the relations between them. Identifying the most probable error configuration
+enables the correction of the error.
+Minimum Weight Perfect Matching(MWPM) decoders [32, 34] operate by converting
+the input measurement syndrome into a graph model where nodes are violated syndrome
+bits (called defects), and edges are potential physical error chains connecting defects. The
+goal of the decoder is to detect a minimum-weight perfect matching that connects nodes in
+the graph, which identifies the most probable error configuration consistent with the syn-
+drome.MWPMdecoders achieve high accuracy but have limited computational efficiency,
+often scaling polynomially with the code size.
+Belief Propagation(BP) decoders [27, 29] operate on the code’s Tanner graph by pass-
+ing probabilistic "beliefs" between variable nodes (qubits or errors) and check nodes (syn-
+drome measurements).BPdecoders achieve high computational efficiency, often scaling
+linearly with the code size, but have lower accuracy as they may not always find the optimal
+solution. To address this,Belief Propagation with Ordered Statistics Decoding(BP+OSD)
+has emerged as a hybrid approach. This method performs an initial pass withBPand then
+employsOSDpost-processing, which explores the most unreliable bit flips to find a more
+accurate, often optimal, solution. TheBP+OSDapproach imposes a trade-off between
+accuracy and efficiency, as it has lower computational efficiency compared to pureBP.
+Union Find(UF) decoders [7, 16] operate by converting the input measurement syn-
+drome into clusters that grow around detected syndrome defects and merge when they
+connect. This process can efficiently identify the most probable error configuration.UF
+decoders provide a strong balance of accuracy and efficiency. Their computational effi-
+ciency often scales near-linearly with the code size, with logical error rates comparable to,
+or even surpassing,MWPMdecoders.
+Correlated Matching(CM) decoders [6, 18] explicitly account for error dependencies
+that arise from multi-qubit gates or device-specific interactions in a real quantum system.
+They operate by converting the input measurement syndrome into a more sophisticated
+model than the simple graphs used in prior work. They achieve this by introducing cal-
+ibrated edge weights based on noise characterization or by employing hypergraph repre-
+sentations.CMdecoders can achieve high accuracy, pushing closer to theoretical error
+thresholds.
+Integer Programming(IP) decoders [20, 23, 24] operate by converting the input mea-
+surement syndrome into an Integer Linear Program (ILP) and decoding the error configu-
+ration by solving the ILP. These decoders provide highly accurate and often optimal solu-
+tions, serving as a powerful benchmark for other algorithms. In this paper, we leveraged
+anIPdecoder to rigorously verify that the performance optimizations we implemented
+insideTesseractdid not degrade its decoding accuracy when processing identical input
+measurement syndromes.
+3 Tesseract Decoder
+Tesseract[3] is a novel Most-Likely-Error (MLE) decoder for Low-Density-Parity-Check
+(LDPC) quantum codes.Tesseractfinds the most likely error configuration by identifying
+the lowest-cost configuration consistent with the input measurement syndrome. Unlike
+3
+=== PAGE 4 ===
+many decoders that start with a polynomial-time algorithm and then employ heuristics to
+improve accuracy,Tesseractstarts with an exponential-time algorithm that identifies the
+most likely configuration and then employs heuristics to improve speed.
+Tesseractformulates theMLEproblem as a shortest path problem on an exponentially
+large graph of error configurations. In this graph, nodes represent configurations, and
+edges represent transitions formed by adding a single new error to a current configuration.
+Tesseractemploys theA*algorithm to find the lowest-cost error configuration, which
+represents the optimal configuration for the given syndrome.Tesseractguides theA*
+search towards the optimal solution by calculating the cost of a search state using the
+get_detcostfunction, which we analyze in detail in Section 4.2 and 4.3, and by prioritizing
+states with lower costs.
+The original authors ofTesseractimplemented several heuristic techniques to accelerate
+the decoder’s speed by sacrificing some accuracy:
+•Admissible A* Heuristic:Tesseractemploys an admissibleA*heuristic function
+to calculate a strict lower bound on the cost of each search state. This property
+guides theA*search towards the optimal solution, reaching the "EXIT" node—the
+state representing the error configuration consistent with the input measurement
+syndrome. The admissibility of the heuristic guarantees finding the optimal configu-
+ration.
+•Graph Pruning:Tesseractprunes the search space by employing a predicate that
+restricts which errors can be added to the current error configuration. This effectively
+makes the search graph a tree and eliminates the exploration of redundant paths.
+•Beam Search:Tesseractintegrates beam search into theA*search by employing a
+"beam cutoff" that prunes nodes with too many residual detection events, specifically
+those with a count of detection events significantly exceeding a minimum observed
+value. Beam search can significantly prune the search space and imposes a trade-off
+between accuracy and speed: smaller beam sizes yield higher efficiency but degrade
+accuracy more, as they risk finding a suboptimal solution if the optimal path is
+pruned.
+•No-revisit Detection Events and Residual Detection Penalty:Tesseractemploys a
+heuristic that avoids re-visiting search states with previously explored patterns of
+fired detectors. This heuristic can significantly prune the search space and prevent
+the exploration of redundant paths. In addition,Tesseractcan introduce a penalty
+cost for residual detection events to discourage high-cost paths.
+•At Most Two Errors Per Detector:Tesseractcan employ an optional heuristic that
+assumes at most two errors can affect any given detector. When enabled, this heuris-
+tic prevents adding errors to the current configuration that would result in more than
+two errors affecting any fired detector. This heuristic, when applied to a specific code
+family and/or noise model, can significantly prune the search space and accelerate
+decoding.
+•Priority Queue Size Management:Tesseractutilizes a priority queue to manage
+search states and their associated costs, prioritizing those with lower costs to guide
+thesearchtowardstheoptimalsolution. Tocontrolmemoryusageandcomputational
+overhead,Tesseractemploys a heuristic that terminates the search if the priority
+queue size exceeds a predefined maximum number of states.
+4
+=== PAGE 5 ===
+The authors of [3] have benchmarkedTesseractand demonstrated its performance ad-
+vantages compared to other decoders. These benchmarks showed thatTesseractis substan-
+tially faster than Integer Programming decoders while maintaining comparable accuracy at
+moderate physical error rates. For Surface, Color, and Bivariate-Bicycle Codes,Tesseract
+and IP decoders achieved logical error rates one to two orders of magnitude lower than
+BP+OSDdecoders. Furthermore,Tesseractis capable of decoding Transversal CNOT
+Protocols for Surface Codes on neutral atom quantum computers, protocols where other
+decoders often struggle with correlated errors.Tesseractexhibits high decoding accuracy
+that enables a precise comparison of different quantum code families. For instance, the
+authors of [3] revealed that Bivariate-Bicycle Codes can be14×to19×more efficient than
+Surface Codes when decoded withTesseract, whereas usingCMandBP+OSDdecoders
+implied only a10×improvement. The authors also comparedTesseractwith concurrently
+developedDecision-Tree-Decoders(DTDs) [26] and showed thatTesseracthas superior
+performance.
+In this paper, we focus on accuracy-preserving optimizations. SinceTesseractwas
+implemented in high-performanceC++, we delve deep into its open-source [15] implemen-
+tation to investigate opportunities to improve decoding speed. Given that efficient software
+is crucial for building robust quantum computers, we identified subtle performance bottle-
+necks inside the decoder and implemented optimizations to address them.
+4 Analysis and Optimization
+We utilized two profiling tools to measureTesseract’s performance, identify critical bottle-
+necks, and implement optimizations. Initially, we utilizedHPCToolkit[1, 37], a profiling
+tool developed at Rice University, to gather detailed, source-code-level performance in-
+sights. Its graphical user interface, which offers top-down, bottom-up, and flat views, was
+instrumental during the early phase of granular bottleneck identification. Subsequently,
+owing to its lower overhead and ease of use, we switched toperf[25] to effectively eval-
+uate the performance gains achieved after implementing each optimization. Additionally,
+when evaluating each modification, we comparedTesseract’s decoding output with the
+output produced by the Integer Programming decoder used as a benchmark in the original
+paper [3], ensuring that our optimizations did not compromise the decoder’s accuracy.
+4.1 Addressing Bit-Packed Data Access Overheads
+Our initial profiling revealed significant performance overheads stemming from the exten-
+sive use ofstd::vector<bool>data structures.Tesseractinitially used these structures to
+store and manage patterns of fired detectors (representing the measurement syndrome) and
+predicates that block specific errors from being added to the current error configuration—a
+key graph pruning technique detailed in Section 3. The issue with thestd::vector<bool>
+data structure is that it is a specializedC++template that packs elements as individual
+bits. While this minimizes the memory footprint, it introduces a significant overhead when
+elements are frequently accessed or modified. This occurs because individual elements are
+not directly addressable bytes; instead, accessing and modifying them requires the use of
+proxy objects that perform costly bit-wise operations, including shifting and masking.
+The computational intensity of these bit-wise operations was further exacerbated by
+Tesseract’s core heuristics.Tesseract’s graph pruning heuristic involves frequently block-
+ing and unblocking errors withinstd::vector<bool>. Furthermore, the "No-Revisit De-
+tection Events" heuristic, which avoids re-visiting search states with previously explored
+5
+=== PAGE 6 ===
+0 0 1 1 0 1 0 0
+0 0 1 1 0 1 0 0
+0 0 1 1 0 10 0
+0 0 0 0 0 10 0
+Access byte containing the bit
+Access bit within the byte
+Shift bit to the right
+Mask other bits
+1 0 0 1 0 1 0 0 0 0 1 1 0 1 0 0 1 0 0 1 1 0 0 1
+Access element at index 15 in std::vector<bool>
+0  1  0  
+Access element at index 1 in std::vector<char>
+Direct memory access
+Figure 1: Comparison of memory access patterns betweenstd::vector<bool>and
+std::vector<char>. Whilestd::vector<bool>minimizes memory footprint through bit-packing,
+frequent access requires proxy objects to perform bit-wise shifting and masking, inducing significant
+computational overhead compared to direct byte-addressable access instd::vector<char>.
+patterns of fired detectors, requires hashing these patterns. This process necessitates it-
+erating through each element of thestd::vector<bool>containing the pattern. These
+frequent access and modify operations across numerous decoding iterations created signif-
+icant overheads in code regions operating withstd::vector<bool>.
+Our initial approach to address these inefficiencies was to systematically replace in-
+stances ofstd::vector<bool>withstd::vector<char>. While this increased the mem-
+ory footprint by storing individual elements as full bytes, our analysis revealed that for
+Tesseract’s specific workload, the performance bottleneck was dominated by the high over-
+head of bit-wise operations insidestd::vector<bool>rather than memory copying or
+overallmemory consumption. Therefore, the performance gainsachieved by enablingdirect
+byte-level access withstd::vector<char>significantly outweighed any increased memory
+consumption. This optimization led to significant decoding speedups across various code
+families and configurations, which we analyze in detail in Section 5.1. Fig. 1 illustrates the
+memory access patterns instd::vector<bool>andstd::vector<char>.
+4.2 Cache-Optimized Data Reorganization
+As detailed in Section 3,Tesseractemploys an admissibleA*heuristic function to guide
+the search towards the optimal solution. This is achieved by calculating a strict lower
+bound on the cost of each search state and prioritizing states with lower costs.Tesseract
+computes the cost of a search state using theget_detcostfunction, which aggregates
+the minimum cost of all errors affecting a specific detector, provided those errors are not
+blocked in the current decoding iteration due to graph pruning rules. Listing 1 shows
+the initial implementation of theget_detcostfunction. Each timeTesseractconsiders
+exploring a search state—by adding a new error to the current error configuration—it first
+6
+=== PAGE 7 ===
+1d o u b l eT e s s e r a c t D e c o d e r :: g e t _ d e t c o s t ( size_t d ,
+2conststd :: vector <bool>& blocked_errs ,
+3conststd :: vector < size_t >& d e t _ c o u n t s ) {
+4d o u b l emi n_ cos t = INF ;
+5for( size_t ei : d2e [ d ]) {
+6if(! b l o c k e d _ e r r s [ ei ]) {
+7d o u b l eecost = errors [ ei ]. l i k e l i h o o d _ c o s t / d e t _ c o u n t s [ ei ];
+8min _c ost = std :: min ( min_cost , ecost ) ;
+9}
+10}
+11r e t u r nmi n_ cos t + config . d e t _ p e n a l t y ;
+12}
+Listing 1: Initial implementation of theget_detcostfunction. This function calculates the minimum
+error cost for a given detectordby iterating through the list of potential errorsd2e[d]that are not
+currently blocked.
+calculates the cost of that state. This involves computing the cost of each detector (via
+get_detcost) potentially affected by the new error, as well as detectors affected by errors
+related to the current error configuration. While this process of calculating an accurate
+state cost is essential for guiding the search, it represents a major performance bottleneck.
+The primary inefficiency within theget_detcostfunction stemmed from its frequent
+access to elements at arbitrary, non-contiguous indices within two large pre-computed
+vectors: one indicating currently blocked errors and another storing the total number of
+fired detectors for each error. The function accesses errors affecting the selected detector
+inside these vectors, computes their cost (if not blocked), and determines the detector’s
+minimum error cost. These high-frequency accesses to scattered memory locations within
+two large vectors led to numerous cache misses, severely degrading performance.
+A key observation in the initial implementation was that while accesses to these two
+large vectors were at arbitrary indices, they exhibited a consistent co-access pattern: el-
+ements at the same index in both vectors were always accessed together. To address the
+cache inefficiency and leverage this concurrent access pattern, we redesigned these two
+vectors into a single vector containing customDetectorCostTupledata structures. This
+technique is similar to converting a Structure of Arrays (SoA) to an Array of Structs
+(AoS) [33]. TheDetectorCostTuplestructure contains twouint32_t(4-byte unsigned
+integer) fields: one for the blocked error flag and the other for the fired detectors count.
+This reorganization dramatically improved data locality, ensuring that co-accessed data
+resided contiguously in memory. Furthermore, by designing the structure with a total size
+that aligns well with CPU cache lines (typically 64 bytes on most modern architectures), we
+maximized the benefits of hardware pre-fetching. Fig. 2 illustrates the data reorganization
+performed inside theget_detcostfunction. This optimization had the highest impact on
+code families and configurations that spent significant time in theget_detcostfunction,
+such as Color Codes and Bivariate-Bicycle Codes.
+4.3 Early-Exit Strategy for Minimizing Cost Calculation
+Listing 1 shows that the cost of a detector is computed as the minimum cost among errors
+that can affect it and are not blocked. Costs of individual errors are calculated by dividing
+theirlikelihood_cost(constant throughout the decoding process) by the number of
+detectors fired by that error in the current iteration. Theget_detcostfunction iterates
+through every error affecting the selected detector, computes its cost, and identifies the
+minimum.
+We realized that we could significantly prune iterations within theget_detcostloop
+7
+=== PAGE 8 ===
+0 1 0 0 
+27 33 11 14 
+0 27 1 33 0 11 0 14 
+lower bound lower bound lower bound lower bound 
+If the error cost lower bound is at least
+as the current accumulated detector
+minimum cost, we can early exit the loop
+Error costs are calculated by
+dividing their probability with
+the number of fired detectors
+Number of fired
+detectors for each error
+Flags indicating which
+errors are blocked in the
+current decoding iteration
+Packing blocked error
+flags and fired detectors
+into a single array
+Using pre-computed error
+cost lower bounds to minimize
+detector cost calculation
+Figure 2: Data reorganization and early-exit logic within theget_detcostfunction. Consolidating
+frequently accessed elements from separate vectors into a single contiguous structure (Array of Structs)
+optimizes CPU cache performance. The integrated early-exit strategy utilizes pre-calculated error cost
+lower bounds to bypass unnecessary computations.
+by computing lower bounds for error costs. While the number of detectors fired by an error
+changes across iterations, each error has a maximum possible number of detectors it can
+affect, and the number of fired detectors will never exceed that maximum. This maximum
+provides a baseline for a lower bound: since a smaller denominator yields a larger cost,
+the largest number of fired detectors gives the smallest possible (lower bound) cost for an
+error.
+Therefore, before the decoding starts, we pre-compute lower bounds for error costs by
+dividing theirlikelihood_costby the maximum possible number of fired detectors. We
+store these pre-computed lower bounds in an array and, for each detector, sort its relevant
+errors based on these lower bounds. This enables an effective early-exit strategy within the
+get_detcostloop: if the currently foundmin_costis less than or equal to the lower bound
+of the next error to be evaluated, further iterations are unnecessary, as no subsequent error
+can yield a smaller cost due to the sorted order. Listing 2 shows the implementation of
+theget_detcostfunction after optimizations. Fig. 2 also illustrates the logic of using pre-
+computed error cost lower bounds to avoid unnecessary computations. This optimization
+had the highest impact on code families that spent significant time in theget_detcost
+function, similar to the second optimization.
+4.4 Efficient Hashing of Syndrome Patterns
+After implementing and evaluating the first three optimizations, we identified another
+opportunity for improvement. Following the second optimization, where we reorganized
+data consumed byget_detcostinto a customDetectorCostTuplestructure, the only
+remainingstd::vector<char>instance was the one storing patterns of fired detectors
+(representing the measurement syndrome). We observed that the function responsible for
+hashing these patterns consumed a significant portion of the decoding time. This func-
+tion is a critical component of the "No-revisit Detection Events" heuristic, detailed in
+Section 3, which stores previously explored patterns in astd::setto prevent redundant
+8
+=== PAGE 9 ===
+1d o u b l eT e s s e r a c t D e c o d e r :: g e t _ d e t c o s t ( size_t d ,conststd :: vector < D e t e c t o r C o s t T u p l e
+>& d e t e c t o r _ c o s t _ t u p l e s ) {
+2d o u b l emi n_ cos t = INF ;
+3E r r o r C o s t ec ;
+4D e t e c t o r C o s t T u p l e dct ;
+5
+6for( size_t ei : d2e [ d ]) {
+7ec = e r r o r _ c o s t s [ ei ];
+8if( ec . mi n_c os t >= mi n_ cos t )break;
+9
+10dct = d e t e c t o r _ c o s t _ t u p l e s [ ei ];
+11if(! dct . e r r o r _ b l o c k e d ) {
+12d o u b l ee r r o r _ c o s t = ec . l i k e l i h o o d _ c o s t / dct . d e t e c t o r s _ c o u n t ;
+13min _c ost = std :: min ( min_cost , e r r o r _ c o s t ) ;
+14}
+15}
+16
+17r e t u r nmi n_ cos t + config . d e t _ p e n a l t y ;
+18}
+Listing 2: Optimizedget_detcostimplementation. This version leverages a unified
+DetectorCostTuplestructure (Array of Structs) to improve cache locality and utilizes pre-sorted
+error cost lower bounds to facilitate an early-exit strategy.
+1s t r u c tV e c t o r C h a r H a s h {
+2size_to p e r a t o r() (conststd :: vector <char>& v )const{
+3size_t seed = v . size () ;
+4
+5for(charel : v ) {
+6seed = seed * 31 +s t a t i c _ c a s t< size_t >( el ) ;
+7}
+8r e t u r nseed ;
+9}
+10};
+Listing3: Unoptimizedhashingimplementationforsyndromepatterns, utilizingastandardaccumulation
+loop overstd::vector<char>.
+computations. The hashing function was initially implemented as a simple loop that iter-
+ates through each element of the vector and accumulates the hash (Listing 3). While the
+switch fromstd::vector<bool>tostd::vector<char>provided speedups, this function
+still consumed a significant amount of decoding time, especially for code families with
+bushy search graphs where theA*search generates more redundant paths.
+We sought a data structure that would provide a highly optimized, built-in hashing
+function. TheC++standard library providesstd::bitset, which combines memory-
+efficient bit-packing with hardware-accelerated bit-wise operations. This is achieved by
+internally storing bits within contiguous memory blocks that can execute vectorized bit-
+wise operations. However,std::bitsetrequires a static size determined at compile-time,
+making it unsuitable forTesseract’s dynamically sized syndrome patterns. This led us
+to explore alternatives that could provide a dynamically sized data structure with similar
+hardware-accelerated operations.
+We turned to theBoostlibrary [31], which providesboost::dynamic_bitset.
+Similar tostd::bitset, this data structure internally stores bits within contiguous
+memory blocks that enable the execution of hardware-accelerated bit-wise operations,
+thereby avoiding the overhead of proxy objects present instd::vector<bool>. Ad-
+ditionally,boost::dynamic_bitsetsupports dynamically sized arrays. We adopted
+boost::dynamic_bitsetto storeTesseract’s syndrome patterns and used the built-in
+9
+=== PAGE 10 ===
+boost::hash_valuefunction to accelerate the hashing. This approach not only mitigated
+the increased memory footprint from our initial optimization withstd::vector<char>but
+also provided a highly optimized method for hashing boolean sequences, further enhancing
+decoding speed. This optimization had the highest impact on Surface Codes and Transver-
+sal CNOT Protocols, especially forA*with longer beam sizes, where search graphs contain
+many redundant paths that must be checked.
+5 Results
+This section details the performance gains achieved through a systematic optimization
+of theTesseractdecoder. Our evaluation spans a diverse range of quantum code fam-
+ilies—including Color Codes, Bivariate-Bicycle Codes, Surface Codes, and Transversal
+CNOT Protocols—under varied noise models and search configurations. To demonstrate
+the portability and robustness of our solution across different architectural and search en-
+vironments, we conducted benchmarks on three distinct hardware platforms using varying
+search parameters. For all tests,Tesseractwas compiled with consistent-O3flags to enable
+aggressive compiler optimizations; this ensures that the reported speedups reflect funda-
+mental algorithmic and architectural improvements that standard compiler passes cannot
+achieve.
+For each hardware architecture and search configuration, we executed a statistically
+significant volume of decoding simulations (shots), leveraging multi-threading to acceler-
+ate data collection. However, to provide a clear measure of algorithmic efficiency and
+eliminate confounding factors, all reported execution times represent the cumulative CPU
+time of individual, single-threaded decoding operations. Table 1 summarizes the four key
+optimization strategies implemented to accelerate theTesseractdecoder.
+Table 1: Optimization strategies for accelerating theTesseractdecoder.
+Optimization T echnical Method & Rationale
+Optimization 1 Replacestd::vector<bool>withstd::vector<char>to eliminate the
+overhead of bit-wise masking/shifting.
+Optimization 2 Transition from Structure of Arrays (SoA) to Array of Structures (AoS) to
+mitigate frequent cache misses insideget_detcost.
+Optimization 3 Compute lower bounds for error costs to enable an early-exit strategy
+insideget_detcost.
+Optimization 4 Vectorize hashing of syndrome patterns usingboost::dynamic_bitsetto
+accelerate graph exploration.
+5.1 Short Beam Experiments
+We conducted the initial set of experiments on a dedicated server equipped with an Intel(R)
+Xeon(R) W-2135 CPU @ 3.70GHz (6 cores, 12 threads), running Debian GNU/Linux. For
+this architecture, theTesseract A*search was configured with a "beam cutoff" of 15 and
+a priority queue limit of 200,000, utilizing the "No-Revisit Detection Events" heuristic
+(detailed in Section 3). Benchmarks were executed across the following configurations:
+•Color Codes:We evaluated theuniformandSI1000[11] noise models. For each, we
+tested error rates (p) of 0.001 and 0.002 across code distances (d) of 7, 9, and 11.
+10
+=== PAGE 11 ===
+•Bivariate-Bicycle Codes:We utilized theSI1000model along with two variants
+described in [3]: theNLR5andNLR10noise models. These variants apply5×and
+10×higher noise strength to the two-qubit depolarizing channels following long-range
+CZ gates, respectively. We tested error rates of 0.001 and 0.002 at code distances of
+6 and 10.
+•Surface Codes and Transversal CNOT Protocols:Using theSI1000noise model, we
+tested error rates of 0.001 and 0.002 for code distances of 7, 9, and 11.
+This architectureserved as the primary environment for profiling theTesseractdecoder,
+identifying critical inefficiencies, and implementing targeted optimizations. By analyzing
+execution bottlenecks within these specific code configurations, we developed the optimiza-
+tions described in the previous section and performed an initial evaluation of the resulting
+speedups.
+For this short beam configuration, we performed a fine-grained analysis of decoding
+speedups by applying the optimizations listed in Table 1 incrementally. This step-by-step
+approach enabled us to quantify the cumulative impact of each modification on overall per-
+formance. For each code family and configuration, we executed 1,000 decoding simulations
+and measured the total execution time at each stage of the optimization process.
+The results, presented in Figure 3, demonstrate that all four optimizations consistently
+and significantly reduced decoding times across all tested configurations. Notably, the
+effectiveness of these optimizations is most pronounced at higher error rates and larger
+code distances—the scenarios representing the most computationally demanding decoding
+tasks.
+Color Codes. Decoding latency for Color Codes increased significantly with both error
+rate and code distance. The implementation ofOptimization 1yielded an initial speedup
+of 17.2%–32.3%. Cumulative speedups after applyingOptimization 2,Optimization 3, and
+Optimization 4reached 33.6%–45.4%, 37.2%–52.1%, and 40.7%–54.8%, respectively. The
+most substantial gain occurred under theSI1000noise model withp= 0.002andd= 11,
+where the total speedup reached 2.21×.
+Bivariate-Bicycle Codes. Bivariate-BicycleCodeswere themost computationallyinten-
+sive, with decoding times exceeding 35,000 seconds for the most demanding configuration
+(p= 0.002,d= 10).Optimization 1provided an initial speedup of 13.0%–22.3%, while
+the most dramatic performance gains followed the application ofOptimization 2, bringing
+cumulative speedups to 37.6%–63.6%. With the addition ofOptimization 3andOptimiza-
+tion 4, cumulative speedups reached 41.2%–79.6% and 41.5%–80.9%, respectively. The
+maximum speedup was achieved for theNLR10noise model atp= 0.002andd= 10,
+reaching 5.24×and reducing the total execution time from 36,853.18 seconds to 7,048.21
+seconds.
+Surface Codes. Surface Codes exhibited the lowest decoding latency among the
+tested families.Optimization 1provided an initial speedup of 33.4%–42.5%. Cumulative
+speedups afterOptimization 2,Optimization 3, andOptimization 4reached 42.1%–50.5%,
+45.4%–52.3%, and 50.0%–62.4%, respectively. The largest improvement was recorded for
+the configuration withp= 0.001andd= 11, where the total speedup reached 2.66×.
+Transversal CNOT Protocols. Decoding times for Transversal CNOT Protocols scaled
+sharply with higher error rates and larger code distances.Optimization 1provided an
+initial speedup of 12.2%–32.4%. Cumulative speedups afterOptimization 2,Optimization
+3, andOptimization 4reached44.2%–51.4%, 45.0%–51.8%, and57.8%–63.6%, respectively.
+The peak performance gain was achieved for the configuration withp= 0.002andd= 9,
+resulting in a total speedup of 2.75×.
+11
+=== PAGE 12 ===
+uniform,d=7 uniform,d=9 uniform,d=11 si1000,d=7 si1000,d=9 si1000,d=11
+0
+100
+200
+300
+400
+500
+600Decoding Time (Seconds)
+16.15
+73.50
+195.44
+27.85
+147.76
+492.85
+32.3%
+24.3%
+17.2%
+30.6%
+26.0%
+18.6%
+42.0%
+33.6%
+35.7%
+45.4%
+38.4%
+38.5%
+49.3%
+37.2%
+40.7%
+49.8%
+44.1%
+44.2%
+51.4%
+40.7%
+43.5%
+52.3%
+46.2%
+46.7%
+Decoding Speedups in Color Codes (p=0.001, 1000 shots)
+Before
+After Opt 1
+After Opt 2
+After Opt 3
+After Opt 4
+(a)
+uniform,d=7 uniform,d=9 uniform,d=11 si1000,d=7 si1000,d=9 si1000,d=11
+0
+1000
+2000
+3000
+4000
+5000Decoding Time (Seconds)
+198.46
+928.70
+2233.03
+456.96
+1826.40
+4027.22
+30.9%
+25.8%
+18.3%
+30.3%
+25.1%
+17.9%
+40.5%
+42.6%
+41.9%
+44.4%
+43.5%
+43.5%
+49.3%
+48.3%
+49.1%
+52.1%
+50.5%
+51.4%
+52.1%
+50.2%
+51.4%
+53.8%
+52.9%
+54.8%
+Decoding Speedups in Color Codes (p=0.002, 1000 shots)
+Before
+After Opt 1
+After Opt 2
+After Opt 3
+After Opt 4 (b)
+si1000,d=6 si1000,d=10 nlr5wb,d=6 nlr5wb,d=10 nlr10wb,d=6 nlr10wb,d=10
+0
+5000
+10000
+15000
+20000Decoding Time (Seconds)
+109.29
+581.51
+1351.72
+5429.60
+5949.04
+17155.13
+22.3%
+13.7%
+21.4%
+14.0%
+20.6%
+13.6%
+37.6%
+43.0%
+45.2%
+47.2%
+49.0%
+54.7%
+41.2%
+46.4%
+52.2%
+55.2%
+58.0%
+67.2%
+41.5%
+49.0%
+52.2%
+56.8%
+59.0%
+68.8%
+Decoding Speedups in Bivariate-Bicycle Codes (p=0.001, 1000 shots)
+Before
+After Opt 1
+After Opt 2
+After Opt 3
+After Opt 4
+(c)
+si1000,d=6 si1000,d=10 nlr5wb,d=6 nlr5wb,d=10 nlr10wb,d=6 nlr10wb,d=10
+0
+10000
+20000
+30000
+40000Decoding Time (Seconds)
+2113.52
+8921.16
+11321.57
+24883.76
+18643.27
+36853.18
+19.7%
+13.3%
+19.7%
+13.0%
+18.6%
+13.5%
+45.2%
+50.7%
+53.3%
+58.7%
+56.6%
+63.3%
+47.7%
+57.3%
+61.6%
+71.6%
+70.8%
+79.6%
+49.5%
+59.1%
+62.5%
+78.1%
+71.8%
+80.9%
+Decoding Speedups in Bivariate-Bicycle Codes (p=0.002, 1000 shots)
+Before
+After Opt 1
+After Opt 2
+After Opt 3
+After Opt 4 (d)
+p=0.001,d=7 p=0.001,d=9 p=0.001,d=11 p=0.002,d=7 p=0.002,d=9 p=0.002,d=11
+0
+50
+100
+150
+200
+250
+300
+350Decoding Time (Seconds)
+1.39
+6.08
+26.26
+8.86
+71.84
+282.08
+35.7%
+36.8%
+42.5%
+37.7%
+39.3%
+33.4%
+45.6%
+44.5%
+50.5%
+42.1%
+49.7%
+47.0%
+45.7%
+48.1%
+50.6%
+45.4%
+52.3%
+48.4%
+50.0%
+55.3%
+62.4%
+54.5%
+60.6%
+61.1%
+Decoding Speedups in Surface Codes (1000 shots)
+Before
+After Opt 1
+After Opt 2
+After Opt 3
+After Opt 4
+(e)
+p=0.001,d=7 p=0.001,d=9 p=0.001,d=11 p=0.002,d=7 p=0.002,d=9 p=0.002,d=11
+0
+1000
+2000
+3000
+4000
+5000
+6000
+7000Decoding Time (Seconds)
+19.73
+137.60
+711.24
+282.49
+1716.52
+5318.01
+31.4%
+24.6%
+12.2%
+32.4%
+25.2%
+14.5%
+44.2%
+46.5%
+51.4%
+43.5%
+50.3%
+50.2%
+45.0%
+48.0%
+51.8%
+46.1%
+51.4%
+51.0%
+57.8%
+62.0%
+61.1%
+58.5%
+63.6%
+60.5%
+Decoding Speedups in Transversal CNOT Protocols (1000 shots)
+Before
+After Opt 1
+After Opt 2
+After Opt 3
+After Opt 4 (f)
+Figure 3: Decoding speedups across various code families and configurations for experiments on the
+first architecture using the short beam configuration: (a) Color Codes atp= 0.001; (b) Color Codes
+atp= 0.002; (c) Bivariate-Bicycle Codes atp= 0.001; (d) Bivariate-Bicycle Codes atp= 0.002; (e)
+Surface Codes; (f) Transversal CNOT Protocols for Surface Codes.
+These results underscore the substantial performance gains achievable through tar-
+geted code-level optimizations. Speedups exceeded2×for Color Codes,2.5×for Surface
+Codes and Transversal CNOT Protocols, and5×for the most computationally demand-
+ing Bivariate-Bicycle Code configurations. This demonstrates the immense potential for
+accelerating decoding simply by optimizing memory-access patterns and data organization.
+The most impactful performance gains were derived fromOptimization 2, which tran-
+sitioned theget_detcostA*heuristic function from a Structure of Arrays (SoA) to an
+Array of Structures (AoS) format. This modification proved critical, as theget_detcost
+12
+=== PAGE 13 ===
+function initially accounted for over 50% of the total decoding time and suffered from
+frequent cache misses. On this architecture,Optimization 2contributed to a cumulative
+speedup of2.75×for the most demanding Bivariate-Bicycle configurations.
+Optimization 3further addressed theget_detcostbottleneck by implementing an
+early-exit strategy based on pre-computed error cost lower bounds, significantly pruning
+iterations within the function’s primary loop. Consequently,Optimization 2andOptimiza-
+tion 3were most effective for configurations where the heuristic function was the primary
+bottleneck—specifically in Bivariate-Bicycle Codes, where it consumed between 70% and
+90% of the total execution time.
+Optimization 1, which replaced bit-vector representations with character vectors, pro-
+vided a substantial initial speedup of up to 42% in Surface Codes. Finally,Optimization 4
+vectorized the hashing of syndrome patterns, which also served to mitigate the increased
+memory footprint introduced byOptimization 1. In our benchmarks on this architec-
+ture,Optimization 4had the most pronounced effect on Surface Codes and Transversal
+CNOT Protocols; their noise models, combined with the short beam configuration, pro-
+duced "bushy" search graphs where theA*search generates numerous redundant paths.
+Filtering these paths relies heavily on the hashing function, making vectorization particu-
+larly effective.
+In the following section, we evaluate the performance gains across two additional hard-
+ware architectures using a larger beam search to assess the portability and scalability of
+our solution across different platforms and search configurations.
+5.2 Long Beam Experiments
+As detailed in the previous section, the initial profiling and incremental evaluation of the
+Tesseractdecoder were performed on the first architecture using a short beam configura-
+tion. To assess the portability and scalability of our optimizations across different plat-
+forms and search settings, we conducted additional experiments on two high-performance
+architectures within Rice University’s NOTS cluster [28]. The first system is an Intel(R)
+Xeon(R) Gold 6230 CPU @ 2.10GHz (40 cores, 80 threads) based on the Cascade Lake
+microarchitecture, and the second is an Intel(R) Xeon(R) Platinum 8468 CPU @ 2.10GHz
+(96 cores, 192 threads) based on the Sapphire Rapids microarchitecture. Both systems run
+Red Hat Enterprise Linux 9.4.
+For these experiments, we utilized a more extensive search configuration with a "beam
+cutoff" of 20. To balance the computational load of the larger beam—which explores a
+broader space of error hypotheses and converges more slowly—we set the priority queue
+limit to 100,000. This smaller memory threshold ensures that the most complex code
+configurations do not consume excessive time in the expanded search space. As with the
+previousexperiments, weutilizedthe"No-RevisitDetectionEvents"heuristicandexecuted
+benchmarks across the same code configurations to ensure comparability:
+•Color Codes:Evaluated underuniformandSI1000noise models at error rates (p)
+of 0.001 and 0.002, with code distances (d) of 7, 9, and 11.
+•Bivariate-Bicycle Codes:Evaluated underSI1000,NLR5, andNLR10noise models
+at error rates of 0.001 and 0.002, with code distances of 6 and 10.
+•Surface Codes and Transversal CNOT Protocols:Evaluated under theSI1000noise
+model with error rates of 0.001 and 0.002 and code distances of 7, 9, and 11.
+Consistent with our initial methodology, we executed 1,000 decoding simulations for
+each configuration. On these NOTS cluster nodes, we measured execution times for the
+13
+=== PAGE 14 ===
+uniform,d=7 uniform,d=9 uniform,d=11 si1000,d=7 si1000,d=9 si1000,d=11
+0
+100
+200
+300
+400
+500
+600
+700
+800Decoding Time (Seconds)
+15.83
+97.54
+277.63
+25.95
+195.75
+600.73
+28.9%
+31.3%
+27.0%
+28.4%
+32.0%
+28.8%
+15.92
+55.38
+140.43
+25.72
+105.34
+322.57
+38.7%
+15.0%
+17.2%
+41.1%
+20.0%
+19.3%
+Decoding Speedups in Color Codes (p=0.001, 1000 shots)
+Cascade Lake: Before
+Cascade Lake: After Opt
+Sapphire Rapids: Before
+Sapphire Rapids: After Opt
+(a)
+uniform,d=7 uniform,d=9 uniform,d=11 si1000,d=7 si1000,d=9 si1000,d=11
+0
+500
+1000
+1500
+2000
+2500
+3000
+3500Decoding Time (Seconds)
+209.72
+959.22
+1982.10
+431.69
+1620.61
+2852.34
+36.1%
+35.1%
+35.4%
+35.6%
+36.3%
+37.7%
+149.86
+525.18
+1630.21
+274.65
+962.18
+1595.55
+42.3%
+27.9%
+31.1%
+35.3%
+30.6%
+31.5%
+Decoding Speedups in Color Codes (p=0.002, 1000 shots)
+Cascade Lake: Before
+Cascade Lake: After Opt
+Sapphire Rapids: Before
+Sapphire Rapids: After Opt (b)
+si1000,d=6 si1000,d=10 nlr5wb,d=6 nlr5wb,d=10 nlr10wb,d=6 nlr10wb,d=10
+0
+2000
+4000
+6000
+8000
+10000
+12000
+14000
+16000Decoding Time (Seconds)
+192.08
+1032.11
+1806.77
+6198.60
+5168.56
+12322.45
+28.7%
+41.0%
+41.7%
+51.6%
+49.0%
+63.1%
+112.04
+298.64
+966.92
+2825.31
+2830.10
+5223.68
+33.3%
+9.7%
+35.4%
+35.6%
+43.7%
+48.9%
+Decoding Speedups in Bivariate-Bicycle Codes (p=0.001, 1000 shots)
+Cascade Lake: Before
+Cascade Lake: After Opt
+Sapphire Rapids: Before
+Sapphire Rapids: After Opt
+(c)
+si1000,d=6 si1000,d=10 nlr5wb,d=6 nlr5wb,d=10 nlr10wb,d=6 nlr10wb,d=10
+0
+5000
+10000
+15000
+20000
+25000
+30000Decoding Time (Seconds)
+2629.05
+7953.90
+8715.32
+16534.42
+11756.10
+24571.34
+42.3%
+51.3%
+56.4%
+67.6%
+63.6%
+76.8%
+1410.07
+3694.32
+4218.01
+6762.90
+5895.78
+9288.51
+34.9%
+38.6%
+45.5%
+54.1%
+56.6%
+64.3%
+Decoding Speedups in Bivariate-Bicycle Codes (p=0.002, 1000 shots)
+Cascade Lake: Before
+Cascade Lake: After Opt
+Sapphire Rapids: Before
+Sapphire Rapids: After Opt (d)
+p=0.001,d=7 p=0.001,d=9 p=0.001,d=11 p=0.002,d=7 p=0.002,d=9 p=0.002,d=11
+0
+200
+400
+600
+800
+1000Decoding Time (Seconds)
+1.21
+5.74
+23.82
+9.46
+85.29
+316.40
+20.2%
+26.8%
+36.3%
+28.3%
+34.0%
+41.2%
+1.81
+6.73
+51.91
+32.10
+271.73
+801.12
+40.0%
+13.6%
+41.6%
+31.1%
+45.7%
+31.3%
+Decoding Speedups in Surface Codes (1000 shots)
+Cascade Lake: Before
+Cascade Lake: After Opt
+Sapphire Rapids: Before
+Sapphire Rapids: After Opt
+(e)
+p=0.001,d=7 p=0.001,d=9 p=0.001,d=11 p=0.002,d=7 p=0.002,d=9 p=0.002,d=11
+0
+500
+1000
+1500
+2000
+2500
+3000
+3500
+4000Decoding Time (Seconds)
+25.24
+170.57
+818.00
+357.30
+1325.74
+3009.26
+40.3%
+46.7%
+36.9%
+40.9%
+45.4%
+39.6%
+34.37
+200.24
+872.04
+965.24
+1597.35
+1985.10
+45.7%
+35.8%
+55.3%
+34.3%
+27.4%
+49.4%
+Decoding Speedups in Transversal CNOT Protocols (1000 shots)
+Cascade Lake: Before
+Cascade Lake: After Opt
+Sapphire Rapids: Before
+Sapphire Rapids: After Opt (f)
+Figure 4: Decoding speedups achieved across various code families and configurations for the second
+(Cascade Lake) and third (Sapphire Rapids) architectures, utilizing the long beam configuration: (a)
+Color Codes atp= 0.001; (b) Color Codes atp= 0.002; (c) Bivariate-Bicycle Codes atp= 0.001; (d)
+Bivariate-Bicycle Codes atp= 0.002; (e) Surface Codes; (f) Transversal CNOT Protocols for Surface
+Codes.
+baselineTesseractdecoder and for the fully optimized version incorporating all strategies
+described in Section 4. This enabled us to calculate the total speedup achieved on each
+architecture and compare these results with the peak improvements observed in the short
+beamexperiments. TheresultsarepresentedinFigure4, whichdisplaysthedecodingtimes
+before and after optimization for both architectures, alongside the percentage speedup for
+each code family and configuration.
+Color Codes. Consistent with the initial experiments, decoding times for Color Codes
+14
+=== PAGE 15 ===
+scaled significantly with both error rate and code distance. On the Cascade Lake architec-
+ture, the cumulative speedup after applying all optimizations ranged from 27.0% to 37.7%.
+The peak speedup of 1.61×was achieved under theSI1000noise model atp= 0.002and
+d= 11. On the Sapphire Rapids architecture, the cumulative speedup reached 15.0%–
+42.3%, with a peak of 1.73×recorded for theuniformnoise model atp= 0.002and
+d= 7. These values are slightly lower than the peak speedup of 2.21×observed on the
+first architecture using the short beam configuration.
+Bivariate-Bicycle Codes. Bivariate-Bicycle Codes remained the most computationally
+intensive family, with decoding times exceeding 24,000 seconds for the most demanding
+configuration (p= 0.002, d= 10on Cascade Lake). For Cascade Lake, the cumulative
+speedup reached 28.7%–76.8%, with a maximum gain of 4.31×for theNLR10noise model
+atp= 0.002andd= 10. On the Sapphire Rapids architecture, cumulative speedups
+ranged from 9.7% to 64.3%, with a peak of 2.8×for the sameNLR10configuration. These
+speedups are notably lower than the 5.24×peak achieved in the short beam experiments.
+Surface Codes. Surface Codes exhibited the lowest decoding latencies, particularly at
+lower error rates and smaller code distances. On the Cascade Lake architecture, cumulative
+speedups ranged from 20.2% to 41.2%, peaking at 1.70×for the configuration withp=
+0.002andd= 11. For Sapphire Rapids, the speedup reached 13.6%–45.7%, with a peak
+of 1.84×atp= 0.002andd= 9. These results are lower than the peak speedup of 2.66×
+recorded on the first architecture.
+Transversal CNOT Protocols. Decoding times for Transversal CNOT Protocols re-
+mained high for larger error rates and distances. On the Cascade Lake architecture, cumu-
+lative speedups reached 36.9%–46.7%, with a peak of 1.88×atp= 0.001andd= 9. On
+the Sapphire Rapids architecture, speedups ranged from 27.4% to 55.3%, reaching a peak
+of 2.24×atp= 0.001andd= 11. As with the other families, these gains are lower than
+the peak of 2.75×achieved using the short beam configuration.
+These results demonstrate that our strategies for accelerating theTesseractdecoder are
+robustly portable across both hardware architectures and search configurations. Although
+the peak speedups on the two additional platforms did not reach the maximum values
+observed on the first architecture—which utilized a more restricted short beam—the cu-
+mulative gains remain highly significant. For Color Codes, Surface Codes, and Transversal
+CNOT Protocols, peak speedups consistently approached 2×, even exceeding 2×for com-
+plex Transversal CNOT configurations. These improvements are highly practical and com-
+parable to the 2.5×gains achieved during our initial experiments. Notably, for Bivariate-
+Bicycle Codes, we achieved a peak speedup of 4.31×on the Cascade Lake architecture,
+which closely rivals the 5.24×peak recorded in the short beam configuration. Even on the
+Sapphire Rapids architecture, speedups approached 3×, representing a substantial reduc-
+tion in computational overhead.
+Thesuccessoftheseexperimentsacrossdiverseenvironmentsisparticularlynoteworthy.
+By identifying and addressing bottlenecks on a specific architecture and configuration,
+and then successfully translating those gains to different CPU architectures and expanded
+search spaces, we have validated the fundamental nature of our optimizations. This cross-
+platform success proves that our solution does not merely exploit narrow hardware quirks,
+but rather addresses core algorithmic and memory-hierarchy inefficiencies inherent in the
+decoding process.
+In the following section, we analyze the memory efficiency gains achieved by optimizing
+the critical decoding bottleneck withinTesseract: theget_detcostheuristic function.
+We detail how our optimizations targeted specific inefficiencies within this function, which
+guides theA*search toward optimal solutions and accounts for the majority of total
+15
+=== PAGE 16 ===
+decoding time.
+5.3 Analyzing Cache Efficiency within the Heuristic Bottleneck
+To complement our macro-scale performance results, we conducted a fine-grained analysis
+of data locality and cache efficiency within the criticalget_detcostbottleneck. As de-
+tailed in Section 4, this heuristic function was optimized through two primary strategies:
+Optimization 2, which transitioned the memory layout from a Structure of Arrays (SoA)
+to an Array of Structures (AoS) to ensure contiguous data residency, andOptimization 3,
+which implemented an early-exit strategy to prune redundant iterations.
+In our initial short beam experiments,Optimization 2alone yielded a cumulative
+speedup of2.75×for the most computationally demanding Bivariate-Bicycle configura-
+tions. This result underscores the profound impact that data organization and memory
+access patterns have on decoding throughput. The disproportionate effectiveness of this
+optimization for Bivariate-Bicycle Codes stems from the fact thatget_detcostconsti-
+tutes the primary bottleneck for this family, consuming 70% to 90% of the total decoding
+time. The function also represents a substantial portion of the computational load in other
+families, accounting for over 60% of the decoding time in Color Codes and approximately
+40% in Surface Codes and Transversal CNOT Protocols.
+To further investigate the mechanics of these improvements, we utilized theperftool to
+measure hardware performance counters for L1 and Last Level Cache (LLC) miss rates. We
+measured these metrics for the long beam experiments conducted on the Rice University
+NOTS cluster, comparing the baseline performance against the state after applying both
+Optimization 2andOptimization 3. WeevaluatedcachemissratesacrossboththeCascade
+Lake and Sapphire Rapids microarchitectures for every tested code configuration. This
+micro-architectural profiling enabled us to quantify the improvements in data locality and
+provides a rigorous explanation for the significant speedups observed; by reducing the
+number of cache lines required per evaluation and minimizing expensive trips to main
+memory, our optimizations directly address the memory-wall challenges inherent in high-
+distance quantum decoding.
+5.3.1 Cache Performance for the Cascade Lake Architecture
+Figure 5 illustrates the cache miss rates for the long beam experiments on the Cascade
+Lakearchitecture. Foreachcodefamilyandconfiguration, wemeasuredL1andLLCmisses
+within theget_detcostkernel before and after applyingOptimization 2andOptimization
+3. The results demonstrate a consistent and significant reduction in both metrics, with
+LLC misses decreasing by up to 90% for configurations with lower error rates and code
+distances. It is remarkable that reorganizing the memory layout of data consumed by a
+major functional bottleneck can yield such a profound impact on data locality and system
+performance. In Figure 5, the bars represent the optimized cache miss rates, with labels
+indicating the percentage of improvement relative to the baseline.
+Color Codes.Baseline L1 miss rates decreased from 66.7%–73.7% to 50.1%–57.7% after
+optimization, with a peak reduction of 29.5% observed for theuniformmodel atp= 0.002
+andd= 11. LLC miss rates fell from 49.7%–71.4% to 5.4%–42.2%, representing a peak
+improvement of 89.7% for theSI1000model atp= 0.001andd= 7. These results quantify
+the significant impact ofOptimization 2on higher-level cache residency.
+Bivariate-Bicycle Codes.L1 miss rates, which were initially quite high (74.3%–91.4%),
+dropped to 62.3%–77.7% post-optimization, with a peak reduction of 17.1% for theNLR5
+model atp= 0.001andd= 10. LLC miss rates plummeted from 74.7%–97.0% to 10.1%–
+16
+=== PAGE 17 ===
+uniform,d=7 uniform,d=9 uniform,d=11 si1000,d=7 si1000,d=9 si1000,d=11
+0
+20
+40
+60
+80Cache Misses (%)
+73.7%
+69.4%
+66.7%
+73.2%
+68.4%
+67.3%
+-25.2%
+-22.9%
+-24.0%
+-24.3%
+-24.3%
+-25.5%
+53.5%
+66.2%
+70.3%
+52.0%
+67.6%
+70.1%
+-88.7%
+-68.4%
+-40.0%
+-89.7%
+-67.8%
+-40.9%
+Cache Miss Rates in Color Codes (p=0.001, 1000 shots)
+L1 Base
+L1 Opt
+LLC Base
+LLC Opt
+(a)
+uniform,d=7 uniform,d=9 uniform,d=11 si1000,d=7 si1000,d=9 si1000,d=11
+0
+20
+40
+60
+80
+100Cache Misses (%)
+74.6%
+70.4%
+73.6%
+74.6%
+72.7%
+72.9%
+-23.1%
+-25.1%
+-29.5%
+-22.7%
+-24.6%
+-25.3%
+49.7%
+66.2%
+68.4%
+50.0%
+67.0%
+71.4%
+-87.7%
+-67.1%
+-41.3%
+-88.5%
+-68.1%
+-42.9%
+Cache Miss Rates in Color Codes (p=0.002, 1000 shots)
+L1 Base
+L1 Opt
+LLC Base
+LLC Opt (b)
+si1000,d=6 si1000,d=10 nlr5wb,d=6 nlr5wb,d=10 nlr10wb,d=6 nlr10wb,d=10
+0
+20
+40
+60
+80
+100
+120Cache Misses (%)
+76.2%
+74.3%
+79.7%
+80.3%
+83.5%
+86.0%
+-16.8%
+-16.2%
+-16.2%
+-17.1%
+-16.8%
+-16.7%
+77.0%
+74.7%
+79.4%
+88.9%
+81.8%
+94.1%
+-82.4%
+-67.5%
+-85.6%
+-42.2%
+-87.0%
+-41.5%
+Cache Miss Rates in Bivariate-Bicycle Codes (p=0.001, 1000 shots)
+L1 Base
+L1 Opt
+LLC Base
+LLC Opt
+(c)
+si1000,d=6 si1000,d=10 nlr5wb,d=6 nlr5wb,d=10 nlr10wb,d=6 nlr10wb,d=10
+0
+20
+40
+60
+80
+100
+120Cache Misses (%)
+80.7%
+82.3%
+86.5%
+88.6%
+90.0%
+91.4%
+-14.7%
+-15.1%
+-14.5%
+-14.4%
+-14.9%
+-15.0%
+82.5%
+90.3%
+91.6%
+95.3%
+89.6%
+97.0%
+-86.1%
+-37.6%
+-89.0%
+-44.2%
+-84.6%
+-48.4%
+Cache Miss Rates in Bivariate-Bicycle Codes (p=0.002, 1000 shots)
+L1 Base
+L1 Opt
+LLC Base
+LLC Opt (d)
+p=0.001,d=7 p=0.001,d=9 p=0.001,d=11 p=0.002,d=7 p=0.002,d=9 p=0.002,d=11
+0
+10
+20
+30
+40
+50
+60
+70
+80Cache Misses (%)
+60.8%
+55.8%
+50.1%
+62.9%
+58.1%
+52.9%
+-24.0%
+-24.0%
+-25.4%
+-29.0%
+-30.4%
+-33.1%
+40.1%
+51.5%
+62.2%
+36.8%
+51.4%
+54.9%
+-85.1%
+-86.3%
+-51.1%
+-89.6%
+-75.6%
+-48.0%
+Cache Miss Rates in Surface Codes (1000 shots)
+L1 Base
+L1 Opt
+LLC Base
+LLC Opt
+(e)
+p=0.001,d=7 p=0.001,d=9 p=0.001,d=11 p=0.002,d=7 p=0.002,d=9 p=0.002,d=11
+0
+10
+20
+30
+40
+50
+60
+70
+80Cache Misses (%)
+51.5%
+41.0%
+31.9%
+53.9%
+44.8%
+38.7%
+-28.3%
+-29.1%
+-29.9%
+-34.5%
+-37.8%
+-40.4%
+61.7%
+54.1%
+31.1%
+53.0%
+47.7%
+29.6%
+-50.5%
+-17.3%
+-13.2%
+-51.3%
+-21.2%
+-21.3%
+Cache Miss Rates in Transversal CNOT Protocols (1000 shots)
+L1 Base
+L1 Opt
+LLC Base
+LLC Opt (f)
+Figure 5: Cache miss rate reduction within theget_detcostkernel for long beam experiments on
+the Cascade Lake architecture: (a) Color Codes atp= 0.001; (b) Color Codes atp= 0.002; (c)
+Bivariate-Bicycle Codes atp= 0.001; (d) Bivariate-Bicycle Codes atp= 0.002; (e) Surface Codes; (f)
+Transversal CNOT Protocols for Surface Codes.
+56.4%, achieving a peak reduction of 89.0% for theNLR5model atp= 0.002andd= 6.
+These findings align with our observation thatget_detcostis the primary bottleneck for
+this family.
+Surface Codes.L1 miss rates fell from 50.1%–62.9% to 35.4%–46.2%, with a peak
+reduction of 33.1% atp= 0.002andd= 11. Baseline LLC miss rates dropped from
+36.8%–62.2% to 3.8%–30.4%, achieving a peak reduction of 89.6% atp= 0.002andd= 7.
+Transversal CNOT Protocols.L1 miss rates were reduced from 31.9%–53.9% to 22.4%–
+36.9%, with a 40.4% peak reduction atp= 0.002, d= 11. LLC miss rates dropped from
+17
+=== PAGE 18 ===
+29.6%–61.7% to 23.3%–44.7%, a peak improvement of 51.3% atp= 0.002, d= 7. The
+lower baseline miss rates in this family correlate withget_detcostconstituting a smaller
+fraction of the total decoding time (around 40% for most code configurations).
+5.3.2 Cache Performance for the Sapphire Rapids Architecture
+We performed a parallel analysis for the Sapphire Rapids architecture to assess cross-
+platform consistency. Figure 6 summarizes the cache miss rates measured within the
+get_detcostkernel.
+Color Codes.Baseline L1 miss rates decreased from 70.7%–80.0% to 53.6%–64.2%,
+with a peak reduction of 24.3% for theuniformmodel atp= 0.002andd= 11. LLC miss
+rates fell from 36.3%–70.6% to 8.7%–29.2%, a peak reduction of 83.5% for theuniform
+model atp= 0.001andd= 9.
+Bivariate-Bicycle Codes.L1 miss rates dropped from 77.0%–92.1% to 65.1%–80.0%, a
+peak reduction of 15.3% for theSI1000model atp= 0.001andd= 10. LLC misses fell
+significantly from 45.6%–87.9% to 7.1%–37.5%, a peak reduction of 87.6% for theNLR5
+model atp= 0.002andd= 6.
+Surface Codes.L1 miss rates fell from 57.9%–70.7% to 43.4%–53.7%, with a peak
+reduction of 28.6% atp= 0.002andd= 11. LLC miss rates dropped from 29.3%–50.4%
+to 6.6%–20.0%, with a 78.4% peak reduction atp= 0.001andd= 7.
+Transversal CNOT Protocols.Baseline L1 miss rates fell from 45.4%–61.9% to 30.4%–
+45.5%, with a 39.6% peak reduction atp= 0.002andd= 11. LLC miss rates decreased
+from 34.8%–48.2% to 7.8%–24.6%, with a 78.2% peak reduction atp= 0.001andd= 7.
+The dramatic reduction in LLC miss rates—reaching up to 90%—stems from the syn-
+ergy between enhanced spatial locality and the CPU’s hardware prefetching mechanisms.
+By transitioning to an AoS layout, we ensured that the data fields required for a single
+get_detcostevaluation are packed into contiguous memory blocks. This alignment en-
+ables a single cache line fetch to populate the L1 cache with all necessary parameters,
+effectively eliminating the fragmented, non-contiguous memory requests that previously
+bottlenecked the LLC. Furthermore, by aligning our data structures with 64-byte cache
+line boundaries, we maximized the efficiency of the hardware prefetcher; this enables the
+CPU to accurately predict and load subsequent data blocks into the cache hierarchy before
+they are explicitly requested.
+6 Conclusion
+The implementation of robust and efficient decoders is a fundamental requirement for the
+success of practical quantum error correction. In this paper, we presented a systematic
+investigation into the performance of theTesseractdecoder, a search-based decoder that
+utilizesA*search to navigate the exponentially large space of error configurations. While
+Tesseractprovides high accuracy and significant speed advantages over traditional Integer
+Programmingdecoders, ourworkdemonstratesthatitsperformancecanbefurtherelevated
+through rigorous profiling and low-level optimizations.
+By conducting a detailed bottleneck analysis, we identified and resolved critical in-
+efficiencies within the decoder’sC++implementation. We iteratively applied four opti-
+mization strategies, focusing on improving memory access patterns, leveraging advanced
+data structures, and accelerating theget_detcostheuristic kernel by reorganizing mem-
+ory layouts from a Structure of Arrays (SoA) to an Array of Structures (AoS). Our results
+show that such systematic refinements to data locality and cache efficiency yield profound
+18
+=== PAGE 19 ===
+uniform,d=7 uniform,d=9 uniform,d=11 si1000,d=7 si1000,d=9 si1000,d=11
+0
+20
+40
+60
+80
+100Cache Misses (%)
+78.8%
+73.6%
+70.7%
+78.8%
+72.9%
+71.0%
+-22.0%
+-20.5%
+-22.3%
+-20.5%
+-21.2%
+-22.9%
+43.3%
+52.8%
+68.0%
+40.1%
+53.4%
+68.5%
+-78.6%
+-83.5%
+-63.1%
+-76.2%
+-80.5%
+-63.6%
+Cache Miss Rates in Color Codes (p=0.001, 1000 shots)
+L1 Base
+L1 Opt
+LLC Base
+LLC Opt
+(a)
+uniform,d=7 uniform,d=9 uniform,d=11 si1000,d=7 si1000,d=9 si1000,d=11
+0
+20
+40
+60
+80
+100Cache Misses (%)
+80.0%
+73.8%
+70.9%
+78.9%
+75.5%
+75.9%
+-19.7%
+-22.0%
+-24.3%
+-19.2%
+-21.4%
+-22.7%
+36.3%
+58.3%
+60.3%
+41.0%
+61.5%
+70.6%
+-73.2%
+-80.1%
+-60.4%
+-76.6%
+-80.0%
+-58.6%
+Cache Miss Rates in Color Codes (p=0.002, 1000 shots)
+L1 Base
+L1 Opt
+LLC Base
+LLC Opt (b)
+si1000,d=6 si1000,d=10 nlr5wb,d=6 nlr5wb,d=10 nlr10wb,d=6 nlr10wb,d=10
+0
+20
+40
+60
+80
+100Cache Misses (%)
+78.7%
+77.0%
+81.2%
+81.7%
+84.5%
+86.9%
+-14.6%
+-15.3%
+-13.8%
+-14.8%
+-14.5%
+-14.6%
+45.6%
+77.7%
+55.1%
+79.8%
+56.8%
+82.9%
+-83.9%
+-65.6%
+-85.5%
+-57.6%
+-87.5%
+-57.3%
+Cache Miss Rates in Bivariate-Bicycle Codes (p=0.001, 1000 shots)
+L1 Base
+L1 Opt
+LLC Base
+LLC Opt
+(c)
+si1000,d=6 si1000,d=10 nlr5wb,d=6 nlr5wb,d=10 nlr10wb,d=6 nlr10wb,d=10
+0
+20
+40
+60
+80
+100
+120Cache Misses (%)
+82.0%
+83.5%
+87.2%
+89.4%
+90.5%
+92.1%
+-12.3%
+-13.1%
+-12.2%
+-12.4%
+-12.7%
+-13.0%
+56.9%
+81.6%
+58.0%
+85.5%
+58.0%
+87.9%
+-86.5%
+-55.9%
+-87.6%
+-56.1%
+-85.5%
+-60.1%
+Cache Miss Rates in Bivariate-Bicycle Codes (p=0.002, 1000 shots)
+L1 Base
+L1 Opt
+LLC Base
+LLC Opt (d)
+p=0.001,d=7 p=0.001,d=9 p=0.001,d=11 p=0.002,d=7 p=0.002,d=9 p=0.002,d=11
+0
+20
+40
+60
+80Cache Misses (%)
+66.7%
+64.2%
+57.9%
+70.7%
+65.0%
+60.7%
+-19.5%
+-18.0%
+-18.4%
+-24.0%
+-26.2%
+-28.6%
+50.4%
+38.3%
+37.1%
+29.3%
+33.6%
+36.5%
+-78.4%
+-62.8%
+-64.9%
+-77.5%
+-63.3%
+-45.3%
+Cache Miss Rates in Surface Codes (1000 shots)
+L1 Base
+L1 Opt
+LLC Base
+LLC Opt
+(e)
+p=0.001,d=7 p=0.001,d=9 p=0.001,d=11 p=0.002,d=7 p=0.002,d=9 p=0.002,d=11
+0
+10
+20
+30
+40
+50
+60
+70
+80Cache Misses (%)
+60.3%
+51.7%
+45.4%
+61.9%
+54.7%
+50.3%
+-24.5%
+-26.2%
+-29.3%
+-30.1%
+-34.7%
+-39.6%
+35.6%
+46.6%
+43.0%
+34.8%
+35.0%
+48.2%
+-78.2%
+-59.1%
+-48.0%
+-45.1%
+-36.4%
+-48.9%
+Cache Miss Rates in Transversal CNOT Protocols (1000 shots)
+L1 Base
+L1 Opt
+LLC Base
+LLC Opt (f)
+Figure 6: Cache miss rate reduction within theget_detcostkernel for long beam experiments on
+the Sapphire Rapids architecture: (a) Color Codes atp= 0.001; (b) Color Codes atp= 0.002; (c)
+Bivariate-Bicycle Codes atp= 0.001; (d) Bivariate-Bicycle Codes atp= 0.002; (e) Surface Codes; (f)
+Transversal CNOT Protocols for Surface Codes.
+performance gains. Across three distinct hardware architectures, we achieved consistent
+speedups of approximately 2×for Color codes, Surface codes, and Transversal CNOT pro-
+tocols, often exceeding 2.5×. For the most computationally demanding configurations of
+Bivariate-Bicycle codes, we achieved a peak speedup exceeding 5×on the primary archi-
+tecture.
+Ultimately, these enhancements makeTesseracta more scalable and viable tool for
+decoding the large code distances and high error rates required for fault-tolerant quantum
+computing. Our work serves as a practical case study in high-performance engineering for
+19
+=== PAGE 20 ===
+QEC, providing a foundation and an extensive performance dataset to guide the develop-
+ment of future real-time decoding solutions.
+Author Contributions
+Conceptualization, D.G., L.A.B., and N.S.; methodology, D.G. and N.S.; software, D.G.;
+validation, D.G., L.A.B., and N.S.; formal analysis, D.G.; investigation, D.G.; resources,
+L.A.B. and N.S.; data curation, D.G.; writing—original draft, D.G.; writing—review and
+editing, D.G., L.A.B., and N.S.; visualization, D.G.; supervision, L.A.B. and N.S.; project
+administration, L.A.B.; funding acquisition, L.A.B.
+Data Availability
+TheTesseractdecoder is an open-source project available at [15]. The specific implementa-
+tions of the optimizations, including detailed descriptions and performance benchmarking
+results, are publicly archived in the repository’s pull requests: [12], [13], and [14]. All other
+data supporting the findings of this study are included within the article.
+Acknowledgments
+The majority of this work was performed at Google Quantum AI during D.G.’s internship
+under the supervision of L.A.B. and N.S. The authors thank the Google Quantum AI team
+for providing the internship opportunity and the computational resources used for the pri-
+mary phase of the study, which included the initial decoder profiling, optimization design,
+and experiments on the first hardware architecture. Additional evaluation experiments
+on the second and third architectures were conducted at Rice University; this work was
+supported in part by the NOTS cluster operated by Rice University’s Center for Research
+Computing (CRC).
+References
+[1] Laksono Adhianto, Sinchan Banerjee, Mike Fagan, Mark Krentel, Gabriel Marin, John
+Mellor-Crummey, andNathanRTallent. Hpctoolkit: Toolsforperformanceanalysisof
+optimizedparallelprograms.Concurrency and Computation: Practice and Experience,
+22(6):685–701, 2010. DOI: 10.1002/cpe.1553.
+[2] Paul Baireuther, Marcello D Caio, Ben Criger, Carlo WJ Beenakker, and Thomas E
+O’Brien. Neural network decoder for topological color codes with circuit level noise.
+New Journal of Physics, 21(1):013003, 2019. DOI: 10.1088/1367-2630/aaf29e.
+[3] Laleh Aghababaie Beni, Oscar Higgott, and Noah Shutty. Tesseract: A search-based
+decoder for quantum error correction.arXiv preprint arXiv:2503.10988, 2025. DOI:
+10.48550/arXiv.2503.10988.
+[4] Hector Bombin and Miguel Angel Martin-Delgado. Topological quantum distillation.
+Physical review letters, 97(18):180501, 2006. DOI: 10.1103/PhysRevLett.97.180501.
+[5] Sergey Bravyi, Andrew W Cross, Jay M Gambetta, Dmitri Maslov, Patrick Rall, and
+Theodore J Yoder. High-threshold and low-overhead fault-tolerant quantum memory.
+Nature, 627(8005):778–782, 2024. DOI: 10.1038/s41586-024-07107-7.
+[6] Madelyn Cain, Chen Zhao, Hengyun Zhou, Nadine Meister, J Ataides, Arthur Jaffe,
+Dolev Bluvstein, and Mikhail D Lukin. Correlated decoding of logical algorithms
+20
+=== PAGE 21 ===
+with transversal gates.arXiv preprint arXiv:2403.03272, 2024. DOI: 10.1103/Phys-
+RevLett.133.240602.
+[7] Nicolas Delfosse, Vivien Londe, and Michael E Beverland. Toward a union-find de-
+coder for quantum ldpc codes.IEEE Transactions on Information Theory, 68(5):
+3187–3199, 2022. DOI: 10.1109/TIT.2022.3143452.
+[8] Eric Dennis, Alexei Kitaev, Andrew Landahl, and John Preskill. Topological quan-
+tum memory.Journal of Mathematical Physics, 43(9):4452–4505, 2002. DOI:
+10.1063/1.1499754.
+[9] Austin G Fowler, Matteo Mariantoni, John M Martinis, and Andrew N Cleland. Sur-
+face codes: Towards practical large-scale quantum computation.Physical Review
+A—Atomic, Molecular, and Optical Physics, 86(3):032324, 2012. DOI: 10.1103/Phys-
+RevA.86.032324.
+[10] Craig Gidney and Cody Jones. New circuits and an open source decoder for the color
+code.arXiv preprint arXiv:2312.08813, 2023. DOI: 10.48550/arXiv.2312.08813.
+[11] Craig Gidney, Michael Newman, and Matt McEwen. Benchmarking the planar hon-
+eycomb code.Quantum, 6:813, 2022. DOI: 10.22331/q-2022-09-21-813.
+[12] Google Quantum AI. Replacing bit-packed boolean sequences with std::vector<char>
+in Tesseract decoder.https://github.com/quantumlib/tesseract-decoder/
+pull/25, 2025.
+[13] Google Quantum AI. AoS data reorganization and early-exit cost calculation in
+Tesseract decoder.https://github.com/quantumlib/tesseract-decoder/pull/
+34, 2025.
+[14] Google Quantum AI. Vectorized hashing of syndrome patterns in Tesseract decoder.
+https://github.com/quantumlib/tesseract-decoder/pull/57, 2025.
+[15] Google Quantum AI. Tesseract open-source C++/Python implementation.https:
+//github.com/quantumlib/tesseract-decoder, 2025.
+[16] Sam J Griffiths and Dan E Browne. Union-find quantum decoding without union-
+find.Physical Review Research, 6(1):013154, 2024. DOI: 10.1103/PhysRevRe-
+search.6.013154.
+[17] Peter E Hart, Nils J Nilsson, and Bertram Raphael. A formal basis for the heuristic
+determination of minimum cost paths.IEEE transactions on Systems Science and
+Cybernetics, 4(2):100–107, 1968. DOI: 10.1109/TSSC.1968.300136.
+[18] Oscar Higgott and Craig Gidney. Sparse blossom: correcting a million errors per core
+second with minimum-weight matching.Quantum, 9:1600, 2025. DOI: 10.22331/q-
+2025-01-20-1600.
+[19] Dominic Horsman, Austin G Fowler, Simon Devitt, and Rodney Van Meter. Surface
+code quantum computing by lattice surgery.New Journal of Physics, 14(12):123011,
+2012. DOI: 10.1088/1367-2630/14/12/123011.
+[20] Qi Huangfu and JA Julian Hall. Parallelizing the dual revised simplex method.Math-
+ematical Programming Computation, 10(1):119–142, 2018. DOI: 10.1007/s12532-017-
+0130-5.
+[21] M Kargarian, H Bombin, and MA Martin-Delgado. Topological color codes and two-
+body quantum lattice hamiltonians.New Journal of Physics, 12(2):025018, 2010. DOI:
+10.1088/1367-2630/12/2/025018.
+[22] Aleksander Kubica and Michael E Beverland. Universal transversal gates with
+color codes: A simplified approach.Physical Review A, 91(3):032330, 2015. DOI:
+10.1103/PhysRevA.91.032330.
+[23] Nathan Lacroix, Alexandre Bourassa, Francisco JH Heras, Lei M Zhang, Johannes
+Bausch, Andrew W Senior, Thomas Edlich, Noah Shutty, Volodymyr Sivak, Andreas
+21
+=== PAGE 22 ===
+Bengtsson, et al. Scaling and logic in the color code on a superconducting quantum
+processor.Nature, pages 1–3, 2025. DOI: 10.1038/s41586-025-09061-4.
+[24] Andrew J Landahl, Jonas T Anderson, and Patrick R Rice. Fault-tolerant quan-
+tum computing with color codes.arXiv preprint arXiv:1108.5738, 2011. DOI:
+10.48550/arXiv.1108.5738.
+[25] Linux Kernel Organization. perf: Linux profiling with performance counters.https:
+//perf.wiki.kernel.org/, 2025.
+[26] Kai R Ott, Bence Hetényi, and Michael E Beverland. Decision-tree decoders
+for general quantum ldpc codes.arXiv preprint arXiv:2502.16408, 2025. DOI:
+10.48550/arXiv.2502.16408.
+[27] Pavel Panteleev and Gleb Kalachev. Degenerate quantum ldpc codes with good finite
+length performance.Quantum, 5:585, 2021. DOI: 10.22331/q-2021-11-22-585.
+[28] Rice University Center for Research Computing. Rice Supercomputing (NOTS) Clus-
+ter Description.https://kb.rice.edu/147971, 2025.
+[29] Joschka Roffe, David R White, Simon Burton, and Earl Campbell. Decoding across
+the quantum low-density parity-check code landscape.Physical Review Research, 2
+(4):043423, 2020. DOI: 10.1103/PhysRevResearch.2.043423.
+[30] Kaavya Sahay, Yingjia Lin, Shilin Huang, Kenneth R Brown, and Shruti Puri. Er-
+ror correction of transversal cnot gates for scalable surface-code computation.PRX
+quantum, 6(2):020326, 2025. DOI: 10.1103/PRXQuantum.6.020326.
+[31] The Boost Community. Boost C++ Libraries.https://www.boost.org/, 2025.
+[32] Suhas Vittal, Poulami Das, and Moinuddin Qureshi. Astrea: Accurate quantum error-
+decoding via practical minimum-weight perfect-matching. InProceedings of the 50th
+Annual International Symposium on Computer Architecture, pages 1–16, 2023. DOI:
+10.1145/3579371.3589037.
+[33] Wikipedia Contributors. Array of structures and structure of arrays.https://en.
+wikipedia.org/wiki/AoS_and_SoA, 2025.
+[34] Yue Wu, Namitha Liyanage, and Lin Zhong. Micro blossom: Accelerated minimum-
+weight perfect matching decoding for quantum error correction. InProceedings
+of the 30th ACM International Conference on Architectural Support for Program-
+ming Languages and Operating Systems, Volume 2, pages 639–654, 2025. DOI:
+10.1145/3676641.3716005.
+[35] Theodore J Yoder, Eddie Schoute, Patrick Rall, Emily Pritchett, Jay M Gambetta,
+Andrew W Cross, Malcolm Carroll, and Michael E Beverland. Tour de gross:
+A modular quantum computer based on bivariate bicycle codes.arXiv preprint
+arXiv:2506.03094, 2025. DOI: 10.48550/arXiv.2506.03094.
+[36] Youwei Zhao, Yangsen Ye, He-Liang Huang, Yiming Zhang, Dachao Wu, Huijie Guan,
+Qingling Zhu, Zuolin Wei, Tan He, Sirui Cao, et al. Realization of an error-correcting
+surface code with superconducting qubits.Physical Review Letters, 129(3):030501,
+2022. DOI: 10.1103/PhysRevLett.129.030501.
+[37] Keren Zhou, Laksono Adhianto, Jonathon Anderson, Aaron Cherian, Dejan Grubisic,
+Mark Krentel, Yumeng Liu, Xiaozhu Meng, and John Mellor-Crummey. Measurement
+and analysis of gpu-accelerated applications with hpctoolkit.Parallel Computing, 108:
+102837, 2021. DOI: 10.1016/j.parco.2021.102837.
+22

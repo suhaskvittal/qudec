@@ -1,0 +1,1170 @@
+
+=== PAGE 1 ===
+Improved accuracy for decoding surface codes with matching synthesis
+Cody Jones∗
+Google Quantum AI, Santa Barbara, CA 93117, USA
+We present a method, called matching synthesis, for decoding quantum codes that produces an
+enhanced assignment of errors from an ensemble of decoders. We apply matching synthesis to
+develop a decoder named Libra, and show in simulations that Libra increases the error-suppression
+ratio Λ by about 10%. Matching synthesis takes the solutions of an ensemble of approximate
+solvers for the minimum-weight hypergraph matching problem, and produces a new solution that
+combines the best local solutions, where locality depends on the hypergraph. We apply matching
+synthesis to an example problem of decoding surface codes with error correlations in the conventional
+circuit model, which induces a hypergraph with hyperedges that are local in space and time. We
+call the matching-synthesis decoder Libra, and in this example the ensemble consists of correlated
+minimum-weight matching using a different hypergraph with randomly perturbed error probabilities
+for each ensemble member. Furthermore, we extend matching synthesis to perform summation of
+probability for multiple low-weight solutions and at small computational overhead, approximating
+the probability of an equivalence class; in our surface code problem, this shows a modest additional
+benefit. We show that matching synthesis has favorable scaling properties where accuracy begins
+to saturate with an ensemble size of 60, and we remark on pathways to real-time decoding at
+near-optimal decoding accuracy if one has an accurate model for the distribution of errors.
+I. INTRODUCTION
+A fault-tolerant quantum computer requires real-time
+decoding of the parity checks that detect errors during
+the computation [1]. Accuracy of decoding is important
+as well, since improvements in accuracy can reduce the
+resource overhead for error correction [2–5]. Hence de-
+coding algorithms that achieve higher accuracy while be-
+ing efficient to run in real time are desirable for making
+useful quantum computers.
+Many works have studied accurate decoding for sur-
+face codes. If accuracy improvements are relative, then
+the historical baseline [6] is Edmonds’ Blossom algo-
+rithm [7] for minimum-weight perfect matching (where
+often the decoder itself is known as MWPM). The ob-
+servation that correlations between the X andZ lattices
+(or primal and dual in the original work [8]) could be
+exploited by edge reweighting [9] led to improved accu-
+racy with correlated MWPM [10–13]. More recently, a
+mapping between surface and color codes [14] converts
+the problem into finding a good decoder for color codes.
+Accuracy in matching can also be improved with belief
+propagation [15] or accounting for path degeneracy with
+multi-path summation [16].
+Whereas correlated matching is heuristic with error
+correlations, there are other decoding algorithms that
+attempt to compute optimal solutions. Belief propa-
+gation [17, 18] can achieve high accuracy but some-
+times fails to converge (Ref. [15] falls back to match-
+ing). Tensor-network decoders appear to approach opti-
+mal accuracy for 2D networks (noiseless syndrome mea-
+surement) [19–21], but contracting a 3D tensor network,
+required for fault tolerance in surface codes, is believed to
+∗ ncodyjones@google.com
+be intractable beyond small code distances [22–24]. Like-
+wise, integer-program decoders have exponential runtime
+in the worst case [25, 26], though the average runtime
+for below-threshold error rates could be more favorable;
+linear-program decoders [27, 28] may also enable circum-
+venting intractable runtimes.
+This work introduces a decoder called Libra that uti-
+lizes ensembling, where a collection of decoders pro-
+duce differing decoding solutions, which are analyzed
+collectively. Ensembling for decoding has appeared in
+machine-learning decoders [29, 30] and matching with
+the Harmony decoder [13]. The Harmony decoder, de-
+veloped by colleagues at the same institution, was an in-
+spiration for how to identify improving cycles in problem-
+independent way, as opposed to local search that would
+introduce complexity that depends on problem structure.
+Both Harmony and Libra access an ensemble of decoders;
+Harmony makes fewer demands on the ensemble out-
+put (majority voting or selecting the global-minimum
+weight), whereas Libra can synthesize the best local so-
+lutions across the ensemble, if the ensemble can produce
+an assignment of errors.
+We remark that the matching synthesis method ap-
+pears new to the author, but the procedure seems to
+apply to other problems in optimization beyond decod-
+ing quantum codes. Hence this method or something
+similar may already appear in a different field, under a
+different name. It was not found in a literature search,
+though this would be limited by the author’s knowledge
+of terminology in other fields. The use of a random en-
+semble and combining pieces of solutions resembles local
+search in simulated annealing [31–33] or “crossover” in
+genetic algorithms [34–36], but the similarity ends there;
+our method is not local search or a genetic algorithm. If
+a closer match to this method is found in prior work, the
+manuscript will be updated accordingly.
+arXiv:2408.12135v1  [quant-ph]  22 Aug 2024
+=== PAGE 2 ===
+2
+II. DECODING FROM MINIMUM-WEIGHT
+HYPERGRAPH PERFECT MATCHING
+The minimum-weight hypergraph perfect matching
+(MWHPM) problem is a generalization of the more com-
+monly encountered minimum-weight perfect matching
+problem [7]. However, whereas the latter can be solved
+optimally in polynomial time, MWHPM is an NP-hard
+problem [37]. Hence the best we can hope for in a new
+approach to this problem is to improve the trade-off be-
+tween computational time and approximation to optimal
+accuracy. Let us first define the MWHPM problem and
+describe how this problem applies to decoding quantum
+codes.
+Define a weighted hypergraph as G = (V,E ) where V
+is a set of vertices and E is a set of hyperedges. Each
+hyperedgee∈E has some list of vertices v(e), where the
+list size is any positive integer (contrast this with a graph,
+where the size must be two for every edge) and every
+vertex in the list is in V . Furthermore, each hyperedge e
+has weightw(e) that in general can be any real number,
+though we restrict our attention tow(e)≥ 0 in this work.
+Let us furthermore represent the sum of edge weights for
+a list of hyperedges e ={ei} as
+w(e) =
+X
+ei∈e
+w(ei). (1)
+In mapping to decoding stabilizer quantum codes [38],
+each vertex is a parity check, and each hyperedge cor-
+responds to an error channel. The vertices v(e) are the
+parity checks that flip when the errore occurs. There are
+different approaches to selecting the hyperedge weights,
+but we will motivate a typical one. If errors are indepen-
+dent binary channels with probabilityp(e) (i.e. weighted
+coin flip for each error occurring or not), then setting
+w(e) = log[(1 −p(e))/p(e)] creates an equivalence be-
+tween minimizing a sum of hyperedge weights and maxi-
+mizing posterior probability over error events consistent
+with the syndrome [9, 13, 19, 20], as described below.
+Because each hyperedge e corresponds to a specific error
+occurring, we will interchangeably refer to e as an error
+as well. Likewise, we will say e, a list of hyperedges, is
+also a configuration of errors.
+The MWHPM problem, generalized for our purposes,
+is defined as follows. For a weighted hypergraph, one
+is given a “syndrome” S that is a list of vertices. In
+decoding quantum codes, the syndrome will be parity
+checks that have flipped due to errors. Furthermore, let
+us define a syndrome function s(e) = v(e) for a single
+hyperedge, and for a list of hyperedges e ={ei}
+s(e) =
+M
+ei∈e
+s(ei), (2)
+wheres(e1)⊕s(e2) means symmetric difference of the lists
+s(e1) ands(e2), or equivalently mod-2 parity. Hence, the
+MWHPM optimization problem is finding e that solves
+minw(e) s.t.s (e) =S. (3)
+Said in words, all configurations of hyperedges that sat-
+isfys(e) =S correspond to possible Pauli-error patterns
+consistent with the observed parity-check violations, and
+we seek the error pattern that minimizes the weight sum
+w(e) because this event will be the most probable. For
+simplicity, we call any solution e that satisfies s(e) = S
+a “matching for S”.
+The generalization to MWHPM used here is in the
+meaning of “perfect matching”, implied by the ⊕ in
+Eqn. (2). Here we take perfect matching to mean that
+the parity of hyperedges incident to a given vertexu must
+be odd for u∈S and must be even for u /∈S. In the tra-
+ditional formulation of perfect matching for graphs [7],
+there is no syndrome (or one could say the syndrome is
+implicitly all vertices), and the number of incident edges
+to every vertex must be one, instead of any odd number.
+To complete the connection between MWHPM and de-
+coding for quantum codes, we additionally associate an
+“observable list”o(e) with every hyperedge e. This does
+not appear in the optimization problem, but it does de-
+termine the result of decoding once a solution to the op-
+timization problem has been chosen. For the quantum
+code, make some arbitrary choice of logical operators
+{Oi} (which are Pauli strings in stabilizer codes) that
+propagate through the error correction circuit. For each
+error event, o(e) is the list of operators in {Oi} that an-
+ticommutes with e (i.e. error e occurring would flip the
+observed value ofOi). For a set of hyperedges we can say
+that
+o(e) =
+M
+ei∈e
+o(ei), (4)
+where again⊕ means symmetric difference. Equivalently,
+if we track observable lists as bitstrings with a 1 in po-
+sition i for each Oi, then the operation ⊕ means bitwise
+XOR.
+These logical observables are important for two rea-
+sons. First, all error patterns with the same observable
+list define an equivalence class [9, 19]. Second, when de-
+coding is employed in a fault-tolerant computation, the
+observable list for the chosen error configuration deter-
+mines the outcome of logical-qubit measurements.
+III. MATCHING SYNTHESIS
+Matching synthesis is a procedure for taking two or
+more solutions to the MWHPM problem, described in
+the previous section, and producing a new solution that
+is in general better than any of the inputs (and at least
+as good as the best input). For two distinct MWHPM
+solutions, the procedure is:
+1. compute the symmetric difference (SD) of the as-
+signed errors,
+2. separate the SD into pieces with null syndrome
+(“cycles”),
+=== PAGE 3 ===
+3
+FIG. 1. Example showing that two matchings (A andB, top)
+for the same syndrome can be related by flipping two cycles
+(bottom), where the cycles are collectively the symmetric dif-
+ference A ⊕ B.
+3. determine the signed weight of each cycle, and
+4. form a new “synthetic matching” that incorporates
+only the cycles that lower weight.
+The rest of this section elaborates on the synthesis pro-
+cess, and later sections describe how this can be used in
+decoding quantum codes.
+Following the nomenclature of Section II, suppose that
+for decoding a syndrome S, there are candidate match-
+ings e and f: s(e) = s(f) = S. Let d = e⊕ f be the
+symmetric difference of these two solutions; namely, can-
+cel out the errors assigned in both configurations and
+keep the errors that appear in only one configuration.
+By linearity,s(d) =s(e)⊕s(f) =∅, the null syndrome.
+Any set of hyperedgesc with null syndrome has a prop-
+erty that is key to this work. Let us label any such c a
+“cycle”, where we will refine the definition below after
+motivating its use. For any error configuration e and
+any cycle c, then s(e⊕ c) = s(e). Hence, given one de-
+coding solution s(e) = S, we can use cycles to generate
+other solutions. If we are clever about which cycles to in-
+corporate, then we can produce new solutions with lower
+weight, w(e⊕ c) < w(e) and improve our approximate
+solution to MWHPM.
+Let us be explicit about what we mean by “cycle” in
+our extended version of a hypergraph. For our purposes,
+a cycle is any hyperedge list c such that s(c) = ∅ and
+o(c) = ∅. Setting aside logical observables, this def-
+inition subsumes the traditional meaning of cycles on
+graph. It also includes any configuration of hyperedges
+such every vertex has an even number of incident hyper-
+edges. The logical observables are furthermore necessary
+because they define equivalence classes, and we require
+that given a cycle c,o(e) =o(e+c) for all e, such that in-
+corporating a cycle does not change the equivalence class
+for a given solution. An example using edges in a normal
+graph, which is easier to visualize than a hypergraph, is
+shown in Fig. 1.
+We want to make the best (i.e. lowest weight) match-
+ing that we can for a given syndromeS, and our approach
+will be to improve an initial solution e by combining with
+one or more cycles. To proceed, we define a “relative
+weight” function for cycles:
+w(c|e) =w(c⊕ e)−w(e). (5)
+While it might seem like we are going in circles, this
+relative weight can be expressed as
+w(c|e) =w(c\e)−w(c∩ e), (6)
+where c\e means “hyperedges in c and not in e” and
+c∩ e is the interection, “hyperedges in both c and e”.
+The interpretation is straightforward: in going from e→
+(e⊕ c), we remove the hyperedges in c∩ e and subtract
+their summed weight, and we we add the hyperedges in
+c\e and add their weight. The formulation in Eqn. (6)
+shows that we can compute the relative weight of the
+cycle with complexity that scales with the cycle size, not
+the size of the matching as one might think from Eqn. (5).
+The relative weight is useful because it tells us how much
+a matching solution improves by combining with a cycle.
+So we want to find cycles with negative relative weight,
+w(c|e)< 0, because this would meanw(c⊕ e)<w (e). If
+we take two matchings e and f, compute the symmetric
+difference d = e⊕ f, and compute w(d|e), we are left
+with the uninspiring result that we are just picking the
+lower weight matching of the two. Now we reach the core
+result of matching synthesis. Instead of computing the
+weight of the entire symmetric difference, we breakd into
+smaller cycles where possible,
+d =
+M
+i
+di s.t. s(d) =s(di) =∅, (7)
+where each di is a subset of d. We then compute
+w(di|e) for each subset, and filter out the ones that have
+o(di) ̸= ∅ or w(di|e) ≥ 0. What remains are cycles
+{ci} of negative relative weight. We can produce a new
+matching
+g = e⊕
+ M
+c∈N
+c
+!
+, (8)
+where the set of negative-relative-weight cycles is N =
+{c : c∈ d,w (c|e) < 0}. Matching g is derived from e
+and f, and it will equal e whenN =∅ and equal f when
+N = d. However, something interesting happens when
+N contains some of, but not all of, the cycles in d: in
+this case, g is an entirely new “synthetic” matching, and
+=== PAGE 4 ===
+4
+FIG. 2. Continuing from the example in Fig. 1, suppose that
+just one of the cycles c from the lower-right of Fig. 1 has
+negative relative weight. We can produce a new “synthetic”
+matching D = A ⊕ c that has lower weight than either of the
+source matchings A or B.
+it has lower weight than either e or f. This is depicted
+with a visual example in Fig. 2.
+Splitting a given d withs(d) =∅ into pieces{di} with
+s(di) =∅ can be done in more than one way. The method
+we employ here is to simply to break d into connected
+components, where two hyperedges are connected when
+they touch a common vertex. This can be computed ef-
+ficiently using standard techniques in graph search. It
+results in subsets di that satisfy Eqn. (7) by being non-
+overlapping; note however than Eqn. (7) does not require
+{di} to be non-overlapping. Using connected compo-
+nents does not guarantee the pieces are as small as possi-
+ble; for example, if there are two cycles that touch at one
+mutual vertex, they will form a single connected compo-
+nent. We find that isolating cycles by connected compo-
+nents works well for decoding surface codes, as shown in
+Section V, and we leave the more general problem of cy-
+cle decomposition, which can be done with cycle-finding
+algorithms, to future work.
+There is one final step to close the loop on matching
+synthesis, and that is addressing the observable lists asso-
+ciated with hyperedges. When we separate a symmetric
+difference d into pieces according to Eqn. (7), such as
+by connected components, sometimes pieces in {di} will
+be logical operators. Using our previous definitions, any
+di with s(di) = ∅ and s(di)̸=∅ is a logical operator.
+Although they are not cycles, logical operators will be
+useful in two ways for improving our decoding solutions.
+First, using one solution e, we can generate another so-
+lution in a different equivalence class via e⊕ di, because
+o(e⊕di) =o(e)⊕o(di). Second, for two pieces di and dj
+withs(di) =s(dj) =∅ ando(di) =o(dj), we can make a
+cycle di⊕ dj, because o(di⊕ dj) =o(di)⊕o(dj) =∅. In
+some cases, adding cycles from a pair of equivalent logi-
+cal operators, which may not be found by the connected-
+components method, can yield an improving cycle.
+While matching synthesis improves a solution to the
+MWHPM problem by incorporating cycles of negative
+relative weight, what can we make of cycles with positive
+relative weight? One application, which will we show can
+improve decoding for surface codes, is to record cycles
+with small positive (or zero) relative weight. Each cycle
+can generate a new matching, and if the relative weight
+is small, this will be another approximate solution, with
+weight that is not the best known, but close to it. Of
+course, if there are cycles with relative weight zero, they
+produce alternative solutions with smallest weight found.
+If these small-weight cycles are non-overlapping, they
+generate many good solutions to the MWHPM prob-
+lem: n non-overlapping cycles encodes 2 n distinct so-
+lutions. We show later that the Libra decoder can effi-
+ciently compute the sum of probability over all 2 n con-
+figurations in time linear in n, and also describe how
+it handles cases where these small-positive cycles over-
+lap. This is reminiscent of multi-path summation [16] or
+the way Markov-chain [9], tensor-network [13, 19, 20] or
+belief-propagation [15, 17, 18] decoders account for mul-
+tiple error configurations in an equivalence class.
+IV. LIBRA DECODER
+We apply matching synthesis to make a new decoder
+that we call Libra. Libra works by using an ensemble
+of decoders to generate multiple distinct matchings, and
+synthesize from them better matchings. Libra iteratively
+improves two or more matchings, one for each equiva-
+lence class represented. For example, in the simulations
+of Section V, there are two equivalence classes for a log-
+ical memory experiment (e.g. in an X-basis memory ex-
+periment, X logical operators act trivially, so there are
+two equivalence classes and not four).
+The architecture of Libra as implemented in this work
+is shown in Fig. 3. To initialize a representative for
+each equivalence class, we first perform complementary
+matching [9, 39–42], using correlated MWPM on the un-
+perturbed error hypergraph. Correlated MWPM returns
+two “edge” matchings for theX andZ graphs, which can
+be converted to the most-probable assignment of hyper-
+edges within the original hypergraph that contain these
+matched X and Z edges using the assignment method
+in Ref. [13]. There are other ways of producing repre-
+sentatives, such as relying on an ensemble to stochas-
+tically generate matchings in more than one equiva-
+lence class [13]. However, the complementary matching
+also provides the “complementary gap”, the difference in
+weight between the two matchings found, which is very
+=== PAGE 5 ===
+5
+FIG. 3. Architecture of the Libra decoder in this work. The diagram depicts 5 decoders in D1–D5 in the ensemble, but the
+ensemble size can be arbitrary. Each ⊕ operation in this diagram stands for matching synthesis (Sec. III) between the two
+matchings indicated by arrows pointing into the ⊕. The arrow coming out of the ⊕ indicates the result of incorporating the
+cycles of negative relative weight (relative to the matching from the horizontal arrow, which originates with the complementary
+matching step). As described in the text, when recording small-positive cycles, the sequence of synthesis stages in Step 3 is
+performed twice. In the final step, a comparison is made between two matchings after incorporating improving cycles from the
+ensemble.
+predictive of the probability of logical error for a given
+syndrome [39]. We use the gap to only invoke the ensem-
+ble on a small fraction of “hard” cases (where the gap is
+small), which happens sufficiently rarely (and with like-
+lihood that decreases exponentially with code distance
+when below threshold) that the average runtime of Libra
+is dictated by complementary matching, and the cost of
+running an ensemble of 100 decoders becomes insignifi-
+cant to the average runtime. Another option would be
+to use a small ensemble first, where we invoke the larger
+ensemble if there are least two equivalence classes for the
+matchings in the first ensemble [13].
+There are many ways to choose an ensemble, but we
+opt for using correlated minimum-weight perfect match-
+ing (MWPM) [10–13] with randomly perturbed hyper-
+edge weights. This is simple to implement (via Stim [43],
+one can edit DEM files) and is similar to the ensemble in
+Harmony [13], though not the same. The perturbation is
+to multiply the probabilitypi→p′
+i for each error channel
+by a log-normally distributed random variable:p′
+i =piri,
+where ri∼ Lognorm(0,σ 2) is equivalent to ri = exp(ti)
+for ti∼ Norm(0,σ 2). For example, if σ = ln 2, then the
+perturbations will have a standard deviation of a factor-
+of-2, normally distributed in the logarithm of probabil-
+ity. This will ensure that probabilities are normalized,
+and zero-probability events (if present) remain zero. Fur-
+thermore, since hyperedge weights are typically the loga-
+rithm of probability, this is effectively adding a normally
+distributed perturbation to hyperedge weights. To be ex-
+plicit, we only use these randomly perturbed hypergraph
+weights to induce an ensemble of correlated-MWPM de-
+coders to give different matching solutions; when we eval-
+uate the weight of a matching or cycle (such as Eqn. (6),
+we use the unperturbed weights.
+For the comparison step in Fig. 3, one could compare
+the weights of the best solution for each equivalence class
+(e.g. two for a logical memory experiment) after match-
+ing synthesis across the ensemble. One can also use small-
+positive cycles found during synthesis to generate mul-
+tiple configurations in each equivalence class, sum the
+probabilities for each equivalence class, and compare the
+probabilities for the equivalence classes, in a manner de-
+scribed below. Libra is configured to do both (the first is
+necessary, and the second comes at negligible additional
+cost), and Section V reports the results for decoding the
+surface code.
+We describe here the algorithm currently employed for
+using the small-positive cycles to estimate probabilities
+=== PAGE 6 ===
+6
+for equivalence classes, though many variations are pos-
+sible. As cycles with nonnegative relative weight are
+discovered, they are stored in a max-heap of fixed size
+(in the simulations of Section V, the size is 30). When
+an improving cycle (one with negative relative weight)
+is found, the heap is cleared, because the stored positive
+cycles were relative to a hyperedge configuration that has
+changed with the improving cycle. Alternatively, one
+could iterate through the cycles in the heap and only
+modify or discard as necessary for those overlapping the
+improving cycle. Because clearing the heap could happen
+in any synthesis step, Libra currently performs the syn-
+thesis procedure twice, where negative cycles are rarely
+discovered in the second pass, which mostly functions to
+discover small-positive cycles.
+After all matching-synthesis operations are performed,
+we have a “best matching” for each of the equivalence
+classes being considered by Libra (e.g. two for the mem-
+ory experiment). We also have the small-positive cycles
+that were discovered, from which we can generate many
+other configurations. For example, if we store 30 such
+cycles, we could generate as many as 2 30≈ 109 configu-
+rations. The number could be less than 2 30 if the cycles
+stored are not linearly independent (e.g. if the combina-
+tion of two cycles is another stored cycle). Computing
+all such configurations generated by these cycles would
+be impractical. However, at least for surface codes, they
+tend to be small cycles from disparate parts of the hy-
+pergraph, so instead we split the cycles into connected
+components. For this step, two cycles are connected if
+they overlap in at least one edge. For each connected
+component of cycles {ci}, we compute a relative proba-
+bility:
+pr({ci}) =
+X
+c∈G({ci})
+pr(c), (9)
+whereG ({ci}) is the set of all unique cycles generated
+by{ci} and the relative probability for a single cycle c is
+pr(c) =p(e⊕ c)/p(e), (10)
+i.e. the ratio of probability of the configuration using the
+cycle to the “base” synthetic matching e. We emphasize
+relative, because the “null” cycle ∅ is always an element
+of anyG, corresponding to the synthetic matching itself,
+and it has a relative probability of 1. If probability is
+the logarithm of weight, then relative probability can be
+computed directly from the relative weight of the cycle,
+which is much faster than a computation over the entire
+matching. Finally, two implementation notes. First, as
+we are generatingG ({ci}), we may encounter a generat-
+ing set from the connected component {ci} that is not
+linearly independent. To guard against this, we use a
+hash table to store the elements of G ({ci}) as they are
+produced, and skip redundant entries. An alternative
+would be to compute an independent vector basis such
+as by Gaussian elimination over binary vectors. Second,
+it is possible that G ({ci}) is very large because it is ex-
+ponential in the size of {ci}. For speed, we truncate the
+FIG. 4. Matching synthesis can be performed by a
+logarithmic-depth binary tree of synthesis steps.
+sum by only considering a low-order approximation to
+the exponentially large number of combinations (e.g. use
+{ci} as the set to sum over, or all combinations of two
+elements of{ci}). In the simulations, we make this ap-
+proximation if|{ci}|≥ 10 cycles. Finally, the estimated
+probability of the equivalence class is
+p(equivalence class) =p(e)
+Y
+k
+p(k)
+r , (11)
+wherep(k)
+r is the relative probability for thekth connected
+component in the small-positive cycles.
+Another generalization of the procedure is the freedom
+of how to synthesize members of the ensemble. Figure 3
+illustrates a sequential procedure where the current syn-
+thesized matching updates iteratively with each ensemble
+member. Alternatively, one could synthesize matchings
+from the ensemble in a logarithmic-depth binary tree,
+as shown in Fig. 4, which could have advantages for
+parallelization of the algorithm. Since synthesis can be
+performed between two matchings, any binary tree with
+number of leaves equal to ensemble size can describe a
+synthesis sequence.
+V. THE SURFACE CODE WITH PAULI
+ERRORS IN THE CIRCUIT MODEL
+For our simulations, we simulate a surface code mem-
+ory experiment, which consists of initializing in a basis
+(X or Z) by direct initialization of data qubits, repeat-
+edly measuring the stabilizers with a circuit of Clifford
+gates for some number of cycles, and then measuring the
+=== PAGE 7 ===
+7
+logical qubit in the same basis as initialization, by direct
+measurement of the data qubits. Noise in the simulation
+consists of a depolarizing channel after every operation,
+with a 1-qubit channel for 1-qubit gates (and reset) or a
+2-qubit channel for the 2-qubit gate, which is controlled-
+Z (CZ) in our circuits. Measurement error is modeled as
+a binary symmetric channel on the classical bit (i.e. flip
+the classical bit with some probability). The depolarizing
+channels and measurement error have different probabil-
+ities according to the SI-1000 model [44], which is repre-
+sentative of error rates in superconducting qubits [23, 45].
+The weighting also captures features seen in other qubit
+platforms [46, 47], such as 1-qubit gates being more reli-
+able than 2-qubit gates, and measurement being less reli-
+able than coherent operations. In this model, the channel
+probabilities are only determined by the operation and
+there is not inhomogeneity in space or time; e.g. all CZ
+gates have the same depolarizing probability.
+The simulations here use a simple ensemble for Li-
+bra. As described in Section IV, each ensemble mem-
+ber is correlated-MWPM [10–13] configured with the
+hypergraph for the circuit (i.e. DEM file [43]), but
+with the error probabilities randomly perturbed by ∼
+Lognorm(0,σ 2). Half of the members have σ = ln 2 and
+the other halfσ = ln 4. In testing, we found such an inho-
+mogeneous ensemble to lead to a small improvement over
+a homogeneous ensemble, which may be due to different
+values ofσ enabling the ensemble to discover a greater va-
+riety of cycles. Future work will explore alternative ways
+to construct an ensemble. Libra also includes a comple-
+mentary matcher (Fig. 3) with unperturbed hypergraph,
+as described in Section IV.
+The simulations are a surface-code memory experi-
+ment, in the logical Z basis, using CZ and Hadamard
+gates, with SI-1000 depolarizing model with parameter
+p = 2e−3. The parameters swept in the simulations are
+code distance ( d), syndrome rounds ( r), and ensemble
+size (s):
+• d∈{ 3, 5, 7, 9, 11},
+• r∈{ 10, 20, 30, 40, 50, 100, 150, 200, 250},
+• s∈{ 20, 40, 60, 80, 100}.
+For every combination of (d,r,s ) we perform correlated
+MWPM as a baseline, and complementary matching to
+determine a complementary gap and initialize two equiv-
+alence classes in Libra. If the complementary gap is less
+than 20 dB (i.e. ratio of probability between the two
+matchings is < 100), then we run the ensemble; this
+conditional execution [13, 48] significantly reduces com-
+putation time since the fraction of problems where the
+ensemble is run scales with the logical error rate [39], de-
+creasing with distance. With the ensemble, we produce
+three decoder predictions:
+• “global” ensembling, which is using the minimum-
+total-weight error configuration found by an ensem-
+ble member [13];
+• Libra using matching synthesis to make improved
+configurations;
+• Libra “degeneracy” using small-positive cycles to
+estimate the probability of equivalence classes.
+Each of these three ensembled methods use exactly the
+same ensemble (described above), so they demonstrate
+the effects of matching synthesis and using small-positive
+cycles. However, it is important to note that different
+ensembles (e.g. distributions of weight perturbations for
+matching) may be better suited to each of the ensembling
+methods listed above. The size of the heap for smallest-
+relative-weight cycles is 30 in all cases. When the ensem-
+ble is not run because the complementary gap is large, all
+decoders default to the prediction of correlated MWPM.
+We use correlated MWPM as the baseline decoder,
+which yields error suppression factor [23] Λ ≈ 3.6 for
+SI-1000(p = 2e−3). We quantify accuracy as the ratio of
+improvement relative to the correlated-MWPM baseline:
+improvement ratio(decoder) = ϵMWPM
+ϵdecoder
+. (12)
+We calculate logical error rate for a memory experiment
+of r rounds as
+ϵ = 1
+2
+
+1−
+
+1− 2nf
+N
+(1/r)
+, (13)
+whereN is total number of samples and nf is number of
+simulated failures. For all values of ( d,r,s ), we simulate
+to at least 1000 failures for every decoder. For a fixed
+(d,r ) combination, all decoders for all values of s see the
+same sampled shots.
+We compare performance of the ensembled decoders at
+eachd, showing improvement over correlated-MWPM as
+a function of r. In Figs. 5–8, we see two effects. First,
+Libra maintains performance (or improves slightly) with
+number of rounds, while global ensembling decreases;
+the onset of the decrease becomes earlier with increas-
+ing d, showing that both d and r affect performance
+of global ensembling. Second, including degeneracy by
+using small-positive cycles to compute probabilities for
+equivalence classes shows an additional modest benefit
+over using the best single matching.
+We can look at the same data organized differently, by
+grouping by fixed r value and plotting improvement as a
+function of distance. This is plotted for r∈{ 10, 30, 100}
+in Figures 10–12. We can see that Libra shows increas-
+ing improvement ratio with distance for all cases. For
+global ensembling, there is improvement for r = 10 with
+d, some slowing of improvement for r = 30, and a de-
+crease with distance for r = 100. Section VI proposes an
+explanation for this. If we take r = 30 as an example, we
+see that both Libra and Libra-degen. appear to saturate
+in performance around ensemble size s = 60.
+Figures 10–12 show that the improvement ratio is in-
+creasing with d in both versions of Libra. The rate of
+improvement can be quantified with Λ, and values for the
+=== PAGE 8 ===
+8
+FIG. 5. Relative accuracy of the decoders at d = 3. Improvement ratio is the ratio of the given decoder’s logical error rate
+to that of correlated MWPM. For the decoders, global ensembling refers to selecting the single best ensemble member, Libra
+refers to using matching synthesis, and “Libra degen” refers to estimating degeneracy with small-positive cycles.
+FIG. 6. Relative accuracy of the decoders at d = 5. As before, improvement ratio is the ratio of the given decoder’s logical error
+rate to that of correlated MWPM. For the decoders, global ensembling refers to selecting the single best ensemble member,
+Libra refers to using matching synthesis, and “Libra degen” refers to estimating degeneracy with small-positive cycles.
+=== PAGE 9 ===
+9
+FIG. 7. Relative accuracy of the decoders at d = 7. As before, improvement ratio is the ratio of the given decoder’s logical error
+rate to that of correlated MWPM. For the decoders, global ensembling refers to selecting the single best ensemble member,
+Libra refers to using matching synthesis, and “Libra degen” refers to estimating degeneracy with small-positive cycles.
+FIG. 8. Relative accuracy of the decoders at d = 9. As before, improvement ratio is the ratio of the given decoder’s logical error
+rate to that of correlated MWPM. For the decoders, global ensembling refers to selecting the single best ensemble member,
+Libra refers to using matching synthesis, and “Libra degen” refers to estimating degeneracy with small-positive cycles.
+=== PAGE 10 ===
+10
+FIG. 9. Relative accuracy of the decoders at d = 11. As before, improvement ratio is the ratio of the given decoder’s logical
+error rate to that of correlated MWPM. For the decoders, global ensembling refers to selecting the single best ensemble member,
+Libra refers to using matching synthesis, and “Libra degen” refers to estimating degeneracy with small-positive cycles.
+FIG. 10. Relative accuracy of the decoders as a function of distance for r = 10. As before, improvement ratio is the ratio of
+the given decoder’s logical error rate to that of correlated MWPM. For the decoders, global ensembling refers to selecting the
+single best ensemble member, Libra refers to using matching synthesis, and “Libra degen” refers to estimating degeneracy with
+small-positive cycles.
+=== PAGE 11 ===
+11
+FIG. 11. Relative accuracy of the decoders as a function of distance for r = 30. As before, improvement ratio is the ratio of
+the given decoder’s logical error rate to that of correlated MWPM. For the decoders, global ensembling refers to selecting the
+single best ensemble member, Libra refers to using matching synthesis, and “Libra degen” refers to estimating degeneracy with
+small-positive cycles.
+different decoders are calculated in Table I for r = 30. If
+we take ensemble size s = 100 for example, we find that
+Λ7,11 increases from 3.64 to 4.02 (+10%) for Libra or to
+4.05 (+11%) when including “degeneracy” from small-
+positive cycles.
+However, we remark that Λ is not the only figure of
+merit – being a ratio of logical error rates, it increases if
+the numerator (a smaller code) has higher logical error
+rate. For example, in Table I, we see that ats = 80, Libra
+has Λ 9,11 = 3.86 and Libra-degen. has Λ 9,11 = 3.84 (as
+a reminder, these are decoding exactly the same samples
+of a memory experiment). Conversely, from Fig. 11, we
+see that Libra-degen. achieves higher improvement ratio
+(hence lower logical error rate) for d = 9 and d = 11.
+We see overall that Libra is improving by Λ by about
+10% for the range of parameters studied here, but gen-
+eralizing to higher distance or different error rates is a
+matter for future study.
+VI. INTERPRETATION OF LIBRA
+In this section, we conjecture on the mechanism that
+enables Libra to work well for surface-code decoding.
+The key concept in Libra is identifying improving cycles.
+How well this works will depend on the structure of the
+weighted hypergraph and the nature of the ensemble. In
+some informal sense, the ensemble needs some “entropy”
+(yielding a diversity of solutions) but not too much (for
+a local neighborhood of the hypergraph, one of the en-
+semble members needs to find a good local solution).
+In our simulations with the surface code (Section V),
+we found that Libra improved accuracy over correlated
+MWPM [10–13]. We attribute this to 3D locality of the
+hypergraph and the fact that the decoders in the en-
+semble produce a diversity of reasonably good solutions.
+The surface code is a topological code [1, 8] and the er-
+ror model is local to each operation, so the hypergraph is
+local in three dimensions (every hyperedge is contained
+within a ball of some finite radius, independent of the
+code distance). Moreover, correlated MWPM is a “pretty
+good” decoder for the surface code, in the sense that
+high-accuracy decoders have demonstrated only mod-
+estly better performance [13, 23, 30], meaning Λ in-
+creases by about 10%. Hence the members of the en-
+semble tend to produce solutions that are good in a local
+neighborhood. We speculate that Libra will show benefit
+with other topological codes, such as color codes [26, 49],
+provided suitably “good” approximate decoders for the
+ensemble. Similarly, we expect Libra to generalize nat-
+urally to surface-code logical operations [4, 50–52], since
+these also have the properties of the error hypergraph
+being 3D-local and being amenable to matching.
+We give some intuition for how Libra improves accu-
+=== PAGE 12 ===
+12
+FIG. 12. Relative accuracy of the decoders as a function of distance for r = 100. As before, improvement ratio is the ratio
+of the given decoder’s logical error rate to that of correlated MWPM. For the decoders, global ensembling refers to selecting
+the single best ensemble member, Libra refers to using matching synthesis, and “Libra degen” refers to estimating degeneracy
+with small-positive cycles.
+Decoder Λ 3,11 Λ7,11 Λ9,11
+MWPM-corr 3.68 3.64 3.52
+global ens.
+ens=20 3.70 3.61 3.45
+ens=40 3.75 3.64 3.43
+ens=60 3.76 3.62 3.37
+ens=80 3.78 3.65 3.41
+ens=100 3.80 3.67 3.44
+Libra
+ens=20 3.95 3.97 3.78
+ens=40 4.00 4.03 3.85
+ens=60 4.01 4.03 3.84
+ens=80 4.02 4.04 3.86
+ens=100 4.01 4.02 3.83
+Libra degen.
+ens=20 3.99 4.01 3.84
+ens=40 4.05 4.10 3.96
+ens=60 4.03 4.04 3.83
+ens=80 4.04 4.06 3.85
+ens=100 4.05 4.05 3.85
+TABLE I. Values for error-suppression ratio Λ calculated at r = 30 for various decoders. The ensemble size is reported as
+“ens=20”, etc. This table computes Λ in three ways, which yield slightly differing results: for logical error rate ϵd at code
+distance d, Λ3,11 = (ϵ3/ϵ11)1/4, Λ7,11 = (ϵ7/ϵ11)1/2, and Λ 9,11 = (ϵ9/ϵ11).
+racy of decoding, though we preface that this story will
+be studied more carefully in future work. When oper-
+ating below the threshold for error correction, which is
+the domain of interest for decoding, errors tend to be
+sparsely distributed [6, 53]. In matching synthesis, this
+leads to small, local cycles.
+As a frame of reference, let us use the matching result
+produced by correlated MWPM as the baseline configu-
+ration of errors, and we can represent any other config-
+uration as the collection of cycles and logical operators
+=== PAGE 13 ===
+13
+FIG. 13. Matching synthesis, and the Libra decoder, filter
+cycles by relative weight. Each gray box is a matching solu-
+tion from the ensemble, and the smaller dashed or solid-blue
+boxes represent cycles of positive or negative relative weight,
+referenced to a baseline solution (in the text, we use corre-
+lated MWPM as a baseline). The synthesized matching only
+incorporates the improving cycles.
+produced by symmetric difference between the two. We
+observe that with randomly perturbed error probabili-
+ties, the cycles discovered in matching synthesis have an
+average weight that is positive. This means that the ma-
+jority are not improving cycles. Hence, if we were to
+take whole matchings from the ensemble and only con-
+sider their total weight [13], then we find a better solu-
+tion than the baseline only when an ensemble member
+gets lucky enough to sample enough improving cycles to
+be in the tail of the distribution. In contrast, Libra is
+able to select the improving cycles individually, shown in
+Fig. 13.
+One might expect that there will be some density dis-
+tribution of cycles that is independent of code distance
+(i.e. diameter of the hypergraph), owing to the local
+structure of the hypergraph described above. We caution
+that this is a conjecture, since we have not yet studied
+this carefully. This distribution could also be correlated
+with other observed values, such as there being more im-
+proving cycles when the complementary gap is small.
+If the relative weight of each cycle can be modeled as a
+real-valued random variable with positive average value,
+then the “global” difference in weight between an ensem-
+ble member and the correlated-MWPM baseline, which
+is the sum over the cycle relative weights, will also have
+positive average value. Moreover, by the Central Limit
+Theorem, the ratio of the average and standard devia-
+tion for this global weight difference will shrink if the
+number of cycles increases (i.e. sample mean converges
+to distribution mean). We conjecture that the number
+of cycles will increase with size of the hypergraph (i.e.
+volume of syndrome, which in a memory experiment is
+∼d2r for code distanced and number of syndrome cycles
+r), as depicted in Fig. 14. In such circumstances, using
+FIG. 14. Conceptual explanation for how ensembling with
+total weight of an error configuration converges to the aver-
+age performance of an ensemble member as size of the error
+hypergraph increase from (a) to (b), with a distribution of
+cycles that have average positive relative weight. The con-
+ceptual representation of positive- or negative-weight cycles
+with dashed or solid-blue boxes, respectively, is the same as
+Fig. 13. The label “base” refers to a baseline decoder which
+is the reference for the relative weight of cycles – for example,
+correlated MWPM. The label “min weight” is the optimal
+solution, shown here only for illustration along the “weight”
+axis.
+the global lowest-weight configuration in the ensemble as
+the solution [13] will require the size of the ensemble to
+increase with the syndrome volume, in order to sample
+from the tail of the distribution for global weight. In
+contrast, Libra would be insensitive to this globally im-
+posed Central Limit Theorem because it can select the
+best local cycles individually. The data in Section V sup-
+ports this interpretation, where we see that Libra perfor-
+mance is insensitive to d and r, whereas global-weight
+ensembling is sensitive to both and recovers by increas-
+=== PAGE 14 ===
+14
+ing the size of the ensemble. However, we do not propose
+a functional form for this dependence. Techniques like
+windowing [54, 55] or graph partitioning [56] are impor-
+tant for parallelization of decoding, as well as streaming
+for real-time operation. If ensembling is applied to in-
+crease accuracy, windowing and/or partitioning the hy-
+pergraph would limit the size of the syndrome volume
+in the cut-out region, mitigating the volume-dependent
+effects described above. However, we expect that the
+minimum size of the syndrome volume will scale ∼ d3
+for the surface code, since logical operators of length∼d
+can be oriented in any of the three cardinal directions
+in 3D. Hence, these considerations become important as
+quantum error correction scales to large d.
+VII. GENERALIZATIONS TO OTHER
+PROBLEMS
+This work focuses on solving a particular variant of
+MWHPM (Section II) that is relevant to decoding quan-
+tum codes, but the methods appear to be more general.
+If one is performing constrained optimization where so-
+lutions can be decomposed into pieces and evaluated in-
+dividually, such as Eqn. (3), then it could be possible
+to synthesize two distinct solutions and keep the best
+pieces. In contrast to local search in stochastic algo-
+rithms [9, 31, 32], this could avoid becoming trapped in
+local minima [33].
+Using small-positive cycles (from Section III) as gener-
+ators of multiple “good” solutions could also be of inter-
+est in optimization. For example, suppose one is optimiz-
+ing routing in a distribution network, and that there is a
+formulation of this problem to which matching synthesis
+or a generalization thereof can be applied. An optimal
+solution that has no small cycles could be interpreted as
+“brittle”, because if the real-world circumstances that in-
+form the cost function change, the single solution could
+become a poor one. In contrast, if there is a solution
+with many small-positive cycles, it means there are many
+almost-best solutions that could be generated. In the ex-
+ample, we might say this is a “robust” solution because
+there are many options to make changes to routing, while
+still being a pretty good solution. Whether these conjec-
+tures can be applied usefully in optimization problems is
+left for future work.
+VIII. DISCUSSION
+We have presented a method for high-accuracy de-
+coding of surface codes called matching synthesis, and
+demonstrated improvements in accuracy with a decoder
+called Libra. We showed that the method makes effi-
+cient use of ensembling, reaching saturation around an
+ensemble size of 60 when using correlated MWPM. Our
+interpretation of the algorithm and these results is that
+each matching in the ensemble can be characterized as
+differing from the optimal solution by some random dis-
+tribution of cycles on the hypergraph. If the hypergraph
+has “local structure” whereby these cycles tend to be
+confined to local neighborhoods, then matching synthesis
+quickly approaches optimality when the ensemble finds a
+good solution in each neighborhood with high probabil-
+ity, which is more favorable than requiring an ensemble
+member to find a good global solution.
+A question not answered here is how close Libra comes
+to optimal decoding, which we will investigate in future
+work. In the case of surface codes, while it is theoreti-
+cally interesting to wonder how close one can get to opti-
+mal accuracy with a computationally efficient algorithm,
+what is the practical benefit? If Libra (or any other de-
+coder) increases Λ by 10%, then the practical benefit is
+to reduce the code distanced required to achieve a target
+logical error rate ϵ according to the approximate formula
+ϵ = 0.1Λ−(d+1)/2 [4, 5]. For example, if the target is
+ϵ = 1e−12 per syndrome round and the baseline decoder
+(e.g. correlated MWPM) achieves Λ = 4, then the ben-
+efit of an improved decoder with Λ = 4 .4 is to reduce
+required code distance from d = 37 to d = 35, reducing
+qubit overhead by about 1− (35/37)2≈ 11%.
+Besides chasing diminishing returns in accuracy, an-
+other avenue to applying these results is real-time decod-
+ing. An advantage inherent in ensembled decoding [13]
+is the ability to do most of the decoding in parallel. Fur-
+thermore, matching synthesis with a logarithmic-depth
+tree lends itself to short-depth computation. Instead of
+making an ensemble out of the already-pretty-good corre-
+lated MWPM decoder, one could instead use simpler al-
+gorithms for the ensemble like uncorrelated matching [6],
+Union-Find [57], clustering decoders [58], or renormaliza-
+tion group decoders [59, 60]. Being less accurate, these
+might require a larger ensemble; however, if they can
+run in parallel on massively parallel hardware (e.g. FP-
+GAs or GPUs) and be synthesized in a logarithmic-depth
+tree, the execution depth might actually be shorter than
+MWPM.
+Finally, the matching synthesis method is not re-
+stricted to surface codes. We expect that the technique
+will translate well to other topological codes, such as
+color codes [14, 26, 49, 61–64]. Whether it offers a ben-
+efit for other families of codes, such as quantum LDPC
+codes [65–67], is not clear at this time. We leave these
+investigations to future work.
+ACKNOWLEDGMENTS
+We thank Michael Newman, Dave Bacon, Oscar Hig-
+gott, and Noah Shutty for feedback on the matching syn-
+thesis procedure.
+=== PAGE 15 ===
+15
+[1] B. M. Terhal, Quantum error correction for quantum
+memories, Rev. Mod. Phys. 87, 307 (2015).
+[2] A. M. Steane, Overhead and noise threshold of fault-
+tolerant quantum error correction, Phys. Rev. A 68,
+042322 (2003).
+[3] P. Aliferis, D. Gottesman, and J. Preskill, Quantum accu-
+racy threshold for concatenated distance-3 codes, Quan-
+tum Info. Comput. 6, 97–165 (2006).
+[4] A. G. Fowler, M. Mariantoni, J. M. Martinis, and A. N.
+Cleland, Surface codes: Towards practical large-scale
+quantum computation, Phys. Rev. A 86, 032324 (2012).
+[5] N. C. Jones, R. Van Meter, A. G. Fowler, P. L. McMahon,
+J. Kim, T. D. Ladd, and Y. Yamamoto, Layered archi-
+tecture for quantum computing, Phys. Rev. X 2, 031007
+(2012).
+[6] E. Dennis, A. Kitaev, A. Landahl, and J. Preskill,
+Topological quantum memory, Journal of Mathematical
+Physics 43, 4452 (2002).
+[7] J. Edmonds, Paths, trees, and flowers, Can. J. Math. 17,
+449 (1965).
+[8] S. B. Bravyi and A. Y. Kitaev, Quantum codes on a
+lattice with boundary, (1998), Preprint arXiv:quant-
+ph/9811052.
+[9] A. Hutter, J. R. Wootton, and D. Loss, Efficient markov
+chain monte carlo algorithm for the surface code, Phys.
+Rev. A 89, 022326 (2014), Preprint arXiv:1302.2669.
+[10] A. G. Fowler, Optimal complexity correction of corre-
+lated errors in the surface code, arXiv:1310.0863 (2013).
+[11] A. Paler and A. G. Fowler, Pipelined correlated minimum
+weight perfect matching of the surface code, Quantum 7,
+1205 (2023).
+[12] O. Higgott, T. C. Bohdanowicz, A. Kubica, S. T. Flam-
+mia, and E. T. Campbell, Improved decoding of circuit
+noise and fragile boundaries of tailored surface codes,
+Physical Review X 13, 031007 (2023).
+[13] N. Shutty, M. Newman, and B. Villalonga, Efficient near-
+optimal decoding of the surface code through ensembling,
+arXiv:2401.12434 (2024).
+[14] A. Benhemou, K. Sahay, L. Lao, and B. J. Brown, Min-
+imising surface-code failures using a color-code decoder,
+(2023), Preprint arXiv:2306.16476.
+[15] O. Higgott, T. C. Bohdanowicz, A. Kubica, S. T. Flam-
+mia, and E. T. Campbell, Improved decoding of circuit
+noise and fragile boundaries of tailored surface codes,
+Phys. Rev. X 13, 031007 (2023).
+[16] B. Criger and I. Ashraf, Multi-path Summation for De-
+coding 2D Topological Codes, Quantum 2, 102 (2018).
+[17] J. Old and M. Rispler, Generalized Belief Propagation
+Algorithms for Decoding of Surface Codes, Quantum 7,
+1037 (2023).
+[18] J. Chen, Z. Yi, Z. Liang, and X. Wang, Improved be-
+lief propagation decoding algorithms for surface codes,
+(2024), Preprint arXiv:2407.11523.
+[19] S. Bravyi, M. Suchara, and A. Vargo, Efficient algorithms
+for maximum likelihood decoding in the surface code,
+Physical Review A 90, 032326 (2014).
+[20] C. T. Chubb and S. T. Flammia, Statistical mechanical
+models for quantum codes with correlated noise, Annales
+de l’Institut Henri Poincar´ e D8, 269 (2021).
+[21] C. T. Chubb, General tensor network decoding of 2d
+pauli codes, arXiv preprint arXiv:2101.04125 (2021).
+[22] C. Piveteau, C. T. Chubb, and J. M. Renes, Ten-
+sor network decoding beyond 2d, arXiv preprint
+arXiv:2310.10722 (2023).
+[23] G. Q. AI, Suppressing quantum errors by scaling a sur-
+face code logical qubit, Nature 614, 676 (2023).
+[24] T. C. Bohdanowicz, Quantum Constructions on Hamil-
+tonians, Codes, and Circuits , Ph.D. thesis, California In-
+stitute of Technology (2022).
+[25] J. Feldman, M. J. Wainwright, and D. R. Karger, Using
+linear programming to decode binary linear codes, IEEE
+Transactions on Information Theory 51, 954 (2005).
+[26] A. J. Landahl, J. T. Anderson, and P. R. Rice, Fault-
+tolerant quantum computing with color codes, arXiv
+preprint arXiv:1108.5738 (2011).
+[27] J. X. Li and P. O. Vontobel, LP Decoding of Quantum
+Stabilizer Codes, in 2018 IEEE International Symposium
+on Information Theory (ISIT) (IEEE Press, 2018) p.
+1306–1310.
+[28] O. Fawzi, L. Grou` es, and A. Leverrier, Linear program-
+ming decoder for hypergraph product quantum codes, in
+IEEE ITW 2020 - IEEE Information theory workshop
+2020 (Riva del Garda / Virtual, Italy, 2021).
+[29] M. Sheth, S. Z. Jafarzadeh, and V. Gheorghiu, Neural en-
+semble decoding for topological quantum error-correcting
+codes, Physical Review A 101, 032338 (2020).
+[30] J. Bausch, A. W. Senior, F. J. Heras, T. Edlich,
+A. Davies, M. Newman, C. Jones, K. Satzinger, M. Y.
+Niu, S. Blackwell, et al. , Learning to decode the surface
+code with a recurrent, transformer-based neural network,
+(2023), Preprint arXiv:2310.05900.
+[31] S. Lin, Computer solutions of the traveling salesman
+problem, The Bell System Technical Journal 44, 2245
+(1965).
+[32] S. Lin and B. W. Kernighan, An Effective
+Heuristic Algorithm for the Traveling-Salesman
+Problem, Operations Research 21, 498 (1973),
+https://doi.org/10.1287/opre.21.2.498.
+[33] O. Martin, S. W. Otto, and E. W. Felten, Large-step
+markov chains for the traveling salesman problem, Com-
+plex Systems 5, 299 (1991).
+[34] S. W. Mahfoud and D. E. Goldberg, Parallel recombina-
+tive simulated annealing: A genetic algorithm, Parallel
+Computing 21, 1 (1995).
+[35] H. M¨ uhlenbein, M. Gorges-Schleuter, and O. Kr¨ amer,
+Evolution algorithms in combinatorial optimization, Par-
+allel Computing 7, 65 (1988).
+[36] L. Manzoni, L. Mariot, and E. Tuba, Balanced crossover
+operators in genetic algorithms, Swarm and Evo-
+lutionary Computation 54, 100646 (2020), Preprint
+arXiv:1904.10494.
+[37] J. H˚ astad, Clique is hard to approximate within n1−ε,
+Acta Mathematica 182, 105 (1999).
+[38] D. Gottesman, The Heisenberg Representation of
+Quantum Computers, (1998), Preprint arXiv:quant-
+ph/9807006.
+[39] C. Gidney, M. Newman, P. Brooks, and C. Jones, Yoked
+surface codes, arXiv:2312.04522 (2023).
+[40] H. Bomb´ ın, M. Pant, S. Roberts, and K. I. Seetharam,
+Fault-tolerant postselection for low-overhead magic state
+preparation, PRX Quantum 5, 010302 (2024).
+[41] N. Meister, C. A. Pattison, and J. Preskill, Efficient soft-
+=== PAGE 16 ===
+16
+output decoders for the surface code, (2024), Preprint
+arXiv:2405.07433.
+[42] S. C. Smith, B. J. Brown, and S. D. Bartlett, Mit-
+igating errors in logical qubits, (2024), Preprint
+arXiv:2405.03766.
+[43] C. Gidney, Stim: a fast stabilizer circuit simulator, Quan-
+tum 5, 497 (2021).
+[44] C. Gidney, M. Newman, A. Fowler, and M. Broughton,
+A fault-tolerant honeycomb memory, Quantum 5, 605
+(2021).
+[45] S. Krinner, N. Lacroix, A. Remm, A. D. Paolo, E. Genois,
+C. Leroux, C. Hellings, S. Lazar, F. Swiadek, J. Her-
+rmann, G. J. Norris, C. K. Andersen, M. M¨ uller, A. Blais,
+C. Eichler, and A. Wallraff, Realizing repeated quantum
+error correction in a distance-three surface code, Nature
+605, 669 (2022).
+[46] D. Bluvstein, S. J. Evered, A. A. Geim, S. H. Li,
+H. Zhou, T. Manovitz, S. Ebadi, M. Cain, M. Kalinowski,
+D. Hangleiter, J. P. B. Ataides, N. Maskara, I. Cong,
+X. Gao, P. S. Rodriguez, T. Karolyshyn, G. Semeghini,
+M. J. Gullans, M. Greiner, V. Vuleti´ c, and M. D. Lukin,
+Logical quantum processor based on reconfigurable atom
+arrays, Nature 626, 58 (2024).
+[47] M. P. da Silva, C. Ryan-Anderson, J. M. Bello-Rivas,
+A. Chernoguzov, J. M. Dreiling, C. Foltz, F. Frachon,
+J. P. Gaebler, T. M. Gatterman, L. Grans-Samuelsson,
+D. Hayes, N. Hewitt, J. Johansen, D. Lucchetti, M. Mills,
+S. A. Moses, B. Neyenhuis, A. Paz, J. Pino, P. Siegfried,
+J. Strabley, A. Sundaram, D. Tom, S. J. Wernli, M. Zan-
+ner, R. P. Stutz, and K. M. Svore, Demonstration of logi-
+cal qubits and repeated error correction with better-than-
+physical error rates, (2024), Preprint arXiv:2404.02280.
+[48] N. Delfosse, Hierarchical decoding to reduce hardware
+requirements for quantum computing, (2020), Preprint
+arXiv:2001.11427.
+[49] C. Gidney and C. Jones, New circuits and an open
+source decoder for the color code, (2023), Preprint
+arXiv:2312.08813.
+[50] D. Horsman, A. G. Fowler, S. Devitt, and R. V. Meter,
+Surface code quantum computing by lattice surgery, New
+Journal of Physics 14, 123011 (2012).
+[51] A. G. Fowler and C. Gidney, Low overhead quantum
+computation using lattice surgery, (2018), Preprint
+arXiv:1808.06709.
+[52] C. Gidney, Inplace Access to the Surface Code Y Basis,
+Quantum 8, 1310 (2024).
+[53] O. Higgott and C. Gidney, Sparse blossom: correcting
+a million errors per core second with minimum-weight
+matching, arXiv preprint arXiv:2303.15933 (2023).
+[54] L. Skoric, D. E. Browne, K. M. Barnes, N. I. Gillespie,
+and E. T. Campbell, Parallel window decoding enables
+scalable fault tolerant quantum computation, Nat Com-
+mun 14, 7040 (2023), Preprint arXiv:2209.08552.
+[55] X. Tan, F. Zhang, R. Chao, Y. Shi, and J. Chen, Scalable
+surface-code decoders with parallelization in time, PRX
+Quantum 4, 040344 (2023).
+[56] Y. Wu and L. Zhong, Fusion Blossom: Fast MWPM De-
+coders for QEC, in 2023 IEEE International Conference
+on Quantum Computing and Engineering (QCE) , Vol. 01
+(2023) pp. 928–938, Preprint arXiv:2305.08307.
+[57] N. Delfosse and N. H. Nickerson, Almost-linear time de-
+coding algorithm for topological codes, Quantum 5, 595
+(2021), Preprint arXiv:1709.06218.
+[58] S. Bravyi and J. Haah, Quantum self-correction in the 3d
+cubic code model, Phys. Rev. Lett. 111, 200501 (2013).
+[59] G. Duclos-Cianci and D. Poulin, Fast decoders for topo-
+logical quantum codes, Phys. Rev. Lett. 104, 050504
+(2010).
+[60] G. Duclos-Cianci and D. Poulin, A renormalization group
+decoding algorithm for topological quantum codes, in
+2010 IEEE Information Theory Workshop (2010) pp. 1–
+5.
+[61] H. Bombin and M. A. Martin-Delgado, Statistical me-
+chanical models and topological color codes, Phys. Rev.
+A 77, 042322 (2008).
+[62] N. Delfosse, Decoding color codes by projection onto sur-
+face codes, Phys. Rev. A 89, 012317 (2014).
+[63] K. Sahay and B. J. Brown, Decoder for the triangular
+color code by matching on a m¨ obius strip, PRX Quantum
+3, 010310 (2022).
+[64] A. Kubica and N. Delfosse, Efficient color code decoders
+in d ≥ 2 dimensions from toric code decoders, Quantum
+7, 929 (2023).
+[65] A. A. Kovalev and L. P. Pryadko, Fault tolerance of
+quantum low-density parity check codes with sublinear
+distance scaling, Phys. Rev. A 87, 020304 (2013).
+[66] N. P. Breuckmann and J. N. Eberhardt, Quantum low-
+density parity-check codes, PRX Quantum 2, 040101
+(2021).
+[67] S. Bravyi, A. W. Cross, J. M. Gambetta, D. Maslov,
+P. Rall, and T. J. Yoder, High-threshold and low-
+overhead fault-tolerant quantum memory, Nature 627,
+778 (2024).

@@ -44,10 +44,15 @@ endif()
 
 set(QUDEC_FILES
     src/circuit_generator.cpp
+    src/decoder/bunchaluts/hypergraph.cpp
     src/decoder/surface_code.cpp
     src/decoder/surface_code/matching_data.cpp
     src/globals.cpp
     src/sampler.cpp
+)
+
+set(BAL_FILES
+    src/decoder/bunchaluts/hypergraph.cpp
 )
 
 
@@ -72,8 +77,7 @@ add_executable(qudec main/qudec.cpp)
 target_compile_options(qudec PRIVATE ${COMPILE_OPTIONS})
 target_link_libraries(qudec PRIVATE qudeclib)
 
-add_executable(dem_dump main/dem_dump.cpp)
-target_compile_options(dem_dump PRIVATE ${COMPILE_OPTIONS})
-target_link_libraries(dem_dump PRIVATE qudeclib)
 
-
+add_executable(bal_dem_analysis main/bal_dem_analysis.cpp ${BAL_FILES})
+target_compile_options(bal_dem_analysis PRIVATE ${COMPILE_OPTIONS})
+target_link_libraries(bal_dem_analysis PRIVATE qudeclib)

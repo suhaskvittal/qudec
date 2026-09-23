@@ -1,0 +1,778 @@
+
+=== PAGE 1 ===
+Tesseract: A Search-Based Decoder for Quantum Error Correction
+Laleh Aghababaie Beni, Oscar Higgott, Noah Shutty
+Google Quantum AI, Venice, CA, 90291
+March 1, 2025
+Abstract
+Tesseract is a Most-Likely Error decoder designed for low-density-parity-check quantum error-correcting
+codes. Tesseract conducts a search through a graph on the set of all subsets of errors to find the lowest
+cost subset of errors consistent with the input syndrome. Although this graph is exponentially large, the
+search can be made efficient in practice for random errors using A∗ search technique along with a few
+pruning heuristics. We show through benchmark circuits for surface, color, and bivariate-bicycle codes
+that Tesseract is significantly faster than integer programming-based decoders while retaining compara-
+ble accuracy at moderate physical error rates. We also find that Tesseract can decode transversal CNOT
+protocols for surface codes on neutral atom quantum computers. Finally, we compare surface code and
+bivariate bicycle code circuits, finding that the [[144,12,12]] bivariate bicycle code is 14 × to 19 × more
+efficient than surface codes using our most-likely error decoding, whereas using correlated matching and
+BP+OSD decoders would have implied only a 10 × improvement. Assuming instead that long-range
+couplers are 10 × noisier, the improvement drops to around 4 × using Tesseract or 2 × using correlated
+matching and BP+OSD.
+1 Introduction
+The implementation of quantum error correction (QEC) requires fast and accurate decoders to achieve low
+logical error rates. Decoding is an NP-hard optimization problem in the worst case but a long and beautiful
+line of work has provided a variety of partial solutions that apply to specific codes. An important class
+of QEC codes are the low-density parity check (LDPC) codes. A full review of decoding algorithms for
+quantum LDPC codes is out of scope but we refer e.g. to the survey [diFO +24]. Many approaches start
+with an algorithm that has a polynomial runtime and use heuristics to improve the accuracy. The Tesseract
+decoder takes a different approach. We begin with an exponential-time algorithm that always identifies the
+most-likely error and use heuristics to make it faster.
+Organization: In §2 we define the framework in which the Tesseract decoding algorithm operates. In §3
+we introduce the algorithm and explain the most important optimizations that make it fast in practice.
+In §4 we apply Tesseract and the integer program decoder to several circuits under SI1000 noise [GNM22]:
+rotated surface code memories [DKLP02], color code memories [BMD06] with the superdense circuit schedule
+[BCC+19,GJ23], transversal CNOT operations between rotated surface codes [CZZ+24], and bivariate bicycle
+code memories [BCG +24]. For the bicycle codes, we also compare with BP+OSD [PK21]. Finally, we
+compare the surface and bivariate bicycle codes to each other using these near-optimal decoders.
+2 Notation
+There are various equivalent sets of terminology for discussing binary linear codes. For efficiency of exposition
+and to best mirror the source code1, we will use the terminology associated with the DetectorErrorModel in
+1Open-source code for the Tesseract decoder and the Integer Program based decoder available at
+github.com/quantumlib/tesseract-decoder.
+1
+arXiv:2503.10988v2  [quant-ph]  6 Aug 2025
+=== PAGE 2 ===
+Stim [Gid21]. Throughout, we will let E ={e1, e2, . . . , eN} denote the set of errors and D ={d1, d2, . . . , dK}
+denote the set of detectors of an error model. 2 We let p : E→ (0, 1/2] be an assignment of the probability
+of each error. 3 We will let w : E→ R+ be the function w(e) =− log ( p
+1−p). We assume that the error ei is
+activated independently with probability c(ei). For a finite set S, we let 2 S denote the power set of S. For
+finite sets S, T, we let S⊕ T = (S∪ T )\(S∩ T ). We let E : D→ 2E be the function such that E(d) is the set
+of errors that activate detector d. We let D : E→ 2D be the function such that D(e) is the set of detectors
+activated by error e. We will abuse notation: if F⊂ E is a set of errors, we will let D(F ) := L
+e∈F D(e).
+We will also fix a set S⊂ D which is the set of “activated detectors” received as input to the decoder. This
+is often called the set of “detection events”. The Most-Likely Error problem is to find
+argmin F⊂E
+D(F )=S
+w(F ) (1)
+The problem (1) may be formulated as an integer program [LAR11, CZZ +24, LBH+24] and solved exactly.
+We use this method as a baseline to compare the Tesseract decoder against. Specifically, we use the High
+Performance Optimization Software (HiGHS) package to solve the integer program [HH18].
+Now we define some objects required to explain the Tesseract decoding algorithm. First, we let G =
+(2E, T, w) denote a weighted directed graph on the powerset of errors with directed edge set T . We define T
+in a rather obtuse way to allow us to parametrize G by a choice of predicate P : 2E× 2E→{ 0, 1}:
+T ={(F, F′) : (|F′| =|F| + 1)∧ (F⊂ F′)∧ P (F, F′)} (2)
+In words, the edges out from a vertex F∈ 2E simply correspond to adding one new error to the set F .
+But not just any error can be added – only errors that satisfy the predicate P (F, F′).
+∅
+{3} {2} {1}
+{2, 3} {1, 3} {1, 2}
+{1, 2, 3}
+Figure 1: The graph G on all error sets, if |E| = 3
+and the predicate P (F, F′) is always 1. Weights of the
+edges are not shown.
+For now, the reader may imagine that the pred-
+icate always evaluates to 1, so that the edges of G
+just correspond to adding any single error. An illus-
+tration of the resulting G for this case when N = 3
+is shown in Figure 1. But later on in §3 we will de-
+scribe how the predicate can be made more restric-
+tive so that G has a lower degree, which can be used
+to improve the efficiency of the implementation.
+Recall that the weight w(e) was defined before
+as the cost of a single error e. But we abuse notation
+now to let the weight of an edge ( F, F′)∈ T be de-
+noted by w((F, F′)) = w(e) where F′\ F ={e}. We
+apologize to the reader for these abuses of notation.
+We refer to the empty set as the START node:
+START := ∅. We define the set of EXIT nodes
+as the set of sets of errors consistent with the syn-
+drome:
+EXIT ={F∈ 2E : D(F ) = S} (3)
+It is immediate from the definition of G that it is an acyclic graph and so the set of paths PG through G
+is finite:
+PG :={(F1, . . . , Fk) : k∈ N and (Fi, Fi+1)∈ T∀i∈{ 1, . . . , k− 1}}. (4)
+2 Note that “error” and “detector” correspond to existing concepts in classical binary linear codes. In a classical binary
+linear code with parity check matrix H ∈ {0, 1}K×N , the errors would correspond to ‘codeword bits’ i.e. columns of H and the
+detectors would correspond to ‘parity checks’ i.e. rows of H. Although it is not our primary motivation here, we point out the
+Tesseract decoder can also be applied as a maximum-likelihood decoder for classical binary linear codes.
+3WLOG we may assume that all errors occur with a nonzero probability that is at most 1 /2 [HG25].
+2
+=== PAGE 3 ===
+We observe that a path exists from F to F′ in PG if and only if F′⊃ F . In that case, all paths from F to
+F′ have the same total edge cost, which we denote dG(F, F′):
+dG(F, F′) :=
+(P
+e∈F ′\F w(e) F′⊃ F
+∞ otherwise . (5)
+We will abuse notation by allowing, when S⊂ 2E,
+dG(F, S) = min
+F ′∈S
+dG(F, F′). (6)
+3 Decoding as Optimized Path-Finding in G
+We have defined the graph G because the Most-Likely Error problem is equivalent to a pathfinding problem
+on G, as formalized in Theorem 3.1.
+Theorem 3.1. The Most-Likely Error problem of eq (1) is the Shortest Path problem in G, i.e.:
+argmin F⊂E
+D(F )=S
+w(F ) = argminEND∈EXITdG(START, END) (7)
+Proof. Observe that
+dG(START, END) =
+X
+e∈END
+w(e).
+Recall that by definition,
+EXIT ={F⊂ E : D(F ) = S}.
+Substituting these definitions, we are left with eq (7).
+This means that we can apply pathfinding algorithms. Dijkstra’s algorithm [Dij22] when applied to this
+graph, amounts to a form of brute-force search where we iterate over the sets of errors in order of increasing
+cost until we reach a valid decoding END ∈ EXIT which is an early stop to the traditional Dijkstra’s
+algorithm. Tesseract is able to go much faster than this by exploiting the A* pathfinding algorithm [HNR68],
+as explained below. We will now explain the most important optimizations used to make Tesseract decode
+quickly in practice.
+Pruning the graph: As explained in§2, we prune the graph G by choosing a predicate P : 2E×2E→{ 0, 1}.
+If this predicate is a constant function that always evaluates to 1, there are |F|! different paths from ∅ to
+F∈ 2E. This redundancy is expensive because the search algorithm has to explore more nodes of the graph.
+We can eliminate the redundancy by canonicalizing the order in which errors are added. We do so using
+the predicate PT defined in Algorithm 1. However, it may be easier to simply explain in words how this
+predicate works. We start with the residual syndrome at node F , which we denote x. The main idea is that
+we limit the errors e∈ E that can be added to F to be those incident to the lowest index activated detector
+in x. To further limit the search space, we don’t allow to add any “forbidden” errors. We forbid errors in
+one of two ways:
+1. GetForbiddenErrorsByPrecedence(F ) returns the set of errors which we could have added at a pre-
+vious state transition on the path to F , if we chose to add a higher-index error instead.
+2. GetForbiddenErrorsAtMostTwo(F ) returns the set of errors such that adding the error e would result
+in more than 2 errors incident to a single detector.
+It is easy to see that both routines GetForbiddenErrorsPrecedence and GetForbiddenErrorsAtMostTwo
+make the graph G into a tree, which simplifies the traversal as we no longer need to maintain a set of visited
+nodes. The predicate GetForbiddenErrorsByPrecedence maintains exactness of the Tesseract decoding
+3
+=== PAGE 4 ===
+Algorithm 1: Pruning Predicate PT(F, F′)
+Input: F, F′∈ 2E where (F′⊃ F )∧ (|F′| =|F| + 1), and a function GetForbiddenErrors: 2 E→ 2E
+Output: PT(F, F′)∈{ 0, 1}
+e← GetSoleElement(F′\ F );
+J←GetForbiddenErrors(F );
+if e∈ J then
+return 0;
+x← S⊕ D(F );
+dmin← Minimum(x);
+if e is incident to dmin then
+return 1;
+return 0;
+algorithm, since there is still a unique path from ∅ to any set F ∈ 2E. The more restrictive routine
+GetForbiddenErrorsAtMostTwo does not maintain exactness.
+A*: The A* pathfinding algorithm [HNR68] changes the ordering of nodes in the priority queue by adding
+a “heuristic cost” h(F ) to the cost of a node F . Despite its name, h(F ) can be chosen in such a way that
+A* is still an exact algorithm. The property required is that the heuristic h(F ) give a strict lower bound
+on dG(F, EXIT). Such heuristics are called admissible heuristics . In Algorithm 2 we explain the heuristic
+used in Tesseract. It is simply a sum of evaluations of the DetCost routine, which is defined in Algorithm 3.
+This choice of heuristic is admissible, so Tesseract maintains its correctness guarantee. One advantage of
+this routine is that for LDPC codes there is a constant amount of work needed to update the sum when a
+single error is added.
+Algorithm 2: A* Heuristic Function h(F )
+Input: F∈ 2E and a function GetForbiddenErrors: 2 E→ 2E
+Output: h(F )∈ R≥0
+J←GetForbiddenErrors(F );
+x← S⊕ D(F );
+c← 0;
+for d∈ x do
+c← c + GetDetCost(x, J, d);
+return c;
+Algorithm 3: GetDetCost(x, J, d)
+Input: A set of residual detection events x⊂ D, a set of forbidden errors J⊂ E, and an activated
+detector d∈ x.
+Output: GetDetCost(x, J, d)∈ R≥0
+c←∞ ;
+for e∈ E(d) do
+if e /∈ J then
+c←Minimum
+
+c, w(e)
+|x∩D(e)|
+
+;
+return c;
+Beam search: The search through G uses the A* pathfinding algorithm. To accelerate progress towards a
+4
+=== PAGE 5 ===
+solution we impose a beam cutoff. For each node F we visit, we compute the number of residual detection
+events r(F ) := |S⊕ D(F )| and track the minimum value rmin of any visited node. Tesseract accepts a
+beam parameter beam and will not visit any node F such that r(F ) > r min+beam. A moderate beam of
+approximately 20 works well in practice. To avoid unbounded runtime and memory consumption, we also
+specify a maximum number pqlimit of nodes that can be added to the priority queue. After this many nodes
+are added, the Tesseract decoder terminates and declares a “low-confidence” outcome. This is a heralded
+failure, but we treat all low-confidence outcomes as logical errors for the results in §4.
+Ensemble Reordering: Algorithm 1 requires an absolute ordering of all detectors in D. We can improve
+the rate of convergence of the search by trying several different detector orderings. For the protocols we
+benchmarked, which have coordinate vectors in Rt assigned to each detector, the method we used to generate
+orderings is to sample a random normally distributed vector z∼N (0, 1)t and order the detectors by the
+inner product of their coordinate vector with z. If multiple valid solutions are obtained, we output the
+minimum cost decoding as in [SNV24].
+Beam Climbing: Although a beam of ≈ 20 is usually a good value, sometimes a larger or smaller beam
+works better. We found empirically that simply choosing a maximum beam value B∈ Z≥0 and trying once
+for each beam value in the range {0, 1, . . . , B} works well. This can be combined with ensemble reordering
+by using a different randomized total ordering on the detectors for each beam setting.
+No-revisit detections: With this heuristic, we maintain a set containing the data of D(F )⊕ S for each
+visited node F . After visiting the node F we will then ignore (i.e., we do not visit) any nodes with the same
+leftover detection set.
+Detection penalty: This is a real number c such that the ordering of the nodes in the priority queue is
+determined by the standard ordering plus a penalty term of c·| D(F )⊕ S|. In other words, we add a cost
+of c for each residual detection event. Similar to the beam cutoff, this discourages Tesseract from visiting
+nodes with many residual detection events (i.e., a high value of r(F )).
+4 Results
+Comparing T esseract with other decoders: We benchmarked Tesseract against an integer programming
+decoder across four protocols: rotated surface code memories, superdense color code memories, transversal
+CNOT operations between rotated surface codes, and bivariate bicycle code memories (see Figure 2). At
+error rates of p≤ 0.001, Tesseract achieves decoding accuracy nearly identical to that of the integer program
+decoder for both of the topological codes, while operating approximately five times faster. At a higher error
+rate ( p = 0 .002), an error floor is observed for larger code distances (e.g., d = 11 in the superdense color
+code), indicating a slight trade-off between speed and accuracy in this regime. To the best of our knowledge,
+the performance of BP+OSD relative to near-optimal decoding for non-topological quantum LDPC codes
+has not previously been studied in detail. We find that the logical error rate of Tesseract and the integer
+programming decoder are one to two orders of magnitude lower relative to the BP+OSD decoder. We use an
+uncorrelated (rather than a correlated) BP+OSD decoder, since uncorrelated BP+OSD has better accuracy
+(see Appendix A for details).
+To compute the logical error rate per round, we fix the error rate per shot Rper shot = number of errors
+number of shots and
+the number of rounds r, and then use the equation
+Rper round = 1
+2
+
+1− (1− 2R)1/r
+
+. (8)
+To find the error bars, we propagate a 90% confidence interval through eq (8). For the transversal CX surface
+code circuits, we set r to be the total number of rounds of syndrome extraction ⁄tieacce♪tlowercaseacross the two interacting
+surface codes. This allows the error rate per round to be more directly compared with the surface code
+memory protocol. For all other protocols, since they are just memory, we simply set r to be the total
+number of rounds of syndrome extraction.
+Comparing the Bivariate Bicycle Code with the Surface Code: In Figure 3, we compare surface
+codes to the [[144,12,12]] bivariate bicycle code (the “gross code”) from Ref. [BCG +24]. The circuit for this
+5
+=== PAGE 6 ===
+10−9
+10−8
+10−7
+10−6
+10−5
+10−4
+10−3
+Logical Error Per Round
+Superdense Color Code
+ Surface Code
+ Bivariate Bicycle Code
+ Transversal CX Surface Code
+100 200
+number of physical qubits
+10−6
+10−5
+10−4
+10−3
+10−2
+10−1
+100
+Mean Decoding Time Per Round
+(seconds)
+100 200 300 400
+number of physical qubits
+150 200 250
+number of physical qubits
+100 200 300 400 500
+number of physical qubits
+p = 0.001 Chromobius p = 0.001 Correlated Matching p = 0.001 BP+OSD p = 0.001 Integer Program p = 0.001 Tesseract
+Figure 2: The Tesseract decoder achieves very similar accuracy to the Integer Program decoder while approx-
+imately 5× faster in runtime. Moreover, both Tesseract and the Integer Program decoders are order(s) of
+magnitude more accurate than fast algorithmic decoders on color codes (comparing withchromobius [GJ23])
+and bicycle codes (comparing with BP+OSD [PK21] via the ldpc module [Rof22]). A square-root scaling
+is used for the number of physical qubits axis. Note that not all combinations of decoder, protocol, and
+physical error rate have an observed logical error, and these points are omitted from the upper row of plots.
+For example, the d = 13 superdense color code circuit at p = 0 .0001 decoded with the Integer Program
+decoder had no observed logical errors within the scope of our simulations.
+code has 288 qubits including ancillas, and its circuit distance is at most 10 (hence its circuit parameters are
+[[288,12,10]]). In Figure 3a we use two-pass correlated sparse blossom [HG25] to decode the surface codes
+and BP+OSD [PK21, Rof22] to decode the bivariate bicycle code, whereas in Figure 3b we use Tesseract
+to decode all circuits. Using the less accurate decoders in Figure 3a, we see that the [[288 , 12, 10]] bivariate
+bicycle (BB) circuit has similar performance to the distance 11 surface codes for SI1000 noise (a 10 × qubit
+saving, consistent with [BCG +24]). Intriguingly, we see that the relative performance of the [[288 , 12, 10]]
+BB circuit is much better using our Tesseract decoder, with the [[288 , 12, 10]] circuit having significantly
+better performance than distance 13 surface codes (a 14× qubit saving), perhaps matching the performance
+of distance 15 surface codes (a 19 × qubit saving). This demonstrates the advantage Tesseract offers in
+enabling a fairer assessment and comparison of QEC protocols, leading to a more accurate understanding of
+their relative performance.
+We also use Tesseract to study how the performance of bicycle codes is impacted if long-range couplers
+are much noisier, which is perhaps a more reasonable noise model for 2D solid state architectures such as
+superconducting qubits. Our results are shown in Figure 3, where we compare a bivariate bicycle code with
+surface codes for a noise model where long-range couplers on a planar implementation of the BB code’s toric
+layout (defined in [BCG+24]) have a higher noise strength. A coupler is considered long-range if it is not an
+immediate neighbor on the toric layout, or if it would have to wrap around the torus (i.e. long-range once
+boundaries are introduced). For example, in the bulk of the bivariate bicycle code there are four short-range
+couplers and two long-range couplers. We call these noisy long-range noise models “NLR5” and “NLR10”,
+which use 5× and 10× higher noise strength for the two-qubit depolarizing channels after the long-range
+CZ gates, but are otherwise equivalent to an SI1000 noise model. Using NLR10, at p = 0.1% we find that
+6
+=== PAGE 7 ===
+the gross code (with circuit parameters [[288,12,10]]) is equivalent to distance 5 surface codes (rather than
+distance 11 for SI1000) using BP+OSD, and is equivalent to distance 7 surface codes (rather than distance
+13 or 15) when using Tesseract. In other words, qubit savings reduce from 10 × (SI1000) to 2× (NLR10)
+using correlated matching and BP+OSD, and from 14×-19× (SI1000) to 4× (NLR10) when using Tesseract.
+10−36× 10−4 2× 10−3
+p
+10−8
+10−7
+10−6
+10−5
+10−4
+10−3
+10−2
+10−1
+100
+Logical Z error rate (per round)
+Correlated sparse blossom and BPOSD
+[[204,12,3]] (surface)
+[[588,12,5]] (surface)
+[[1164,12,7]] (surface)
+[[1932,12,9]] (surface)
+[[2892,12,11]] (surface)
+[[288,12,10]] (bicycle, SI1000)
+[[288,12,10]] (bicycle, NLR5)
+[[288,12,10]] (bicycle, NLR10)
+(a)
+10−36× 10−4 2× 10−3
+p
+10−8
+10−7
+10−6
+10−5
+10−4
+10−3
+10−2
+10−1
+100
+Logical Z error rate (per round)
+Tesseract Decoder
+[[204,12,3]] (surface)
+[[588,12,5]] (surface)
+[[1164,12,7]] (surface)
+[[1932,12,9]] (surface)
+[[2892,12,11]] (surface)
+[[4044,12,13]] (surface)
+[[288,12,10]] (bicycle, SI1000)
+[[288,12,10]] (bicycle, NLR5)
+[[288,12,10]] (bicycle, NLR10) (b)
+Figure 3: We compare the performance of the [[144,12,12]] bivariate bicycle (BB) code from Ref. [BCG +24]
+with surface codes. The circuit for the [[144,12,12]] code uses 288 qubits including ancillas, and has circuit
+distance 10 (hence is referred to as [[288 , 12, 10]] in the figure). We compare with the performance of 12
+copies of surface codes. In (a) we use correlated sparse blossom to decode the surface codes and BPOSD to
+decode the BB code, whereas in (b) we use our Tesseract decoder to decode both. We use an SI1000 noise
+model [GNM22] for all surface code circuits and the BB code noise models are given in the legend. The
+“NLR5” and “NLR10” noise models use 5× and 10× higher noise strengths for couplers that are long-range
+on the toric layout.
+5 Comparison with [OHB25]
+Tesseract is specialized for decoding quantum LDPC codes. These include topological codes such as the
+surface code and color code, and other interesting codes such as bivariate bicycle (BB) codes [DKLP02,
+BCG+24, BMD06, BCC+19, GJ23]. There is tremendous interest in decoding algorithms for these codes.
+Concurrent independent work shared in [OHB25] introduced a similar idea to Tesseract. They call it a
+“Decision-Tree Decoder” (DTD). The DTD and Tesseract algorithms are closely related, as we discuss in
+the appendix. Happily, there are complementary aspects of our work. We explored different heuristic cutoffs
+with a greater emphasis on benchmarking with circuit-level noise models. Ideally the insights from both
+of our works would be combined together to achieve the best performance. 4 Tesseract is free open-source
+software written in high-performance C++, and our implementation appears to be somewhat faster than
+DTD. We extracted the timing data from Figure 14 of [OHB25] and made a comparison (Figure 4). Note
+we are unable to benchmark DTD directly on the same system so this is only a rough point of comparison.
+4For example, we expect the DTD decoder could be optimized by incorporating our canonicalized ordering of error paths,
+which removes redundancy from the search graph and avoids the need to track visited sets of errors.
+7
+=== PAGE 8 ===
+10−2 10−1
+p
+10−5
+10−4
+10−3
+10−2
+10−1
+100
+Decoding time per shot (seconds)
+d = 9
+10−2 10−1
+p
+d = 13
+Most-Likely Error Decoders for the Color Code (Code-Capacity noise)
+MaxSAT HB-DTD Integer Program Tesseract
+Figure 4: Comparison of the DTD and MaxSAT decoder timing data from [OHB25] with our Integer Program
+and Tesseract decoder implementation. All of the above decoders areexact – in particular, none of Tesseract’s
+beam cutoffs were used – guaranteeing that the most likely error is returned every time. It is worth noting
+that in practice, judicious use of the cutoffs such as Tesseract’s beam parameter can make both Tesseract
+and the DTD decoder significantly faster without comprimising much accuracy.
+Acknowledgments: We thank Michael Newman for suggesting simulating noisy long-range couplers. We
+thank Navin Kashyap, Benjamin Villalonga, Adam Zalcman, Cody Jones, Craig Gidney, Michael Newman,
+and Dripto Debroy for helpful conversations and feedback.
+References
+[BCC+19] Paul Baireuther, Marcello D Caio, Ben Criger, Carlo WJ Beenakker, and Thomas E O’Brien.
+Neural network decoder for topological color codes with circuit level noise. New Journal of
+Physics, 21(1):013003, 2019.
+[BCG+24] Sergey Bravyi, Andrew W Cross, Jay M Gambetta, Dmitri Maslov, Patrick Rall, and Theodore J
+Yoder. High-threshold and low-overhead fault-tolerant quantum memory.Nature, 627(8005):778–
+782, 2024.
+[BJM+24] Jeremias Berg, Matti J¨ arvisalo, Ruben Martins, Andreas Niskanen, and Tobias Paxian. Maxsat
+evaluation 2024: Solver and benchmark descriptions. 2024.
+[BMD06] Hector Bombin and Miguel Angel Martin-Delgado. Topological quantum distillation. Physical
+review letters, 97(18):180501, 2006.
+[CZZ+24] Madelyn Cain, Chen Zhao, Hengyun Zhou, Nadine Meister, J Pablo Bonilla Ataides, Arthur
+Jaffe, Dolev Bluvstein, and Mikhail D Lukin. Correlated decoding of logical algorithms with
+transversal gates. Physical Review Letters, 133(24):240602, 2024.
+[diFO+24] Antonio deMarti iOlius, Patricio Fuentes, Rom´ an Or´ us, Pedro M Crespo, and Josu Etxezarreta
+Martinez. Decoding algorithms for surface codes. Quantum, 8:1498, 2024.
+8
+=== PAGE 9 ===
+[Dij22] Edsger W Dijkstra. A note on two problems in connexion with graphs. In Edsger Wybe Dijkstra:
+his life, work, and legacy , pages 287–290. 2022.
+[DKLP02] Eric Dennis, Alexei Kitaev, Andrew Landahl, and John Preskill. Topological quantum memory.
+Journal of Mathematical Physics , 43(9):4452–4505, 2002.
+[Gid21] Craig Gidney. Stim: a fast stabilizer circuit simulator. Quantum, 5:497, 2021.
+[GJ23] Craig Gidney and Cody Jones. New circuits and an open source decoder for the color code. arXiv
+preprint arXiv:2312.08813, 2023.
+[GNM22] Craig Gidney, Michael Newman, and Matt McEwen. Benchmarking the Planar Honeycomb Code.
+Quantum, 6:813, September 2022.
+[HG25] Oscar Higgott and Craig Gidney. Sparse blossom: correcting a million errors per core second
+with minimum-weight matching. Quantum, 9:1600, 2025.
+[HH18] Qi Huangfu and JA Julian Hall. Parallelizing the dual revised simplex method. Mathematical
+Programming Computation, 10(1):119–142, 2018.
+[HNR68] Peter E Hart, Nils J Nilsson, and Bertram Raphael. A formal basis for the heuristic determination
+of minimum cost paths. IEEE transactions on Systems Science and Cybernetics , 4(2):100–107,
+1968.
+[LAR11] Andrew J Landahl, Jonas T Anderson, and Patrick R Rice. Fault-tolerant quantum computing
+with color codes. arXiv preprint arXiv:1108.5738 , 2011.
+[LBH+24] Nathan Lacroix, Alexandre Bourassa, Francisco JH Heras, Lei M Zhang, Johannes Bausch, An-
+drew W Senior, Thomas Edlich, Noah Shutty, Volodymyr Sivak, Andreas Bengtsson, et al.
+Scaling and logic in the color code on a superconducting quantum processor. arXiv preprint
+arXiv:2412.14256, 2024.
+[OHB25] Kai R Ott, Bence Het´ enyi, and Michael E Beverland. Decision-tree decoders for general quantum
+ldpc codes. arXiv preprint arXiv:2502.16408 , 2025.
+[PC08] David Poulin and Yeojin Chung. On the iterative decoding of sparse quantum codes. Quantum
+Info. Comput., 8(10):987–1000, November 2008.
+[PK21] Pavel Panteleev and Gleb Kalachev. Degenerate quantum ldpc codes with good finite length
+performance. Quantum, 5:585, 2021.
+[Rof22] Joschka Roffe. Ldpc: Software for decoding classical and quantum codes. https://github.com/
+quantumgizmos/ldpc, 2022.
+[SNV24] Noah Shutty, Michael Newman, and Benjamin Villalonga. Efficient near-optimal decoding of the
+surface code through ensembling. arXiv preprint arXiv:2401.12434 , 2024.
+A The challenge of handling Y errors using BPOSD
+In this work, we use “uncorrelated” BPOSD, where we decode theX-type errors and Z-type errors separately.
+We do this by annotating only the detectors of the same basis as the observable we are benchmarking
+(e.g. only X detectors, for an X memory experiment). Interestingly, we find that uncorrelated BPOSD is
+significantly more accurate than correlated BPOSD (in addition to being much faster, since it operates on
+a much smaller Tanner graph). See Figure 5 for a comparison of the accuracy of both variants of BPOSD
+decoding for a [[72,8,6]] bivariate bicycle code circuit. While this might initially seem counterintuitive,
+since the uncorrelated variant of BPOSD receives much less information about the error model, it can be
+9
+=== PAGE 10 ===
+10 3
+ 10 2
+Physical Error Rate
+10 3
+10 2
+10 1
+100
+Logical Error Probability
+X detectors
+X and Z detectors
+Figure 5: Comparison of uncorrelated vs. correlated decoding using BP+OSD for the [[72,12,6]] bivari-
+ate bicycle code, using the same circuit and uniform circuit-level depolarizing noise model as given in
+Ref. [BCG +24]. We perform a 6-round X memory experiment. For uncorrelated BP (labeled “X detec-
+tors”), we decode a stim circuit with only the X-type detectors annotated, whereas for correlated BP+OSD
+we annotate all detectors ( X-type and Z-type).
+understood by the fact that Y -type errors can cause trapping sets in BP-based decoders when both bases
+of detectors are annotated. For example, if an X stabilizer SX and a Z stabilizer SZ overlap, they must
+do so on at least two qubits i and j to commute. There is therefore necessarily a 4-cycle ( SX , Yi, SZ, Yj) in
+the full Tanner graph (detector error model) of a circuit implementing this code, if detectors in both bases
+are considered. Furthermore, there are more sets of low-weight degenerate error configurations (e.g. an X
+and a Z error on a qubit will have the same syndrome and a comparable probability to a Y error). Both
+degeneracy and short cycles in the Tanner graph are known to be problematic for BP-based decoders [PC08].
+This issue motivates the development of decoders (such as Tesseract) that much better exploit Y errors in
+circuits for quantum LDPC codes, and is one reason why our Tesseract decoder improves so significantly on
+BPOSD for the circuits we study here.
+B Full results and benchmarking details
+We benchmarked Tesseract on SI1000 error rates p∈{ 0.0005, 0.001, 0.002}. The full results are shown in
+Figure 6. We used two parameter settings in our benchmarking. The short beam setting is a beam of 15 with
+beam climbing combined with an ensemble of 16 different detector orderings, and a pqlimit of 200,000. The
+long beam setting is a beam of 20 with beam climbing combined with an ensemble of 21 different detector
+orderings, and a pqlimit of 1,000,000. We used the long beam for these protocols:
+1. All surface code transversal CX protocols.
+2. The superdense color code at these distance and error rate combinations: (d, p)∈{ 11, 13}×{0.001, 0.002}.
+3. The surface code at these distance and error rate combinations: ( d, p)∈{ 11, 13}×{ 0.002}.
+We used the short beam for all other protocols, including all bicycle codes. We enabled the no-revisit
+detections heuristic for all protocols. We did not use a detection penalty. In future work, it would be helpful
+to automate the selection of beam parameters.
+System Information: We compiled Tesseract using Clang 18.1.8 (Red Hat 18.1.8-1) on a 64-bit x86 64
+Linux system. The benchmarks were conducted on a machine equipped with two Intel ® Xeon® CPUs
+10
+=== PAGE 11 ===
+10−9
+10−8
+10−7
+10−6
+10−5
+10−4
+10−3
+10−2
+Logical Error Per Round
+Superdense Color Code
+ Surface Code
+ Bivariate Bicycle Code
+ Transversal CX Surface Code
+50 100 150 200 250
+number of physical qubits
+10−6
+10−5
+10−4
+10−3
+10−2
+10−1
+100
+101
+Mean Decoding Time Per Round
+(seconds)
+100 200 300 400
+number of physical qubits
+150 200 250
+number of physical qubits
+100 200 300 400 500
+number of physical qubits
+p = 0.0005 Chromobius
+p = 0.001 Chromobius
+p = 0.002 Chromobius
+p = 0.0005 Correlated Matching
+p = 0.001 Correlated Matching
+p = 0.002 Correlated Matching
+p = 0.0005 BP+OSD
+p = 0.001 BP+OSD
+p = 0.002 BP+OSD
+p = 0.0005 Integer Program
+p = 0.001 Integer Program
+p = 0.002 Integer Program
+p = 0.0005 Tesseract
+p = 0.001 Tesseract
+p = 0.002 Tesseract
+Figure 6: Results using Tesseract on a larger gamut of physical error rates: p∈{ 0.0005, 0.001, 0.002}.
+running at 3.10 GHz, with a total of 60 logical processors (15 physical cores per CPU, 2 threads per core).
+Each decoder was executed on a single physical core, but no explicit resource isolation was enforced to control
+system load. As a result, the reported execution times are intended to be representative estimates rather
+than precise measurements under controlled conditions.
+C Technical differences from [OHB25]
+We will explain a few of the similarities and differences between Tesseract and DTD at a high level. First,
+it is important to note that both our work and [OHB25] each provide two decoders:
+1. A “slower decoder” that has a rigorous guarantee of optimality
+2. A “faster decoder” that sacrifices some amount of accuracy for improved performance
+In our open-source implementation, the command-line arguments can be adjusted to interpolate between
+these modes. In both algorithms, the A* search procedure is used. 5 Tesseract traverses the graph of error
+sets slightly differently with a canonicalized path ordering. There are also differences in the heuristics or
+“cutoffs” used to improve performance. In [OHB25], the authors explore more sophisticated admissible
+heuristics for special cases such as k-colorable graphs. They also consider BP-guided search. Tesseract uses
+a simpler A* heuristic cost calculation and a beam cutoff. We both make use of ensembling techniques.
+We also benchmark our decoders differently. In [OHB25] there is some emphasis on code-capacity noise
+models which assume noise-free measurement. These error models are of fundamental interest, but do not
+give a representative picture of practical runtimes on circuit-level noise. Our focus is on applying Tesseract
+to circuit-level noise models for color codes, surface codes, bicycle codes, and transversal CNOT operations
+5Although the authors of [OHB25] do not identify it as such, what they term the “syndrome height” is the same as the
+“admissible heuristic” used in A*.
+11
+=== PAGE 12 ===
+10−3 10−2
+p
+10−8
+10−7
+10−6
+10−5
+10−4
+10−3
+10−2
+10−1
+100
+Logical Z error rate (per round)
+Correlated sparse blossom and BPOSD
+[[204,12,3]] (surface)
+[[588,12,5]] (surface)
+[[1164,12,7]] (surface)
+[[1932,12,9]] (surface)
+[[2892,12,11]] (surface)
+[[144,12,6]] (bicycle, SI1000)
+[[144,12,6]] (bicycle, NLR5)
+[[144,12,6]] (bicycle, NLR10)
+10−3 10−2
+p
+10−8
+10−7
+10−6
+10−5
+10−4
+10−3
+10−2
+10−1
+100
+Logical Z error rate (per round)
+Correlated sparse blossom and BPOSD
+[[136,8,3]] (surface)
+[[392,8,5]] (surface)
+[[776,8,7]] (surface)
+[[1288,8,9]] (surface)
+[[1928,8,11]] (surface)
+[[180,8,8]] (bicycle, SI1000)
+[[180,8,8]] (bicycle, NLR5)
+[[180,8,8]] (bicycle, NLR10)
+10−3 10−2
+p
+10−8
+10−7
+10−6
+10−5
+10−4
+10−3
+10−2
+10−1
+100
+Logical Z error rate (per round)
+Correlated sparse blossom and BPOSD
+[[136,8,3]] (surface)
+[[392,8,5]] (surface)
+[[776,8,7]] (surface)
+[[1288,8,9]] (surface)
+[[1928,8,11]] (surface)
+[[216,8,8]] (bicycle, SI1000)
+[[216,8,8]] (bicycle, NLR5)
+[[216,8,8]] (bicycle, NLR10)
+10−3 10−2
+p
+10−8
+10−7
+10−6
+10−5
+10−4
+10−3
+10−2
+10−1
+100
+Logical Z error rate (per round)
+Correlated sparse blossom and BPOSD
+[[204,12,3]] (surface)
+[[588,12,5]] (surface)
+[[1164,12,7]] (surface)
+[[1932,12,9]] (surface)
+[[2892,12,11]] (surface)
+[[288,12,10]] (bicycle, SI1000)
+[[288,12,10]] (bicycle, NLR5)
+[[288,12,10]] (bicycle, NLR10)
+Figure 7: A comparison of surface codes and bivariate bicycle codes. Here the surface codes are decoded
+with correlated sparse blossom and the bivariate bicycle codes are decoded with BP+OSD. All surface code
+circuits use an SI1000 noise model and we use k copies of surface codes to compare with a bicycle code
+encoding k logical qubits. The bivariate bicycle codes use SI1000, NLR5 and NLR10 noise models (given in
+the legend).
+between two surface codes, applicable to neutral atom architectures [CZZ +24]. We also focus on the high-
+accuracy regime. We achieve 100x lower logical error rates than BP+OSD for the bicycle codes at p = 0.001,
+suggesting that the “fast decoder” (BP+DTD) of [OHB25] is leaving a factor of about 10x in logical error
+rate on the table (see Fig. 12 of [OHB25]). Of course, this is not to say that the DTD cannot achieve the
+same accuracy, but rather that with BP+DTD they probed a different operating regime where the algorithm
+is significantly faster and less accurate. Lastly, as mentioned before, our implementation appears significantly
+faster for the case of exact decoding of color codes under code capacity noise. Together, our results provide
+strong motivation for future work improving and applying search-based decoders for QEC codes.
+D Additional results comparing surface codes and bivariate bicy-
+cle codes
+In this section we present additional results comparing surface codes to the four smallest bivariate bicycle
+codes from [BCG +24]. In Figure 7 we use correlated matching to decode the surface codes and BP+OSD
+for the bivariate bicycle codes, whereas in Figure 8 we use Tesseract to decode all codes. We verified with a
+MaxSAT solver6 that the circuit distance of the [[72,12,6]] code is 6 (circuit parameters [[144,12,6]]) and the
+circuit distance of the [[90,8,10]] code is 8 (circuit parameters [[180,8,8]]). For the larger codes we give the
+upper bound on the circuit distance given in [BCG +24]. Note that we use d rounds of measurements for all
+bivariate bicycle code circuits, where d is the distance of the code.
+6We used the Circuit.shortest error sat problem method in stim [Gid21] combined with a solver from the MaxSAT
+Evaluation 2024 [BJM +24].
+12
+=== PAGE 13 ===
+10−36× 10−4 2× 10−3
+p
+10−8
+10−7
+10−6
+10−5
+10−4
+10−3
+10−2
+10−1
+100
+Logical Z error rate (per round)
+Tesseract Decoder
+[[204,12,3]] (surface)
+[[588,12,5]] (surface)
+[[1164,12,7]] (surface)
+[[1932,12,9]] (surface)
+[[2892,12,11]] (surface)
+[[4044,12,13]] (surface)
+[[144,12,6]] (bicycle, SI1000)
+10−36× 10−4 2× 10−3
+p
+10−8
+10−7
+10−6
+10−5
+10−4
+10−3
+10−2
+10−1
+100
+Logical Z error rate (per round)
+Tesseract Decoder
+[[136,8,3]] (surface)
+[[392,8,5]] (surface)
+[[776,8,7]] (surface)
+[[1288,8,9]] (surface)
+[[1928,8,11]] (surface)
+[[2696,8,13]] (surface)
+[[180,8,8]] (bicycle, SI1000)
+10−36× 10−4 2× 10−3
+p
+10−8
+10−7
+10−6
+10−5
+10−4
+10−3
+10−2
+10−1
+100
+Logical Z error rate (per round)
+Tesseract Decoder
+[[136,8,3]] (surface)
+[[392,8,5]] (surface)
+[[776,8,7]] (surface)
+[[1288,8,9]] (surface)
+[[1928,8,11]] (surface)
+[[2696,8,13]] (surface)
+[[216,8,8]] (bicycle, SI1000)
+10−36× 10−4 2× 10−3
+p
+10−8
+10−7
+10−6
+10−5
+10−4
+10−3
+10−2
+10−1
+100
+Logical Z error rate (per round)
+Tesseract Decoder
+[[204,12,3]] (surface)
+[[588,12,5]] (surface)
+[[1164,12,7]] (surface)
+[[1932,12,9]] (surface)
+[[2892,12,11]] (surface)
+[[4044,12,13]] (surface)
+[[288,12,10]] (bicycle, SI1000)
+[[288,12,10]] (bicycle, NLR5)
+[[288,12,10]] (bicycle, NLR10)
+Figure 8: A comparison of surface codes and bivariate bicycle codes, all decoded with Tesseract. All surface
+code circuits use an SI1000 noise model and we use k copies of surface codes to compare with a bicycle code
+encoding k logical qubits. The bivariate bicycle codes use SI1000, NLR5 and NLR10 noise models (given in
+the legend).
+13
