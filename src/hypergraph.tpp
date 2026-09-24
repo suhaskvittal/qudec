@@ -20,7 +20,6 @@ TEMPL_CLASS::add_vertex(V d)
         adj_.push_back(si_adj_elem_type{});
     else
         adj_.add_vertex(hy_adj_vdata_type{});
-    vertex_count_++;
     return x;
 }
 
@@ -51,7 +50,6 @@ TEMPL_CLASS::add_edge(std::vector<id_type> inc, E d)
     const id_type x = static_cast<id_type>(edge_count());
     edge_data_.push_back(d);
     edge_support_.push_back(supp);
-    edge_count_++;
 
     if constexpr (K == 2)
     {
@@ -197,3 +195,6 @@ TEMPL_CLASS::validate_vertex_list(std::string_view caller_id, const std::vector<
         if (x < 0 || static_cast<size_t>(x) >= vertex_count())
             std::cerr << "Hypergraph::" << caller_id << ": vertex \"" << x << "\" not in hypergraph (N = " << N() << ")" << _die{};
 }
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
