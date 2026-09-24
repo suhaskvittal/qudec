@@ -27,48 +27,46 @@ TEMPL_CLASS::add_vertex(V d)
 ////////////////////////////////////////////////////////////////
 
 TEMPL_PARAM typename TEMPL_CLASS::id_type
-TEMPL_CLASS::add_edge(std::vector<id_type> inc, E d)
+TEMPL_CLASS::add_edge(std::vector<id_type> supp, E d)
 {
-    // check that all elements of `inc` are valid vertices:
-    validate_vertex_list("add_edge()", inc);
+    // check that all elements of `supp` are valid vertices:
+    validate_vertex_list("add_edge()", supp);
     // canonicalize: an edge's identity does not depend on the order or
     // repetition of its endpoints.
-    std::sort(inc.begin(), inc.end());
-    inc.erase(std::unique(inc.begin(), inc.end()), inc.end());
+    std::sort(supp.begin(), supp.end());
+    supp.erase(std::unique(supp.begin(), supp.end()), supp.end());
     // check that order is ok as well:
-    if (inc.size() > K)
+    if (supp.size() > K)
         std::cerr << "Hypergraph::add_edge(): tried to add edge with order > max order (" << K << ")" << _die{};
-    // finally, check that the edge is unique:
-    if (edges_incident_to(inc).size() > 0)
-        std::cerr << "Hypergraph::add_edge(): edge is non-unique" << _die{};
+    // OpenAI GPT-6: Containing an input support does not make a larger
+    // hyperedge a duplicate; compare complete canonical supports instead.
+    for (auto e : edges_incident_to(supp))
+        if (support(e) == supp)
+            std::cerr << "Hypergraph::add_edge(): edge is non-unique" << _die{};
 
     // create edge support:
-    edge_support_type supp{};
-    supp.fill(INV);
-    std::copy(inc.begin(), inc.end(), supp.begin());
-
     const id_type x = static_cast<id_type>(edge_count());
     edge_data_.push_back(d);
     edge_support_.push_back(supp);
 
     if constexpr (K == 2)
     {
-        if (inc.size() == 2)
+        if (supp.size() == 2)
         {
-            id_type v = inc[0],
-                    w = inc[1];
+            id_type v = supp[0],
+                    w = supp[1];
             adj_[v].insert({w, x});
             adj_[w].insert({v, x});
         }
     }
     else
     {
-        for (size_t i = 0; i < inc.size(); i++)
+        for (size_t i = 0; i < supp.size(); i++)
         {
-            id_type v = inc[i];
-            for (size_t j = i+1; j < inc.size(); j++)
+            id_type v = supp[i];
+            for (size_t j = i+1; j < supp.size(); j++)
             {
-                id_type w = inc[j];
+                id_type w = supp[j];
                 // two possibiltiies: (v,w) already in `adj_` or it is not:
                 auto edges = adj_.edges_incident_to({v,w});
                 id_type y;
@@ -81,7 +79,7 @@ TEMPL_CLASS::add_edge(std::vector<id_type> inc, E d)
         }
     }
 
-    for (auto v : inc)
+    for (auto v : supp)
         incident_edges_[v].push_back(x);
 
     return x;
@@ -136,7 +134,12 @@ TEMPL_CLASS::for_each_edge_incident_to(this auto& G, std::vector<id_type> inc, c
 
     if constexpr (K != 2)
     {
-        std::vector<id_type> out = G.adj_.edges_incident_to({inc[0], inc[1]});
+        // OpenAI GPT-6: Resolve the interaction edge to its incident hyperedges
+        // before filtering supports containing every requested vertex.
+        auto interaction_edges = G.adj_.edges_incident_to({inc[0], inc[1]});
+        if (interaction_edges.empty())
+            return;
+        std::vector<id_type> out = G.adj_.e(interaction_edges[0]).incident;
         auto it = std::remove_if(out.begin(), out.end(),
                             [&G, &inc] (auto e)
                             {
@@ -174,7 +177,7 @@ TEMPL_CLASS::adjacency(id_type v) const
     // initialize mmap
     for (auto e : incident_edges_[v])
         for (auto w : support(e))
-            if (w != v && w != INV)
+            if (w != v)
                 mmap[w]++;
 
     // copy mmap contents to `out`

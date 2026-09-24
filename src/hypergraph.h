@@ -18,6 +18,19 @@
 #include <utility>
 #include <vector>
 
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
+namespace hg
+{
+
+using id_type = int32_t;
+
+} // namespace hg
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
 /*
  * `VDATA` = metadata for each vertex
  * `EDATA` = metadata for each hyperedge
@@ -27,9 +40,8 @@ template <class VDATA, class EDATA, size_t K>
 class Hypergraph
 {
 public:
-    using id_type = int32_t;
-    using edge_support_type = std::array<id_type, K>;
-    constexpr static id_type INV{-1};
+    using id_type = hg::id_type;
+    using edge_support_type = std::vector<id_type>;
 
     /*
      * When `Hypergraph` has `K = 2`, then we can track adjacency
@@ -109,12 +121,7 @@ public:
     auto& e(this auto& g, id_type x) { return g.edge_data_[x]; }
 
     size_t degree(id_type v) const { return incident_edges_[v].size(); }
-    size_t order(id_type e) const
-    {
-        auto begin = support(e).begin(), end = support(e).end();
-        auto it = std::find(begin, end, INV);
-        return std::distance(begin, it);
-    }
+    size_t order(id_type e) const { return edge_support_[e].size(); }
     const edge_support_type& support(id_type x) const { return edge_support_[x]; }
 
     /*
@@ -125,6 +132,9 @@ public:
 private:
     void validate_vertex_list(std::string_view caller_id, const std::vector<id_type>&) const;
 };
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
 
 #include "hypergraph.tpp"
 

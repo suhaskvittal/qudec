@@ -3,3 +3,6 @@ Debug/
 venv/
 .cache/
 build_nompi/
+build_mpi/
+results/
+out/
