@@ -76,7 +76,7 @@ see "Worth investigating" below.
 
 ### P0 — `low_confidence_flag` is silently discarded
 
-`decoder::Tesseract::decode` in `src/decoder/surface_code.cpp` calls
+`dec::Tesseract::decode` in `src/decoder/surface_code.cpp` calls
 `TesseractDecoder::decode()` and ignores `decoder_.low_confidence_flag`
 (`deps/tesseract/src/tesseract.h:135`). On pqlimit exhaustion the search
 returns early (`tesseract.cc:727-733`) and the buffer holds whatever it had,
@@ -88,7 +88,7 @@ forces a squash (cost ≈ 2× FIFO occupancy plus re-distilled magic states).
 Tesseract's most runahead-relevant property is currently being thrown away at
 the wrapper boundary.
 
-Fix: surface the flag on `decoder::result_type`.
+Fix: surface the flag on `dec::result_type`.
 
 ### P1 — Kill the Boost dependency (660 MB)
 
@@ -158,7 +158,7 @@ qudec-side CLI surface. Two of those defaults are surprising:
   of the box. The default ordering method is `Index`, not the `Coordinate`
   method the paper uses for its benchmarks.
 
-### P4 — Move `decoder::Tesseract` out of `surface_code.{h,cpp}`
+### P4 — Move `dec::Tesseract` out of `surface_code.{h,cpp}`
 
 Tesseract is a general qLDPC decoder (surface, color, bivariate bicycle), so
 it sits oddly in a file named for the surface code. Probably wants
@@ -270,7 +270,7 @@ pass ran. Working tree at time of writing:
 ```
 M  CMakeLists.txt                      Tesseract build integration
 M  main/qudec.cpp                      "tesseract" dispatch branch
-M  src/decoder/surface_code.{h,cpp}    decoder::Tesseract wrapper
+M  src/decoder/surface_code.{h,cpp}    dec::Tesseract wrapper
 M  deps/tesseract/CMakeLists.txt       trimmed to surviving targets
 M  deps/tesseract/src/utils.{h,cc}     JSON excision
 D  deps/tesseract/src/...              ~60 deleted files (tests, pybind,

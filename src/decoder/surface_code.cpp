@@ -16,7 +16,7 @@
 #include <queue>
 #include <unordered_map>
 
-namespace decoder
+namespace dec
 {
 
 ////////////////////////////////////////////////////////////////
@@ -468,4 +468,4 @@ BlossomV::solve_matching_problem(const MatchingProblemType& mp) const
     return out;
 }
 
-} // namespace decoder
+} // namespace dec

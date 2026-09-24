@@ -94,15 +94,15 @@ main(int argc, char* argv[])
 
     if (decoder_name == "pymatching")
     {
-        run(decoder::PyMatching(dem, enable_gap), [] (auto, auto, auto) {});
+        run(dec::PyMatching(dem, enable_gap), [] (auto, auto, auto) {});
     }
     else if (decoder_name == "blossom5")
     {
-        run(decoder::BlossomV(dem), [] (auto, auto, auto) {});
+        run(dec::BlossomV(dem), [] (auto, auto, auto) {});
     }
     else if (decoder_name == "tesseract")
     {
-        run(decoder::Tesseract(dem), [] (auto, auto, auto) {});
+        run(dec::Tesseract(dem), [] (auto, auto, auto) {});
     }
     else
     {

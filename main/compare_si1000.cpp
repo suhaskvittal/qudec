@@ -49,7 +49,7 @@ int main(int argc, char** argv)
 
     auto circuit = sc_si1000(d, rounds, p, false, true);
     auto dem = stim::circuit_to_dem(circuit, {.decompose_errors = true});
-    decoder::PyMatching pymatching(dem, false);
+    dec::PyMatching pymatching(dem, false);
     // OpenAI GPT-6-Sol: Match the paper's short-beam search configuration.
     tesseract_decoder::TesseractConfig config{.dem=dem};
     if (paper)
@@ -62,7 +62,7 @@ int main(int argc, char** argv)
         config.no_revisit_dets = true;
         config.det_penalty = 0;
     }
-    decoder::Tesseract tesseract(std::move(config));
+    dec::Tesseract tesseract(std::move(config));
 
     std::ofstream circuit_out(prefix + ".stim");
     std::ofstream dem_out(prefix + ".dem");

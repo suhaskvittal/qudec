@@ -8,7 +8,7 @@
 
 #include <vector>
 
-namespace decoder
+namespace dec
 {
 
 Tesseract::Tesseract(const stim::DetectorErrorModel& dem)
@@ -44,4 +44,4 @@ Tesseract::decode(SyndromeRef syn, ObsRef)
     return out;
 }
 
-} // namespace decoder
+} // namespace dec

@@ -3,7 +3,7 @@
 
 #include <stim.h>
 
-namespace decoder
+namespace dec
 {
 
 using SyndromeType = stim::simd_bits<64>;
@@ -11,6 +11,6 @@ using SyndromeRef = stim::simd_bits_range_ref<64>;
 using ObsType = SyndromeType;
 using ObsRef = SyndromeRef;
 
-} // namespace decoder
+} // namespace dec
 
 #endif

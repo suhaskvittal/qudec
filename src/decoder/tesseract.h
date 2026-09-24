@@ -12,7 +12,7 @@
 #include <stim.h>
 #include <tesseract.h>
 
-namespace decoder
+namespace dec
 {
 
 /*
@@ -47,6 +47,6 @@ private:
     tesseract_decoder::TesseractDecoder decoder_;
 };
 
-} // namespace decoder
+} // namespace dec
 
 #endif // DECODER_TESSERACT_h
