@@ -47,6 +47,8 @@ main(int argc, char* argv[])
      * PyMatching parameters:
      * */
     bool enable_gap{false};
+    // OpenAI GPT-6-Sol: Let CLI experiments opt into interior opposite-basis checks.
+    bool include_opposite_basis_detectors{false};
 
     ARGPARSE()
         .required("decoder-name", "Decoder to run", decoder_name)
@@ -57,6 +59,7 @@ main(int argc, char* argv[])
         .optional("-m", "--method", "Sampler method: monte_carlo or rare_event", conf.method, "monte_carlo")
         .optional("-pp", "--print-progress", "Print simulation progress", conf.print_progress, false)
         .optional("-g", "--gap", "Enable complementary gap estimation (pymatching only)", enable_gap, false)
+        .optional("", "--include-opposite-basis-detectors", "Include interior opposite-basis check detectors", include_opposite_basis_detectors, false)
 
         .optional("", "--mc-max-samples", "Monte-carlo: max shots to sample", conf.monte_carlo.max_samples, 1000000)
         .optional("", "--mc-stop-at-errors", "Monte-carlo: stop after this many logical errors", conf.monte_carlo.stop_at_error_count, 25)
@@ -72,7 +75,7 @@ main(int argc, char* argv[])
     conf.rare_event.start_level = (d-1)/2 - 1;
     conf.rare_event.max_level = 128;
 
-    auto circuit = sc_si1000(d, r, p, false);
+    auto circuit = sc_si1000(d, r, p, false, include_opposite_basis_detectors);
 
     // Convert to DEM with error decomposition required by PyMatching
     auto dem = stim::circuit_to_dem(circuit, {.decompose_errors = true});

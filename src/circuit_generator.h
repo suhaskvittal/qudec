@@ -24,17 +24,22 @@
  *      (5) idle during a CX layer -> DEPOLARIZE1(p),
  *      (6) idle during measurement -> DEPOLARIZE1(2p).
  *
- * Detection events are only emitted for the checks relevant to the requested
- * memory experiment: Z checks (which detect X errors) for a Z-memory
- * experiment, and X checks for an X-memory experiment.
+ * By default, detection events use only checks in the memory basis: Z checks
+ * for Z memory and X checks for X memory. With
+ * `include_opposite_basis_detectors`, comparisons between successive interior
+ * rounds also emit detectors for the other check basis. The first round and
+ * final data readout retain only the memory-basis detectors.
  *
  * Arguments:
  *      `distance`    -- code distance of the rotated surface code,
  *      `rounds`      -- number of syndrome-extraction rounds,
  *      `p`           -- physical error rate,
  *      `is_memory_x` -- true for an X-memory experiment, false for Z-memory.
+ *      `include_opposite_basis_detectors` -- include other-basis interior checks.
  * */
-stim::Circuit sc_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x);
+// OpenAI GPT-6-Sol: Expose optional interior opposite-basis detectors while preserving existing calls.
+stim::Circuit sc_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
+                        bool include_opposite_basis_detectors = false);
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
@@ -55,17 +60,19 @@ stim::Circuit sc_si1000(uint32_t distance, uint32_t rounds, double p, bool is_me
  * data qubits and 2*L^2 ancilla qubits (L^2 X-check vertices, L^2 Z-check
  * plaquettes). The toric code has two logical qubits; both observables are
  * emitted (`OBSERVABLE_INCLUDE(0)` and `OBSERVABLE_INCLUDE(1)`). Detection
- * events are only emitted for the checks relevant to the requested memory
- * experiment: Z checks (which detect X errors) for a Z-memory experiment,
- * and X checks for an X-memory experiment.
+ * events are emitted for the memory-basis checks. Optionally, comparisons
+ * between successive interior rounds also emit the other-basis checks.
  *
  * Arguments:
  *      `distance`    -- linear size L of the toric lattice (also its code distance),
  *      `rounds`      -- number of syndrome-extraction rounds,
  *      `p`           -- physical error rate,
  *      `is_memory_x` -- true for an X-memory experiment, false for Z-memory.
+ *      `include_opposite_basis_detectors` -- include other-basis interior checks.
  * */
-stim::Circuit toric_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x);
+// OpenAI GPT-6-Sol: Keep toric SI1000's detector option consistent with the rotated code.
+stim::Circuit toric_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
+                           bool include_opposite_basis_detectors = false);
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////

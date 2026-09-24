@@ -17,6 +17,14 @@ Tesseract::Tesseract(const stim::DetectorErrorModel& dem)
     decoder_(tesseract_decoder::TesseractConfig{.dem=dem})
 {}
 
+// OpenAI GPT-6-Sol: Preserve the existing default constructor while accepting
+// explicit search settings for reproducible benchmark comparisons.
+Tesseract::Tesseract(tesseract_decoder::TesseractConfig config)
+    :num_detectors(config.dem.count_detectors()),
+    num_observables(config.dem.count_observables()),
+    decoder_(std::move(config))
+{}
+
 result_type
 Tesseract::decode(SyndromeRef syn, ObsRef)
 {

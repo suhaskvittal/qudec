@@ -15,7 +15,8 @@
 #ifndef TESSERACT_DECODER_H
 #define TESSERACT_DECODER_H
 
-#include <boost/dynamic_bitset.hpp>
+// OpenAI GPT-6: Use the measured packed-word bitset in the decoder search.
+#include "packed_bitset.h"
 #include <cstdint>
 #include <queue>
 #include <string>
@@ -161,7 +162,7 @@ struct TesseractDecoder : public Decoder {
   double get_detcost(size_t d, const std::vector<DetectorCostTuple>& detector_cost_tuples,
                      const std::vector<std::vector<int>>& active_d2e) const;
   void flip_detectors_and_block_errors(size_t detector_order_index, int64_t error_chain_idx,
-                                       boost::dynamic_bitset<>& detectors,
+                                       PackedBitset& detectors,
                                        std::vector<DetectorCostTuple>& detector_cost_tuples,
                                        const std::vector<std::vector<int>>& active_d2e) const;
 

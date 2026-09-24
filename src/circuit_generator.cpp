@@ -162,7 +162,8 @@ struct toric_coord
 ////////////////////////////////////////////////////////////////
 
 stim::Circuit
-sc_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x)
+sc_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
+          bool include_opposite_basis_detectors)
 {
     using namespace stim;
 
@@ -328,6 +329,8 @@ sc_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x)
             {measure.x, measure.y, 0});
     }
 
+    // OpenAI GPT-6-Sol: Match Stim's original two-record interior detector timing;
+    // the optional opposite basis has no first-round or final-readout detector.
     // Body: cycle + detectors comparing this round to the previous one.
     Circuit body = cycle_actions;
     uint32_t m = measurement_qubits.size();
@@ -337,6 +340,17 @@ sc_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x)
         auto k = (uint32_t)measurement_qubits.size() - measure_coord_to_order[m_coord] - 1;
         body.safe_append_u(
             "DETECTOR", {(k + 1) | TARGET_RECORD_BIT, (k + 1 + m) | TARGET_RECORD_BIT}, {m_coord.x, m_coord.y, 0});
+    }
+    if (include_opposite_basis_detectors)
+    {
+        const auto& opposite_basis_measure_coords = is_memory_x ? z_measure_coords : x_measure_coords;
+        for (auto m_coord : opposite_basis_measure_coords)
+        {
+            auto k = (uint32_t)measurement_qubits.size() - measure_coord_to_order[m_coord] - 1;
+            body.safe_append_u(
+                "DETECTOR", {(k + 1) | TARGET_RECORD_BIT, (k + 1 + m) | TARGET_RECORD_BIT},
+                {m_coord.x, m_coord.y, 0});
+        }
     }
 
     // Tail: destructive data readout, final detectors, and the observable.
@@ -369,7 +383,8 @@ sc_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x)
 ////////////////////////////////////////////////////////////////
 
 stim::Circuit
-toric_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x)
+toric_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
+             bool include_opposite_basis_detectors)
 {
     using namespace stim;
 
@@ -526,6 +541,7 @@ toric_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x)
             {(float)measure.x, (float)measure.y, 0});
     }
 
+    // OpenAI GPT-6-Sol: Add the other check basis only between measured rounds.
     // Body: cycle + detectors comparing this round to the previous one.
     Circuit body = cycle_actions;
     uint32_t m = measurement_qubits.size();
@@ -535,6 +551,17 @@ toric_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x)
         auto k = (uint32_t)measurement_qubits.size() - measure_coord_to_order[m_coord] - 1;
         body.safe_append_u(
             "DETECTOR", {(k + 1) | TARGET_RECORD_BIT, (k + 1 + m) | TARGET_RECORD_BIT}, {(float)m_coord.x, (float)m_coord.y, 0});
+    }
+    if (include_opposite_basis_detectors)
+    {
+        const auto& opposite_basis_measure_coords = is_memory_x ? z_measure_coords : x_measure_coords;
+        for (auto m_coord : opposite_basis_measure_coords)
+        {
+            auto k = (uint32_t)measurement_qubits.size() - measure_coord_to_order[m_coord] - 1;
+            body.safe_append_u(
+                "DETECTOR", {(k + 1) | TARGET_RECORD_BIT, (k + 1 + m) | TARGET_RECORD_BIT},
+                {(float)m_coord.x, (float)m_coord.y, 0});
+        }
     }
 
     // Tail: destructive data readout, final detectors, and both observables.

@@ -33,8 +33,13 @@ public:
     const size_t num_observables;
 public:
     Tesseract(const stim::DetectorErrorModel&);
+    // OpenAI GPT-6-Sol: Let controlled comparisons supply paper benchmark settings.
+    Tesseract(tesseract_decoder::TesseractConfig);
 
     result_type decode(SyndromeRef, ObsRef);
+
+    // OpenAI GPT-6-Sol: Expose Tesseract's per-decode confidence signal for comparisons.
+    bool last_low_confidence() const { return decoder_.low_confidence_flag; }
 
     void print_stats(std::ostream&) const {}
     void mpi_accumulate() {}

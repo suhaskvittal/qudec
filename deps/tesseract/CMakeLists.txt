@@ -16,21 +16,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(stim)
 
-# Boost headers - prefer system Boost when available
-find_package(Boost 1.83 QUIET)
-if(Boost_FOUND)
-  add_library(boost_headers INTERFACE)
-  target_link_libraries(boost_headers INTERFACE Boost::boost)
-else()
-  FetchContent_Declare(
-    boost
-    URL https://archives.boost.io/release/1.83.0/source/boost_1_83_0.tar.gz
-    URL_HASH SHA256=c0685b68dd44cc46574cce86c4e17c0f611b15e195be9848dfd0769a0a207628
-  )
-  FetchContent_MakeAvailable(boost)
-  add_library(boost_headers INTERFACE)
-  target_include_directories(boost_headers INTERFACE ${boost_SOURCE_DIR})
-endif()
+# OpenAI GPT-6: Local packed bitsets replace the former Boost headers.
 
 set(OPT_COPTS -Ofast -fno-fast-math -march=native)
 
@@ -50,7 +36,7 @@ target_link_libraries(utils PUBLIC common libstim Threads::Threads)
 add_library(visualization ${TESSERACT_SRC_DIR}/visualization.cc ${TESSERACT_SRC_DIR}/visualization.h)
 target_include_directories(visualization PUBLIC ${TESSERACT_SRC_DIR})
 target_compile_options(visualization PRIVATE ${OPT_COPTS})
-target_link_libraries(visualization PUBLIC common boost_headers)
+target_link_libraries(visualization PUBLIC common)
 
 add_library(tesseract_lib
   ${TESSERACT_SRC_DIR}/tesseract.cc
@@ -58,7 +44,7 @@ add_library(tesseract_lib
 )
 target_include_directories(tesseract_lib PUBLIC ${TESSERACT_SRC_DIR})
 target_compile_options(tesseract_lib PRIVATE ${OPT_COPTS})
-target_link_libraries(tesseract_lib PUBLIC common utils boost_headers visualization libstim)
+target_link_libraries(tesseract_lib PUBLIC common utils visualization libstim)
 
 # Kept for research purposes (layered beam-search decoder). Not currently
 # used by any executable in this tree, but built here to make sure it still

@@ -15,7 +15,6 @@
 #include "tesseract.h"
 
 #include <algorithm>
-#include <boost/functional/hash.hpp>  // For boost::hash_range
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -81,17 +80,6 @@ int suggest_sparsify_reactivate_limit_capped(size_t num_detectors, int sparsify_
 }
 
 };  // namespace
-
-namespace std {
-template <>
-struct hash<boost::dynamic_bitset<>> {
-  size_t operator()(const boost::dynamic_bitset<>& bs) const {
-    // Delegate to Boost's internal hash_value for dynamic_bitset
-    // This is the correct and most efficient way.
-    return boost::hash_value(bs);
-  }
-};
-}  // namespace std
 
 namespace tesseract_decoder {
 
@@ -347,8 +335,8 @@ void TesseractDecoder::initialize_structures(size_t num_detectors) {
 
   eneighbors.resize(num_errors);
 
-  std::vector<boost::dynamic_bitset<>> edets_bitsets(num_errors,
-                                                     boost::dynamic_bitset<>(num_detectors));
+  // OpenAI GPT-6: Keep construction and A* syndrome bitsets in packed words.
+  std::vector<PackedBitset> edets_bitsets(num_errors, PackedBitset(num_detectors));
   for (size_t ei = 0; ei < num_errors; ++ei) {
     for (int d : edets[ei]) {
       edets_bitsets[ei][d] = 1;
@@ -356,7 +344,7 @@ void TesseractDecoder::initialize_structures(size_t num_detectors) {
   }
 
   for (size_t ei = 0; ei < num_errors; ++ei) {
-    boost::dynamic_bitset<> neighbor_set(num_detectors, false);
+    PackedBitset neighbor_set(num_detectors, false);
     for (int d : edets[ei]) {
       for (int oei : d2e[d]) {
         // Unify detectors from neighboring errors
@@ -366,7 +354,7 @@ void TesseractDecoder::initialize_structures(size_t num_detectors) {
     // Remove detectors from error's own set
     neighbor_set &= ~edets_bitsets[ei];
 
-    for (size_t d = neighbor_set.find_first(); d != boost::dynamic_bitset<>::npos;
+    for (size_t d = neighbor_set.find_first(); d != PackedBitset::npos;
          d = neighbor_set.find_next(d)) {
       eneighbors[ei].push_back(d);
     }
@@ -471,7 +459,7 @@ void TesseractDecoder::decode_to_errors(const std::vector<uint64_t>& detections)
 }
 
 void TesseractDecoder::flip_detectors_and_block_errors(
-    size_t detector_order_index, int64_t error_chain_idx, boost::dynamic_bitset<>& detectors,
+    size_t detector_order_index, int64_t error_chain_idx, PackedBitset& detectors,
     std::vector<DetectorCostTuple>& detector_cost_tuples,
     const std::vector<std::vector<int>>& active_d2e) const {
   int64_t walker_idx = error_chain_idx;
@@ -518,9 +506,10 @@ void TesseractDecoder::decode_to_errors_with_graph(
   }
 
   std::priority_queue<Node, std::vector<Node>, std::greater<Node>> pq;
-  std::unordered_map<size_t, std::unordered_set<boost::dynamic_bitset<>>> visited_detectors;
+  // OpenAI GPT-6: Hash packed residual syndromes for the visited-state check.
+  std::unordered_map<size_t, std::unordered_set<PackedBitset, PackedBitsetHash>> visited_detectors;
 
-  boost::dynamic_bitset<> initial_detectors(num_detectors, false);
+  PackedBitset initial_detectors(num_detectors, false);
   std::vector<DetectorCostTuple> initial_detector_cost_tuples(num_errors);
 
   for (size_t d : detections) {
@@ -548,7 +537,7 @@ void TesseractDecoder::decode_to_errors_with_graph(
   size_t min_num_dets = detections.size();
   size_t max_num_dets = min_num_dets + detector_beam;
 
-  boost::dynamic_bitset<> next_detectors;
+  PackedBitset next_detectors;
   std::vector<DetectorCostTuple> next_detector_cost_tuples;
 
   pq.push({initial_cost, min_num_dets, 0, -1});
@@ -560,7 +549,7 @@ void TesseractDecoder::decode_to_errors_with_graph(
 
     if (node.num_dets > max_num_dets) continue;
 
-    boost::dynamic_bitset<> detectors = initial_detectors;
+    PackedBitset detectors = initial_detectors;
     std::vector<DetectorCostTuple> detector_cost_tuples(num_errors);
     flip_detectors_and_block_errors(detector_order_index, node.error_chain_idx, detectors,
                                     detector_cost_tuples, active_d2e);

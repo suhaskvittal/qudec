@@ -1,5 +1,10 @@
 # Tesseract decoder: code walkthrough
 
+**Update (2026-09-24):** This walkthrough predates the replacement of
+`boost::dynamic_bitset` with the local `PackedBitset` in
+`deps/tesseract/src/packed_bitset.h`. The A* algorithm is unchanged, but
+bitset types and some source line numbers below have moved.
+
 Written for an agent picking this up cold. Describes the vendored source at
 `deps/tesseract/src/` (from `https://github.com/quantumlib/tesseract-decoder`,
 `main` as of a shallow clone on 2026-09-23, git metadata stripped;

@@ -1,5 +1,10 @@
 # Tesseract Boost audit: can the 660 MB dependency go away?
 
+**Update (2026-09-24):** The local `PackedBitset` recommendation was adopted
+in `deps/tesseract/src/packed_bitset.h`; the build declarations no longer
+fetch Boost. The analysis below documents the original Boost-based snapshot
+and retains its historical source references.
+
 Written for an agent picking this up cold. Read-only analysis, no code
 changed. Scope: every Boost usage in `deps/tesseract/src/` as of 2026-09-23
 (same vendored snapshot documented in `docs/tesseract-code-walkthrough.md`).

@@ -92,6 +92,14 @@ Fix: surface the flag on `decoder::result_type`.
 
 ### P1 — Kill the Boost dependency (660 MB)
 
+**Completed 2026-09-24.** The shared Tesseract source now uses
+`PackedBitset` backed by `std::vector<uint64_t>`. The root and vendored CMake
+files, plus Bazel module/build declarations, no longer fetch or link Boost.
+The isolated d=7 and d=9 comparisons found about 4–5% faster end-to-end
+execution with the packed version at `p=0.005` and 10,240 shots. The adopted
+build reproduced the baseline LERs at both distances. The notes below record
+the pre-change audit.
+
 Full analysis in `docs/tesseract-boost-audit.md`. Summary:
 
 - Boost usage is exactly `boost::dynamic_bitset` + `boost::hash_value`, at
@@ -114,9 +122,14 @@ crashing. Any implementation needs a test for this specifically.
 
 Note the audit cites `deps/tesseract/CMakeLists.txt:45-55,94,114` for the
 Boost lines; that file was rewritten by the cleanup pass, so re-locate them.
-The four files with actual Boost usage are untouched.
+The four files with actual Boost usage were updated as part of the adoption.
 
 ### P2 — Build hygiene
+
+The Boost target collision and deprecated Boost `FetchContent_Populate` call
+were removed with P1. The remaining Bazel cleanup below is a separate issue;
+`deps/tesseract/AGENTS.md` currently requires that Bazel and CMake builds
+both stay working.
 
 - **`boost_headers` target-name collision.** Root `CMakeLists.txt` does
   `add_library(boost_headers INTERFACE)` in the `find_package(Boost)` success

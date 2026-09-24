@@ -35,7 +35,8 @@ void Visualizer::add_activated_errors(int64_t node_idx,
   lines.push_back(ss.str());
 }
 
-void Visualizer::add_activated_detectors(const boost::dynamic_bitset<>& detectors,
+// OpenAI GPT-6: Read packed syndrome bits when rendering detector states.
+void Visualizer::add_activated_detectors(const PackedBitset& detectors,
                                          size_t num_detectors) {
   std::stringstream ss;
   ss << "activated_detectors = ";

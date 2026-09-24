@@ -98,22 +98,7 @@ git_repository(
 
 
 
-BOOST_VERSION = "1.83.0"
-BOOST_ARCHIVE_NAME = "boost_{}".format(BOOST_VERSION.replace(".", "_"))
-
-http_archive(
-    name = "boost",
-    urls = [
-        "https://archives.boost.io/release/{}/source/{}.tar.gz".format(
-            BOOST_VERSION,
-            BOOST_ARCHIVE_NAME,
-        )
-    ],
-    strip_prefix = BOOST_ARCHIVE_NAME,
-    sha256 = "c0685b68dd44cc46574cce86c4e17c0f611b15e195be9848dfd0769a0a207628",
-    build_file = "//third_party:boost.BUILD",
-)
+# OpenAI GPT-6: The local packed bitset removes the Boost archive dependency.
 
 cc_compatibility_proxy = use_extension("@rules_cc//cc:extensions.bzl", "compatibility_proxy")
 use_repo(cc_compatibility_proxy, "cc_compatibility_proxy")
-

@@ -175,6 +175,12 @@ cc_library(
 )
 
 cc_library(
+    # OpenAI GPT-6: Share the packed bitset header between search and visualization.
+    name = "libpacked_bitset",
+    hdrs = ["packed_bitset.h"],
+)
+
+cc_library(
     name = "libviz",
     srcs = ["visualization.cc"],
     hdrs = ["visualization.h"],
@@ -182,7 +188,7 @@ cc_library(
     linkopts = OPT_LINKOPTS,
     deps = [
         ":libutils",
-        "@boost//:dynamic_bitset",
+        ":libpacked_bitset",
     ],
 
 )
@@ -206,7 +212,7 @@ cc_library(
         ":liberror_correlations",
         ":libutils",
         ":libviz",
-        "@boost//:dynamic_bitset",
+        ":libpacked_bitset",
         "@nlohmann_json//:json",
         "@stim//:stim_lib",
     ],

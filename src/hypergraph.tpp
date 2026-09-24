@@ -1,7 +1,7 @@
 /*
- *  author: Suhas Vittal
- *  date:   21 September 2026
- * */
+ * author: OpenAI GPT-6-Luna
+ * purpose: Provide template definitions for the standalone global Hypergraph.
+ */
 
 #include <algorithm>
 #include <deque>
@@ -10,15 +10,6 @@
 
 #define TEMPL_PARAM template <class V, class E, size_t K>
 #define TEMPL_CLASS Hypergraph<V,E,K>
-
-namespace decoder
-{
-namespace bal
-{
-
-////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////
-
 TEMPL_PARAM typename TEMPL_CLASS::id_type
 TEMPL_CLASS::add_vertex(V d)
 {
@@ -206,82 +197,3 @@ TEMPL_CLASS::validate_vertex_list(std::string_view caller_id, const std::vector<
         if (x < 0 || static_cast<size_t>(x) >= vertex_count())
             std::cerr << "Hypergraph::" << caller_id << ": vertex \"" << x << "\" not in hypergraph (N = " << N() << ")" << _die{};
 }
-
-////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////
-
-namespace hg
-{
-
-template <class G> ErrorCube
-extract_error_cube(const G& gr, id_type base, size_t k)
-{
-    ErrorCube cu{ .base=base, .radius=k };
-    cu.nodes.reserve(32);
-    cu.edges.reserve(512);
-    cu.dist_map.reserve(32);
-
-    cu.dist_map[base] = ErrorCube::dist_type{};
-
-    std::unordered_set<id_type> visited_edges;
-    visited_edges.reserve(512);
-
-    std::deque<id_type> bfsq{ base }; 
-    while (bfsq.size() > 0)
-    {
-        id_type v = std::move(bfsq.front());
-        bfsq.pop_front();
-
-        auto d_v = cu.dist_map[v];
-        cu.nodes.push_back(v);
-
-        if (d_v.edges.size() >= k)
-            continue;
-
-        gr.for_each_edge_incident_to({v},
-                [&] (auto e)
-                {
-                    if (visited_edges.count(e))
-                        return;
-                    auto supp = gr.support(e);
-
-                    // add `e` to `cu.edges` since this is a potential edge
-                    // in the graph
-                    cu.edges.push_back(e);
-                    visited_edges.insert(e);
-
-                    // now handle traversal
-                    auto d_w = d_v;
-                    d_w.edges.push_back(e);
-                    d_w.pr *= gr.e(e).error_probability;
-
-                    for (auto w : supp)
-                    {
-                        auto d_w_it = cu.dist_map.find(w);
-                        if (d_w_it != cu.dist_map.end())
-                        {
-                            if (d_w.pr > d_w_it->second.pr)
-                                d_w_it->second = d_w;        
-                            continue;
-                        }
-                        else
-                        {
-                            cu.dist_map.insert({w, d_w});
-                        }
-                        bfsq.push_back(w);
-                    }
-                });
-    }
-    return cu;
-}
-
-} // namespace hg
-
-////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////
-
-} // namespace bal
-} // namespace decoder
-
-#undef TEMPL_PARAM
-#undef TEMPL_CLASS
