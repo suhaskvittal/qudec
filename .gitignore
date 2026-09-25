@@ -6,3 +6,5 @@ build_nompi/
 build_mpi/
 results/
 out/
+*.tar.gz
+*.tar.xz

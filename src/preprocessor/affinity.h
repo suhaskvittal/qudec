@@ -52,7 +52,6 @@ namespace aff
 {
 
 template <class G>
-// OpenAI GPT-6: Accept the const syndrome supplied by measure_affinity().
 AffinityResult impl_dijkstra(const G&, const std::vector<hg::id_type>& syndrome);
 
 } // namespace aff

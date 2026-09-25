@@ -109,6 +109,7 @@ target_compile_options(compare_si1000 PRIVATE ${COMPILE_OPTIONS})
 target_link_libraries(compare_si1000 PRIVATE qudeclib)
 
 # OpenAI GPT-6: Build the undecomposed-DEM syndrome affinity analysis executable.
+find_package(LibLZMA REQUIRED)
 add_executable(analyze_syndrome main/analyze_syndrome.cpp)
 target_compile_options(analyze_syndrome PRIVATE ${COMPILE_OPTIONS})
-target_link_libraries(analyze_syndrome PRIVATE qudeclib)
+target_link_libraries(analyze_syndrome PRIVATE qudeclib LibLZMA::LibLZMA)

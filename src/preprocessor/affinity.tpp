@@ -42,6 +42,11 @@ impl_dijkstra(const G& gr, const std::vector<hg::id_type>& s)
     for (auto x : s)
         s_membership[x] = true;
 
+    // adjacency cache: we will store computed adjacency data in this table to avoid
+    // recomputation across multiple Dijkstra's steps
+    using adj_c_entry = std::pair<hg::id_type, double>;
+    std::vector<std::vector<adj_c_entry>> adj_c(gr.N());
+
     // `pmap` is an accumulation structure in the traversal segment of Dijkstra's.
     std::unordered_map<hg::id_type, double> pmap;
     pmap.reserve(16);
@@ -72,35 +77,41 @@ impl_dijkstra(const G& gr, const std::vector<hg::id_type>& s)
             q.pop();
             if (entry.w > dist[entry.id] || settled[entry.id])
                 continue;
-            // OpenAI GPT-6: Count each target only once when equal-cost paths exist.
             settled[entry.id] = true;
             if (s_membership[entry.id])
                 s_rem--;
 
             auto r = entry.id;
-            gr.for_each_edge_incident_to({r},
-                    [&] (auto e)
-                    {
-                        const double pr = gr.e(e).pr;
-                        for (auto s : gr.support(e))
-                            if (s != r)
-                                pmap[s] += pr;
-                    });
-            for (auto [s, pr] : pmap)
+            // check if the adjacency cache is non-empty for this entry. if not, we need to populate it
+            if (adj_c[r].empty())
             {
-                const double w = -std::log(pr) + entry.w;
+                pmap.clear();
+                gr.for_each_edge_incident_to({r},
+                        [&] (auto e)
+                        {
+                            const double pr = gr.e(e).pr;
+                            for (auto s : gr.support(e))
+                                if (s != r)
+                                    pmap[s] += pr;
+                        });
+                for (auto [s, pr] : pmap)
+                    adj_c[r].push_back(adj_c_entry{s,-std::log(pr)});
+            }
+
+            for (auto [s, _w] : adj_c[r])
+            {
+                const double w = _w + entry.w;
                 if (w < dist[s])
                 {
                     q.push(pq_entry{s, w});
                     dist[s] = w;
                 }
             }
-            pmap.clear();
         }
 
         // once Dijkstra's terminates, copy contents of `dist` to `a`
         for (size_t j = 0; j < s.size(); j++)
-            a[ii++] = dist[s[j]] == INF ? 0.0 : std::exp(-dist[s[j]]);
+            a[ii++] = (i == j || dist[s[j]] == INF) ? 0.0 : std::exp(-dist[s[j]]);
     }
     return a;
 }

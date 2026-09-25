@@ -2,7 +2,7 @@
  * author: OpenAI GPT-6
  * date: 24 September 2026
  * purpose: Record SI1000 surface-code syndromes, PyMatching outcomes, and
- *          unnormalized detector-affinity matrices as JSON Lines.
+ *          effective detector-partner counts in a compact binary format.
  */
 
 #include "circuit_generator.h"
@@ -14,19 +14,22 @@
 #include <stim/util_top/circuit_to_dem.h>
 
 #include <argparse/argparse.h>
+#include <lzma.h>
 
 #include <algorithm>
+#include <array>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <fstream>
-#include <iomanip>
 #include <iostream>
 #include <limits>
 #include <map>
+#include <memory>
 #include <random>
-#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #if defined(ENABLE_MPI)
@@ -43,6 +46,121 @@ struct EdgeData { double pr; };
 constexpr size_t MAX_ERROR_ORDER{16};
 using AffinityGraph = Hypergraph<VertexData, EdgeData, MAX_ERROR_ORDER>;
 constexpr size_t BATCH_SIZE{64};
+constexpr std::string_view FILE_MAGIC{"QDAFF001"};
+
+// OpenAI GPT-6: Encode the versioned file in little-endian fixed-width fields.
+// The flags byte uses bit 0 for the odd-weight boundary rule and bit 1 for
+// opposite-basis detector inclusion.
+void append_u8(std::string& out, uint8_t value) { out.push_back(static_cast<char>(value)); }
+
+void
+append_u16(std::string& out, uint16_t value)
+{
+    for (size_t i = 0; i < 2; ++i)
+        append_u8(out, static_cast<uint8_t>(value >> (8 * i)));
+}
+
+void
+append_u64(std::string& out, uint64_t value)
+{
+    for (size_t i = 0; i < 8; ++i)
+        append_u8(out, static_cast<uint8_t>(value >> (8 * i)));
+}
+
+void
+append_f64(std::string& out, double value)
+{
+    static_assert(sizeof(double) == 8 && std::numeric_limits<double>::is_iec559);
+    append_u64(out, std::bit_cast<uint64_t>(value));
+}
+
+// OpenAI GPT-6: Compress binary batches as they arrive when the path ends in
+// .xz, without keeping earlier batches in memory.
+class BinaryWriter
+{
+public:
+    explicit BinaryWriter(const std::string& path)
+        : output_(path, std::ios::binary | std::ios::trunc),
+          compressed_(path.ends_with(".xz"))
+    {
+        if (!output_)
+            throw std::runtime_error("failed to open output file: " + path);
+        if (compressed_)
+        {
+            const auto status = lzma_easy_encoder(&stream_, 1, LZMA_CHECK_CRC64);
+            if (status != LZMA_OK)
+                throw std::runtime_error("failed to initialize LZMA encoder: " + std::to_string(status));
+        }
+    }
+
+    BinaryWriter(const BinaryWriter&) = delete;
+    BinaryWriter& operator=(const BinaryWriter&) = delete;
+
+    ~BinaryWriter()
+    {
+        if (compressed_)
+            lzma_end(&stream_);
+    }
+
+    void write(std::string_view data)
+    {
+        if (finished_)
+            throw std::runtime_error("cannot write after binary output is finished");
+        if (!compressed_)
+        {
+            output_.write(data.data(), static_cast<std::streamsize>(data.size()));
+        }
+        else
+        {
+            stream_.next_in = reinterpret_cast<const uint8_t*>(data.data());
+            stream_.avail_in = data.size();
+            while (stream_.avail_in > 0)
+                encode(LZMA_RUN);
+        }
+        if (!output_)
+            throw std::runtime_error("failed while writing syndrome records");
+    }
+
+    void finish()
+    {
+        if (finished_)
+            return;
+        if (compressed_)
+        {
+            lzma_ret status;
+            do
+            {
+                status = encode(LZMA_FINISH);
+            } while (status != LZMA_STREAM_END);
+        }
+        output_.flush();
+        if (!output_)
+            throw std::runtime_error("failed while finishing syndrome output");
+        finished_ = true;
+    }
+
+private:
+    lzma_ret encode(lzma_action action)
+    {
+        stream_.next_out = buffer_.data();
+        stream_.avail_out = buffer_.size();
+        const auto status = lzma_code(&stream_, action);
+        if (status != LZMA_OK && status != LZMA_STREAM_END)
+            throw std::runtime_error("LZMA compression failed: " + std::to_string(status));
+        const auto produced = buffer_.size() - stream_.avail_out;
+        output_.write(reinterpret_cast<const char*>(buffer_.data()),
+                      static_cast<std::streamsize>(produced));
+        if (!output_)
+            throw std::runtime_error("failed while writing compressed syndrome records");
+        return status;
+    }
+
+    std::ofstream output_;
+    bool compressed_;
+    bool finished_{false};
+    lzma_stream stream_ = LZMA_STREAM_INIT;
+    std::array<uint8_t, 1 << 16> buffer_{};
+};
 
 // Merge independent mechanisms with identical detector support by odd parity.
 double
@@ -111,51 +229,61 @@ build_affinity_graph(const stim::DetectorErrorModel& dem)
     return graph;
 }
 
-// Preserve the raw row-major array returned by measure_affinity(). Detector
-// IDs identify its row and column order; no normalization is applied here.
+// OpenAI GPT-6: Reduce each detector's affinity row to its effective partner
+// count, excluding self-affinity even when a decoder returns a nonzero diagonal.
+// The boundary detector is included as the final row for odd physical weight.
 void
-write_shot(std::ostream& out, uint64_t shot_index, bool truth, bool prediction,
+write_shot(std::string& out, bool truth, bool prediction,
            size_t physical_weight, const std::vector<hg::id_type>& detector_ids,
            const pp::AffinityResult& affinity)
 {
     const size_t matrix_size = detector_ids.size();
-    if (matrix_size != physical_weight + physical_weight % 2 ||
+    if (physical_weight > std::numeric_limits<uint16_t>::max() ||
+        matrix_size != physical_weight + physical_weight % 2 ||
         affinity.size() != matrix_size * matrix_size)
         throw std::runtime_error("unexpected affinity matrix size");
 
-    out << "{\"type\":\"shot\",\"shot_index\":" << shot_index
-        << ",\"hamming_weight\":" << physical_weight
-        << ",\"boundary_added\":" << (physical_weight % 2 ? "true" : "false")
-        << ",\"logical_error\":" << (truth != prediction ? "true" : "false")
-        << ",\"true_observable\":" << int(truth)
-        << ",\"pymatching_prediction\":" << int(prediction)
-        << ",\"detector_ids\":[";
+    append_u16(out, static_cast<uint16_t>(physical_weight));
+    append_u8(out, static_cast<uint8_t>(physical_weight % 2));
+    append_u8(out, static_cast<uint8_t>(truth != prediction));
+    for (const auto id : detector_ids)
+    {
+        if (id > std::numeric_limits<uint16_t>::max())
+            throw std::runtime_error("detector ID exceeds binary format range");
+        append_u16(out, static_cast<uint16_t>(id));
+    }
+
     for (size_t i = 0; i < matrix_size; ++i)
     {
-        if (i > 0) out << ',';
-        out << detector_ids[i];
+        double row_sum{0.0};
+        double row_square_sum{0.0};
+        for (size_t j = 0; j < matrix_size; ++j)
+        {
+            if (i == j)
+                continue;
+            const double value = affinity[i * matrix_size + j];
+            if (!(value >= 0.0 && value <= 1.0) || !std::isfinite(value))
+                throw std::runtime_error("measure_affinity returned a value outside [0, 1]");
+            row_sum += value;
+            row_square_sum += value * value;
+        }
+        const double effective_partners = row_square_sum > 0.0
+                ? row_sum * row_sum / row_square_sum : 0.0;
+        if (!std::isfinite(effective_partners))
+            throw std::runtime_error("effective partner count is not finite");
+        append_f64(out, effective_partners);
     }
-    out << "],\"affinity\":[";
-    for (size_t i = 0; i < affinity.size(); ++i)
-    {
-        const double value = affinity[i];
-        if (!(value >= 0.0 && value <= 1.0) || !std::isfinite(value))
-            throw std::runtime_error("measure_affinity returned a value outside [0, 1]");
-        if (i > 0) out << ',';
-        out << value;
-    }
-    out << "]}\n";
 }
 
-// Rank 0 owns the output file. Gather one bounded batch of JSONL records at a
-// time so high-shot MPI runs do not keep all syndrome matrices in memory.
+// Rank 0 owns the output file. Gather one bounded batch of binary records at a
+// time so high-shot MPI runs do not keep all syndromes in memory.
 void
-write_batch(std::ofstream& output, const std::string& local_records,
+write_batch(const std::unique_ptr<BinaryWriter>& output, const std::string& local_records,
             int rank, int world_size)
 {
 #if defined(ENABLE_MPI)
     if (local_records.size() > static_cast<size_t>(std::numeric_limits<int>::max()))
-        throw std::runtime_error("one rank's JSONL batch exceeds MPI count range");
+        throw std::runtime_error("one rank's binary batch exceeds MPI count range");
     const int send_count = static_cast<int>(local_records.size());
     std::vector<int> counts(rank == 0 ? world_size : 0);
     MPI_Gather(&send_count, 1, MPI_INT, rank == 0 ? counts.data() : nullptr,
@@ -170,12 +298,12 @@ write_batch(std::ofstream& output, const std::string& local_records,
         for (int i = 0; i < world_size; ++i)
         {
             if (total > std::numeric_limits<int>::max())
-                throw std::runtime_error("combined JSONL batch exceeds MPI count range");
+                throw std::runtime_error("combined binary batch exceeds MPI count range");
             offsets[i] = static_cast<int>(total);
             total += counts[i];
         }
         if (total > std::numeric_limits<int>::max())
-            throw std::runtime_error("combined JSONL batch exceeds MPI count range");
+            throw std::runtime_error("combined binary batch exceeds MPI count range");
         gathered.resize(static_cast<size_t>(total));
     }
     MPI_Gatherv(local_records.data(), send_count, MPI_CHAR,
@@ -184,18 +312,12 @@ write_batch(std::ofstream& output, const std::string& local_records,
                 rank == 0 ? offsets.data() : nullptr,
                 MPI_CHAR, 0, MPI_COMM_WORLD);
     if (rank == 0)
-        output.write(gathered.data(), static_cast<std::streamsize>(gathered.size()));
+        output->write(std::string_view(gathered.data(), gathered.size()));
 #else
     (void)rank;
     (void)world_size;
-    output << local_records;
+    output->write(local_records);
 #endif
-    if (rank == 0)
-    {
-        output.flush();
-        if (!output)
-            throw std::runtime_error("failed while writing syndrome records");
-    }
 }
 
 } // namespace
@@ -212,7 +334,7 @@ run_analysis(int argc, char* argv[], int rank, int world_size)
     bool opposite_basis{false};
 
     ARGPARSE()
-        .required("output-file", "JSON Lines output path", output_path)
+        .required("output-file", "Binary output path (.bin.xz or .bin)", output_path)
         .required("code-distance", "Distance of the rotated surface code", distance)
         .optional("-r", "--rounds", "Syndrome rounds (-1 = distance)", rounds, -1)
         .optional("-p", "--physical-error-rate", "SI1000 physical error rate", p, 1e-3)
@@ -228,6 +350,12 @@ run_analysis(int argc, char* argv[], int rank, int world_size)
         rounds < 1 || rounds > std::numeric_limits<uint32_t>::max() ||
         shot_count < 1 || seed < 0 || !(p > 0.0 && p < 1.0))
         throw std::invalid_argument("invalid distance, rounds, shots, seed, or physical error rate");
+    if (!(output_path.ends_with(".bin.xz") || output_path.ends_with(".bin")))
+        throw std::invalid_argument("output file must end in .bin.xz or .bin");
+    if (distance > std::numeric_limits<uint8_t>::max() ||
+        rounds > std::numeric_limits<uint8_t>::max() ||
+        world_size > std::numeric_limits<uint16_t>::max())
+        throw std::invalid_argument("distance, rounds, or MPI ranks exceed binary format range");
 
     const auto circuit = sc_si1000(static_cast<uint32_t>(distance),
                                    static_cast<uint32_t>(rounds), p, false, opposite_basis);
@@ -235,7 +363,12 @@ run_analysis(int argc, char* argv[], int rank, int world_size)
     // decomposed DEM with the same detector and observable numbering.
     const auto affinity_dem = stim::circuit_to_dem(circuit, {.decompose_errors = false});
     const auto matching_dem = stim::circuit_to_dem(circuit, {.decompose_errors = true});
-    if (affinity_dem.count_detectors() != matching_dem.count_detectors() ||
+    // OpenAI GPT-6: Stim scans the DEM to count detectors, so cache the count
+    // before the per-shot detector scan.
+    const auto detector_count = affinity_dem.count_detectors();
+    if (detector_count > std::numeric_limits<uint16_t>::max())
+        throw std::invalid_argument("detector count exceeds binary format range");
+    if (detector_count != matching_dem.count_detectors() ||
         affinity_dem.count_observables() != matching_dem.count_observables() ||
         affinity_dem.count_observables() != 1)
         throw std::runtime_error("affinity and matching DEM layouts differ");
@@ -249,45 +382,27 @@ run_analysis(int argc, char* argv[], int rank, int world_size)
     const uint64_t base = requested / world_size;
     const uint64_t remainder = requested % world_size;
     const uint64_t local_shots = base + (static_cast<uint64_t>(rank) < remainder);
-    const uint64_t rank_start = static_cast<uint64_t>(rank) * base +
-                                std::min<uint64_t>(static_cast<uint64_t>(rank), remainder);
     const uint64_t max_local_shots = base + (remainder > 0);
     const uint64_t batches = (max_local_shots + BATCH_SIZE - 1) / BATCH_SIZE;
 
-    std::ofstream output;
+    std::unique_ptr<BinaryWriter> output;
     if (rank == 0)
     {
-        output.open(output_path, std::ios::out | std::ios::trunc);
-        if (!output)
-            throw std::runtime_error("failed to open output file: " + output_path);
-        output << std::setprecision(17)
-               << "{\"type\":\"metadata\",\"schema\":2"
-               << ",\"distance\":" << distance
-               << ",\"rounds\":" << rounds
-               << ",\"physical_error_rate\":" << p
-               << ",\"memory_basis\":\"Z\""
-               << ",\"include_opposite_basis_detectors\":" << (opposite_basis ? "true" : "false")
-               << ",\"requested_shots\":" << requested
-               << ",\"seed\":" << seed
-               << ",\"mpi_ranks\":" << world_size
-               << ",\"rank_seed\":\"seed_plus_rank\""
-               << ",\"detector_count\":" << affinity_dem.count_detectors()
-               << ",\"boundary_detector_id\":" << affinity_dem.count_detectors()
-               << ",\"affinity_graph_edges\":" << graph.edge_count()
-               << ",\"affinity_dem_decompose_errors\":false"
-               << ",\"pymatching_dem_decompose_errors\":true"
-               << ",\"affinity_layout\":\"row-major square matrix in detector_ids order\""
-               << ",\"affinity_normalized\":false"
-               << ",\"boundary_rule\":\"append boundary to odd-order errors and odd-weight syndromes\"}\n";
-        if (!output)
-            throw std::runtime_error("failed while writing metadata");
+        output = std::make_unique<BinaryWriter>(output_path);
+        std::string header(FILE_MAGIC);
+        append_u8(header, static_cast<uint8_t>(distance));
+        append_u8(header, static_cast<uint8_t>(rounds));
+        append_f64(header, p);
+        append_u16(header, static_cast<uint16_t>(world_size));
+        append_u16(header, static_cast<uint16_t>(detector_count));
+        append_u8(header, static_cast<uint8_t>(1 | (opposite_basis ? 2 : 0)));
+        output->write(header);
     }
 
     uint64_t completed{0};
     for (uint64_t batch = 0; batch < batches; ++batch)
     {
-        std::ostringstream records;
-        records << std::setprecision(17);
+        std::string records;
         const size_t rows = static_cast<size_t>(
             std::min<uint64_t>(BATCH_SIZE, local_shots - completed));
         if (rows > 0)
@@ -298,7 +413,7 @@ run_analysis(int argc, char* argv[], int rank, int world_size)
             for (size_t row = 0; row < rows; ++row, ++completed)
             {
                 std::vector<hg::id_type> detector_ids;
-                for (size_t det = 0; det < affinity_dem.count_detectors(); ++det)
+                for (size_t det = 0; det < detector_count; ++det)
                     if (detectors[row][det])
                         detector_ids.push_back(static_cast<hg::id_type>(det));
 
@@ -306,15 +421,14 @@ run_analysis(int argc, char* argv[], int rank, int world_size)
                 // boundary, while the affinity matrix includes it when odd.
                 const size_t physical_weight = detector_ids.size();
                 if (physical_weight % 2 != 0)
-                    detector_ids.push_back(static_cast<hg::id_type>(affinity_dem.count_detectors()));
+                    detector_ids.push_back(static_cast<hg::id_type>(detector_count));
                 const auto decoded = decoder.decode(detectors[row], observables[row]);
                 const auto affinity = pp::measure_affinity(graph, detector_ids);
-                write_shot(records, rank_start + completed,
-                           observables[row][0], decoded.flipped_obs[0],
+                write_shot(records, observables[row][0], decoded.flipped_obs[0],
                            physical_weight, detector_ids, affinity);
             }
         }
-        write_batch(output, records.str(), rank, world_size);
+        write_batch(output, records, rank, world_size);
     }
 
     uint64_t total_completed = completed;
@@ -325,10 +439,7 @@ run_analysis(int argc, char* argv[], int rank, int world_size)
     {
         if (total_completed != requested)
             throw std::runtime_error("MPI shot counts do not sum to requested total");
-        output << "{\"type\":\"summary\",\"completed_shots\":" << total_completed << "}\n";
-        output.flush();
-        if (!output)
-            throw std::runtime_error("failed while writing syndrome summary");
+        output->finish();
     }
     return 0;
 }
