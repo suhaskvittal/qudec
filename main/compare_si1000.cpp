@@ -2,7 +2,7 @@
  * author: OpenAI GPT-6-Sol
  * date: 24 September 2026
  * purpose: Compare Tesseract and PyMatching on identical SI1000 DEM samples,
- *          recording every shot where only PyMatching has a logical error.
+ *          recording selected logical failures from the same sampled shots.
  */
 
 #include "circuit_generator.h"
@@ -26,7 +26,7 @@ int main(int argc, char** argv)
 {
     if (argc != 4 && argc != 5 && argc != 6)
     {
-        std::cerr << "usage: compare_si1000 OUTPUT_PREFIX SHOTS SEED [paper [ORDER_SEED] | UNIFORM_ERROR_COUNT]\n";
+        std::cerr << "usage: compare_si1000 OUTPUT_PREFIX SHOTS SEED [paper [ORDER_SEED | replay] | UNIFORM_ERROR_COUNT]\n";
         return 2;
     }
     const std::string prefix = argv[1];
@@ -37,9 +37,12 @@ int main(int argc, char** argv)
     // OpenAI GPT-6-Sol: Keep the prior default and conditioned CLI behavior;
     // paper mode selects Appendix B's short beam and coordinate ensemble.
     const bool paper = argc >= 5 && std::string(argv[4]) == "paper";
+    // OpenAI GPT-6: Replay the saved Monte Carlo stream, decoding with
+    // Tesseract only where PyMatching fails to recover shared failures.
+    const bool replay = argc == 6 && paper && std::string(argv[5]) == "replay";
     const bool conditioned = argc == 5 && !paper;
     const size_t uniform_error_count = conditioned ? std::stoull(argv[4]) : 0;
-    const uint64_t order_seed = argc == 6 ? std::stoull(argv[5]) : seed;
+    const uint64_t order_seed = argc == 6 && !replay ? std::stoull(argv[5]) : seed;
     if (argc == 6 && !paper)
         throw std::invalid_argument("six arguments require paper mode");
     constexpr uint32_t d = 9;
@@ -91,6 +94,7 @@ int main(int argc, char** argv)
            << (conditioned ? ",\"fixed_error_count\":" + std::to_string(uniform_error_count) : "")
            << ",\"detector_ids\":\"zero-based IDs in circuit order\""
            << ",\"tesseract_configuration\":\"" << (paper ? "paper_short_beam" : "default") << "\""
+           << (replay ? ",\"replay_pymatching_failures_only\":true" : "")
            << (paper ? ",\"det_beam\":15,\"beam_climbing\":true,\"detector_orders\":16,\"order_method\":\"coordinate\",\"order_seed\":" + std::to_string(order_seed) + ",\"pqlimit\":200000,\"no_revisit_dets\":true,\"det_penalty\":0" : "")
            << "}\n";
     events.flush();
@@ -125,14 +129,16 @@ int main(int argc, char** argv)
         for (size_t i = 0; i < batch_size && completed < shots; ++i, ++completed)
         {
             auto pm_result = pymatching.decode(detectors[i], observables[i]);
-            auto te_result = tesseract.decode(detectors[i], observables[i]);
             const bool truth = observables[i][0];
             const bool pm_prediction = pm_result.flipped_obs[0];
-            const bool te_prediction = te_result.flipped_obs[0];
             const bool pm_error = pm_prediction != truth;
+            pymatching_errors += pm_error;
+            if (replay && !pm_error)
+                continue;
+            auto te_result = tesseract.decode(detectors[i], observables[i]);
+            const bool te_prediction = te_result.flipped_obs[0];
             const bool te_error = te_prediction != truth;
             const bool low_confidence = tesseract.last_low_confidence();
-            pymatching_errors += pm_error;
             tesseract_errors += te_error;
             tesseract_low_confidence += low_confidence;
             paper_scored_tesseract_errors += te_error || low_confidence;
@@ -142,9 +148,10 @@ int main(int argc, char** argv)
             only_tesseract_errors += !pm_error && te_error;
             both_errors += pm_error && te_error;
 
-            if (pm_error && !te_error && (!paper || !low_confidence))
+            if (replay ? (pm_error && te_error) : (pm_error && !te_error && (!paper || !low_confidence)))
             {
                 events << "{\"type\":\"shot\",\"shot_index\":" << completed
+                       << (replay ? ",\"capture_reason\":\"both_decoders_failed\"" : "")
                        << ",\"truth\":" << int(truth)
                        << ",\"pymatching_prediction\":" << int(pm_prediction)
                        << ",\"tesseract_prediction\":" << int(te_prediction)
@@ -176,6 +183,20 @@ int main(int argc, char** argv)
             std::cerr << "completed " << completed << " / " << shots << " shots\n";
             events.flush();
         }
+    }
+
+    if (replay)
+    {
+        // OpenAI GPT-6: These Tesseract counts cover PyMatching failures only.
+        events << "{\"type\":\"summary\",\"completed_shots\":" << completed
+               << ",\"pymatching_errors\":" << pymatching_errors
+               << ",\"tesseract_decoded_shots\":" << pymatching_errors
+               << ",\"both_errors\":" << both_errors
+               << ",\"only_pymatching_errors\":" << only_pymatching_errors
+               << "}\n";
+        std::cout << "shots=" << completed << " pymatching_errors=" << pymatching_errors
+                  << " both=" << both_errors << "\n";
+        return 0;
     }
 
     events << "{\"type\":\"summary\",\"completed_shots\":" << completed

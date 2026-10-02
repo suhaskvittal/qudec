@@ -69,12 +69,10 @@ TEMPL_CLASS::add_edge(std::vector<id_type> supp, E d)
                 id_type w = supp[j];
                 // two possibiltiies: (v,w) already in `adj_` or it is not:
                 auto edges = adj_.edges_incident_to({v,w});
-                id_type y;
                 if (edges.empty())  // create new edge:
-                    y = adj_.add_edge({v,w}, hy_adj_edata_type{});
+                    adj_.add_edge({v,w}, hy_adj_edata_type{.incident={x}});
                 else
-                    y = edges[0];
-                adj_.e(y).incident.push_back(x);
+                    adj_.e(edges[0]).incident.push_back(x);
             }
         }
     }

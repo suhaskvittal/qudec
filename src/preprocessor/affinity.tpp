@@ -80,6 +80,8 @@ impl_dijkstra(const G& gr, const std::vector<hg::id_type>& s)
             settled[entry.id] = true;
             if (s_membership[entry.id])
                 s_rem--;
+            if (gr.v(entry.id).is_boundary)
+                continue;
 
             auto r = entry.id;
             // check if the adjacency cache is non-empty for this entry. if not, we need to populate it

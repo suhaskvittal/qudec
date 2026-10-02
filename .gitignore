@@ -8,3 +8,5 @@ results/
 out/
 *.tar.gz
 *.tar.xz
+
+.agentic_artifacts
