@@ -7,7 +7,7 @@
 #ifndef QUDEC_DECODER_LIBRA_H
 #define QUDEC_DECODER_LIBRA_H
 
-#include "decoder/common.h"
+#include "decoder/types.h"
 
 #include <cstdint>
 #include <iosfwd>
@@ -86,7 +86,7 @@ public:
      * matching_data.gap is the unsigned initial complementary gap in dB.
      * matching_data.probability is an unnormalized class score, not confidence.
      * */
-    result_type decode(SyndromeRef, ObsRef);
+    Result decode(SyndromeRef, ObsRef);
     DetailedResult decode_detailed(SyndromeRef);
 
     // Prepare immutable perturbed priors before timing decoding.

@@ -1,12 +1,13 @@
 /* 
  *  author: Suhas Vittal
  *  date:   16 May 2026
+ *  contributor: OpenAI Codex
  * */
 
 #ifndef DECODER_SURFACE_CODE_h
 #define DECODER_SURFACE_CODE_h
 
-#include "decoder/common.h"
+#include "decoder/types.h"
 #include "stats.h"
 
 #include <stim.h>
@@ -24,10 +25,18 @@ namespace dec
 class PyMatching
 {
 public:
+    struct config_type
+    {
+        bool enable_gap_estimation{false};
+        // Report matched detector endpoints and each pair's observable parity.
+        // Boundary endpoints use -1. Weights are not populated in this mode.
+        bool report_matching_data{false};
+    };
+
     const size_t num_detectors;
     const size_t num_observables;
 
-    const bool estimate_complementary_gap;
+    const config_type conf;
 
     /*
      * `s_gap` is the complementary gap distribution.
@@ -38,7 +47,7 @@ public:
                            s_unsigned_gap_errors{"UNSIGNED_GAP_ERRORS", 0, 256, 256};
 private:
     /*
-     * When `estimate_complementary_gap` is set, the matching graph is built from an
+     * When `conf.enable_gap_estimation` is set, the matching graph is built from an
      * augmented DEM in which the single logical observable is folded into an explicit
      * boundary node at index `obs_det_id_` (= `num_detectors`). The node's parity equals
      * the logical class, so decoding with it unfired vs. fired yields the two parity
@@ -56,9 +65,10 @@ private:
     double norm_const_{1.0};
     double decibels_per_w_{1.0};
 public:
-    PyMatching(const stim::DetectorErrorModel&, bool enable_gap_estimation);
+    explicit PyMatching(const stim::DetectorErrorModel&);
+    PyMatching(const stim::DetectorErrorModel&, config_type);
 
-    result_type decode(SyndromeRef, ObsRef);
+    Result decode(SyndromeRef, ObsRef);
 
     void print_stats(std::ostream&) const;
     
@@ -70,7 +80,8 @@ public:
         s_unsigned_gap_errors.mpi_accumulate();
     }
 private:
-    result_type internal_decode(SyndromeRef, bool fire_obs_det, pm::total_weight_int& weight_out);
+    Result internal_decode(SyndromeRef, bool fire_obs_det, pm::total_weight_int& weight_out,
+                                bool report_matching_data=false);
 };
 
 ////////////////////////////////////////////////////////////////
@@ -129,7 +140,7 @@ public:
 public:
     BlossomV(const stim::DetectorErrorModel&);
 
-    result_type decode(SyndromeRef, ObsRef);
+    Result decode(SyndromeRef, ObsRef);
 
     void print_stats(std::ostream&) const {}
     void mpi_accumulate() {}
@@ -150,7 +161,7 @@ private:
      * `solve_matching_problem()` runs Blossom-5 and returns the correction implied
      * by the min-weight perfect matching.
      * */
-    result_type solve_matching_problem(const matching_problem_type&) const;
+    Result solve_matching_problem(const matching_problem_type&) const;
 
     /*
      * Decoding graph adjacency data:

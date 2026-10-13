@@ -3,7 +3,8 @@
  * date: 24 September 2026
  * purpose: Record SI1000 surface-code syndromes, PyMatching outcomes, and
  *          effective detector-partner counts in a compact binary format.
- */
+ * contributor: OpenAI Codex
+*/
 
 #include "circuit_generator.h"
 #include "decoder/surface_code.h"
@@ -374,7 +375,7 @@ run_analysis(int argc, char* argv[], int rank, int world_size)
         throw std::runtime_error("affinity and matching DEM layouts differ");
 
     auto graph = build_affinity_graph(affinity_dem);
-    dec::PyMatching decoder(matching_dem, false);
+    dec::PyMatching decoder(matching_dem);
     stim::DemSampler<64> sampler(affinity_dem,
                                 std::mt19937_64(static_cast<uint64_t>(seed) + rank), BATCH_SIZE);
 

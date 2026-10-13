@@ -1,12 +1,15 @@
 /*
  *  author: Suhas Vittal
  *  date:   22 June 2026
+ *  contributor: OpenAI Codex (decoder type consolidation).
  * */
 
-#include "decoder/surface_code/matching_data.h"
-#include "globals.h"
+#include "decoder/types.h"
 
+#include <algorithm>
 #include <iostream>
+#include <sstream>
+#include <string>
 
 namespace dec
 {
@@ -81,9 +84,9 @@ matching_show_diff(std::ostream& ostrm, MatchingData m1, MatchingData m2, size_t
         if (ad1 > ad2)
             std::swap(ad1, ad2);
 
-        ostrm << "\n\tM!: " << ad1 << " <---> " << ad2 
-                << ", W = " << a.w_qu 
-                << ", PR = " << a.pr 
+        ostrm << "\n\tM!: " << ad1 << " <---> " << ad2
+                << ", W = " << a.w_qu
+                << ", PR = " << a.pr
                 << ", step = " << a.matching_step
                 << ", cid = " << a.cluster_id
                 << ", f = " << _frames_to_string(a.frame_flips, num_observables)
@@ -103,7 +106,7 @@ matching_show_diff(std::ostream& ostrm, MatchingData m1, MatchingData m2, size_t
                  bd2 = b.d2;
             if (bd1 > bd2)
                 std::swap(bd1, bd2);
-            
+
             bool frame_mismatch{false};
             for (size_t i = 0; i < num_observables; i++)
                 if (a.frame_flips[i] != b.frame_flips[i])
@@ -111,8 +114,8 @@ matching_show_diff(std::ostream& ostrm, MatchingData m1, MatchingData m2, size_t
 
             if (ad1 != bd1 || ad2 != bd2 || frame_mismatch)
             {
-                ostrm << "\t" << bd1 << " <---> " << bd2 
-                        << ", W = " << b.w_qu 
+                ostrm << "\t" << bd1 << " <---> " << bd2
+                        << ", W = " << b.w_qu
                         << ", PR = " << b.pr
                         << ", step = " << b.matching_step
                         << ", cid = " << b.cluster_id

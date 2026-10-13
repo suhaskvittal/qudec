@@ -1,6 +1,7 @@
 /*
  *  author: Suhas Vittal
  *  date:   16 May 2026
+ *  contributor: OpenAI Codex
  * */
 
 #include <circuit_generator.h>
@@ -113,7 +114,7 @@ run_cli(int argc, char* argv[], int world_rank)
 
     if (decoder_name == "pymatching")
     {
-        run(dec::PyMatching(dem, enable_gap), [] (auto, auto, auto) {});
+        run(dec::PyMatching(dem, {.enable_gap_estimation=enable_gap}), [] (auto, auto, auto) {});
     }
     else if (decoder_name == "blossom5")
     {

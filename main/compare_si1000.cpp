@@ -3,7 +3,8 @@
  * date: 24 September 2026
  * purpose: Compare Tesseract and PyMatching on identical SI1000 DEM samples,
  *          recording selected logical failures from the same sampled shots.
- */
+ * contributor: OpenAI Codex
+*/
 
 #include "circuit_generator.h"
 #include "decoder/surface_code.h"
@@ -52,7 +53,7 @@ int main(int argc, char** argv)
 
     auto circuit = sc_si1000(d, rounds, p, false, true);
     auto dem = stim::circuit_to_dem(circuit, {.decompose_errors = true});
-    dec::PyMatching pymatching(dem, false);
+    dec::PyMatching pymatching(dem);
     // OpenAI GPT-6-Sol: Match the paper's short-beam search configuration.
     tesseract_decoder::TesseractConfig config{.dem=dem};
     if (paper)

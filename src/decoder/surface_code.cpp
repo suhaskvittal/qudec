@@ -1,6 +1,7 @@
 /*
  *  author: Suhas Vittal
  *  date:   16 May 2026
+ *  contributor: OpenAI Codex
  * */
 
 #include "decoder/surface_code.h"
@@ -14,6 +15,7 @@
 #include <cmath>
 #include <limits>
 #include <queue>
+#include <stdexcept>
 #include <unordered_map>
 
 namespace dec
@@ -91,17 +93,24 @@ _build_gap_dem(const stim::DetectorErrorModel& dem)
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-PyMatching::PyMatching(const stim::DetectorErrorModel& dem, bool enable_gap_estimation)
+PyMatching::PyMatching(const stim::DetectorErrorModel& dem)
+    :PyMatching(dem, config_type{})
+{
+}
+
+PyMatching::PyMatching(const stim::DetectorErrorModel& dem, config_type conf)
     :num_detectors(dem.count_detectors()),
     num_observables(dem.count_observables()),
-    estimate_complementary_gap(enable_gap_estimation),
+    conf(conf),
     obs_det_id_(dem.count_detectors()),
     mwpm_(pm::detector_error_model_to_mwpm(
-                enable_gap_estimation ? _build_gap_dem(dem) : dem,
+                conf.enable_gap_estimation ? _build_gap_dem(dem) : dem,
                 pm::NUM_DISTINCT_WEIGHTS))
 {
-    if (enable_gap_estimation)
+    if (conf.enable_gap_estimation)
         assert(num_observables == 1 && "complementary gap estimation supports exactly one observable");
+    if (conf.report_matching_data && num_observables > sizeof(pm::obs_int) * 8)
+        throw std::invalid_argument("PyMatching matched-edge reporting supports at most 64 observables");
 
     norm_const_ = mwpm_.flooder.graph.normalising_constant;
     if (norm_const_ <= 0.0)
@@ -112,22 +121,35 @@ PyMatching::PyMatching(const stim::DetectorErrorModel& dem, bool enable_gap_esti
     decibels_per_w_ = 10.0 / (std::log(10.0) * norm_const_);
 }
 
-result_type
+Result
 PyMatching::decode(SyndromeRef syn, ObsRef obs)
 {
     pm::total_weight_int w_primary = 0;
-    auto out = internal_decode(syn, /*fire_obs_det=*/false, w_primary);
-    if (!estimate_complementary_gap)
+    auto out = internal_decode(syn, /*fire_obs_det=*/false, w_primary,
+                               conf.report_matching_data && !conf.enable_gap_estimation);
+    if (!conf.enable_gap_estimation)
         return out;
 
     // Complementary pass: fire the observable detector to force the opposite parity class.
     pm::total_weight_int w_complement = 0;
-    internal_decode(syn, /*fire_obs_det=*/true, w_complement);
+    if (conf.report_matching_data)
+    {
+        // The endpoint API does not return solution weight; retain the established weight
+        // passes for gap estimation, then report endpoints for the selected logical class.
+        internal_decode(syn, /*fire_obs_det=*/true, w_complement);
+        const bool predict_flip = (w_complement < w_primary);
+        pm::total_weight_int ignored_weight = 0;
+        out = internal_decode(syn, predict_flip, ignored_weight, true);
+    }
+    else
+        internal_decode(syn, /*fire_obs_det=*/true, w_complement);
 
     // set output observable:
     const bool predict_flip = (w_complement < w_primary);
     out.flipped_obs = ObsType(num_observables);
     out.flipped_obs[0] = predict_flip ? 1 : 0;
+    if (conf.report_matching_data)
+        out.matching_data.frame_flips = out.flipped_obs;
 
     // update gap distributions
     if (predict_flip)
@@ -147,8 +169,9 @@ PyMatching::decode(SyndromeRef syn, ObsRef obs)
     return out;
 }
 
-result_type
-PyMatching::internal_decode(SyndromeRef syn, bool fire_obs_det, pm::total_weight_int& weight_out)
+Result
+PyMatching::internal_decode(SyndromeRef syn, bool fire_obs_det, pm::total_weight_int& weight_out,
+                            bool report_matching_data)
 {
     // Collect indices of fired detectors.
     std::vector<uint64_t> det_events;
@@ -163,17 +186,53 @@ PyMatching::internal_decode(SyndromeRef syn, bool fire_obs_det, pm::total_weight
     // flip goes in `obs_begin_ptr[k]`), which is a different layout from `ObsType`'s bit-packed
     // storage (where `flipped_obs[k]` is bit `k`) -- so we decode into a byte buffer first and
     // then translate it into the bit-packed `ObsType` that the rest of the codebase expects.
-    std::vector<uint8_t> obs_bytes(num_observables, 0);
-
-    pm::total_weight_int weight = 0;
-    pm::decode_detection_events(mwpm_, det_events, obs_bytes.data(), weight, false);
-    weight_out = weight;
-
-    result_type res;
+    Result res;
     res.flipped_obs = ObsType(num_observables);
-    for (size_t i = 0; i < num_observables; i++)
-        res.flipped_obs[i] = obs_bytes[i] & 1;
-    res.matching_data.total_weight = weight;
+    if (report_matching_data)
+    {
+        pm::decode_detection_events_to_match_edges(mwpm_, det_events);
+        const auto* node_begin = mwpm_.flooder.graph.nodes.data();
+        res.matching_data.frame_flips = ObsType(num_observables);
+        for (const auto& edge : mwpm_.flooder.match_edges)
+        {
+            pm::obs_int edge_obs_mask = edge.obs_mask;
+            if (conf.enable_gap_estimation &&
+                ((edge.loc_from && static_cast<size_t>(edge.loc_from - node_begin) == obs_det_id_) ||
+                 (edge.loc_to && static_cast<size_t>(edge.loc_to - node_begin) == obs_det_id_)))
+                edge_obs_mask ^= 1;
+            for (size_t k = 0; k < num_observables; k++)
+                if ((edge_obs_mask >> k) & 1)
+                    res.flipped_obs[k] = !res.flipped_obs[k];
+            const auto id = [node_begin, this](const pm::DetectorNode* node) -> int64_t
+            {
+                if (!node) return -1;
+                const auto index = static_cast<size_t>(node - node_begin);
+                return index == obs_det_id_ ? -1 : static_cast<int64_t>(index);
+            };
+            const int64_t d1 = id(edge.loc_from), d2 = id(edge.loc_to);
+            if (d1 < 0 && d2 < 0) continue;
+            MatchingData::assignment_type assignment{
+                .d1 = d1,
+                .d2 = d2,
+                .pr = 1.0,
+                .w_qu = 0,
+                .frame_flips = ObsType(num_observables)};
+            for (size_t k = 0; k < num_observables; k++)
+                assignment.frame_flips[k] = (edge_obs_mask >> k) & 1;
+            res.matching_data.add(assignment);
+        }
+        weight_out = 0;
+    }
+    else
+    {
+        std::vector<uint8_t> obs_bytes(num_observables, 0);
+        pm::total_weight_int weight = 0;
+        pm::decode_detection_events(mwpm_, det_events, obs_bytes.data(), weight, false);
+        weight_out = weight;
+        for (size_t i = 0; i < num_observables; i++)
+            res.flipped_obs[i] = obs_bytes[i] & 1;
+        res.matching_data.total_weight = weight;
+    }
     return res;
 }
 
@@ -185,7 +244,7 @@ PyMatching::print_stats(std::ostream& ostrm) const
 {
     // The gap histogram is only populated when complementary-gap estimation is enabled;
     // otherwise it is empty (and its mean would divide by a zero count).
-    if (estimate_complementary_gap)
+    if (conf.enable_gap_estimation)
     {
         ostrm << s_signed_gap.to_string_full()
                 << "\n" << s_unsigned_gap.to_string_full()
@@ -321,12 +380,12 @@ BlossomV::adj_matrix(DetIdType d) const
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-result_type
+Result
 BlossomV::decode(SyndromeRef syndrome, ObsRef)
 {
     auto detectors = collect_detection_events(syndrome);
     if (detectors.empty())
-        return result_type{.flipped_obs=ObsType(num_observables)};
+        return Result{.flipped_obs=ObsType(num_observables)};
 
     auto mp = synthesize_matching_problem(std::move(detectors));
     return solve_matching_problem(mp);
@@ -427,7 +486,7 @@ BlossomV::synthesize_matching_problem(std::vector<DetIdType> detectors) const
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-result_type
+Result
 BlossomV::solve_matching_problem(const MatchingProblemType& mp) const
 {
     using AssignmentType = MatchingData::assignment_type;
@@ -453,7 +512,7 @@ BlossomV::solve_matching_problem(const MatchingProblemType& mp) const
     pm.Solve();
 
     // Apply the frame flips of every matched edge.
-    result_type out{.flipped_obs=ObsType(num_observables)};
+    Result out{.flipped_obs=ObsType(num_observables)};
     for (size_t k = 0; k < m; k++)
     {
         if (pm.GetSolution(k))

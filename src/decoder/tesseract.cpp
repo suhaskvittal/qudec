@@ -1,4 +1,5 @@
 /*
+ *  contributor: OpenAI Codex (decoder types migration).
  *  author: OpenAI GPT-6-Luna
  *  date:   23 Sep 2026
  *  purpose: Implement the Tesseract wrapper in its dedicated decoder translation unit.
@@ -25,7 +26,7 @@ Tesseract::Tesseract(tesseract_decoder::TesseractConfig config)
     decoder_(std::move(config))
 {}
 
-result_type
+Result
 Tesseract::decode(SyndromeRef syn, ObsRef)
 {
     // Collect indices of fired detectors -- `TesseractDecoder::decode` wants
@@ -38,7 +39,7 @@ Tesseract::decode(SyndromeRef syn, ObsRef)
     // `decode()` returns the sorted list of flipped observable ids.
     auto flipped = decoder_.decode(det_events);
 
-    result_type out{.flipped_obs=ObsType(num_observables)};
+    Result out{.flipped_obs=ObsType(num_observables)};
     for (int k : flipped)
         out.flipped_obs[k] ^= 1;
     return out;

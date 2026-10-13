@@ -1,4 +1,5 @@
 /*
+ *  contributor: OpenAI Codex (decoder types migration).
  *  author: OpenAI GPT-6-Luna
  *  date:   23 Sep 2026
  *  purpose: Isolate the Tesseract decoder wrapper from the surface-code decoders.
@@ -7,7 +8,7 @@
 #ifndef DECODER_TESSERACT_h
 #define DECODER_TESSERACT_h
 
-#include "decoder/common.h"
+#include "decoder/types.h"
 
 #include <stim.h>
 #include <tesseract.h>
@@ -24,7 +25,7 @@ namespace dec
  * This wrapper only exposes the plain single-shot decode path
  * (`tesseract_decoder::TesseractDecoder::decode`); Tesseract's complementary-gap /
  * low-confidence signals, multi-pass decoding, and visualization are out of scope
- * for now, so `result_type::matching_data` is left at its default value.
+ * for now, so `Result::matching_data` is left at its default value.
  * */
 class Tesseract
 {
@@ -36,7 +37,7 @@ public:
     // OpenAI GPT-6-Sol: Let controlled comparisons supply paper benchmark settings.
     Tesseract(tesseract_decoder::TesseractConfig);
 
-    result_type decode(SyndromeRef, ObsRef);
+    Result decode(SyndromeRef, ObsRef);
 
     // OpenAI GPT-6-Sol: Expose Tesseract's per-decode confidence signal for comparisons.
     bool last_low_confidence() const { return decoder_.low_confidence_flag; }

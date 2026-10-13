@@ -211,7 +211,7 @@ void run(const Options& o, const stim::DetectorErrorModel& dem,
                 dec::Libra::Config lc;
                 lc.seed = o.seed;
                 decoders[w].libra = std::make_unique<dec::Libra>(dem, lc);
-                decoders[w].pm = std::make_unique<dec::PyMatching>(dem, false);
+                decoders[w].pm = std::make_unique<dec::PyMatching>(dem);
                 decoders[w].libra->prepare_ensemble();
 
                 const uint64_t worker_seed = sampling_seed(o.seed, 0, static_cast<uint32_t>(w));

@@ -3,7 +3,7 @@
  * */
 
 #include "sampler.h"
-#include "decoder/common.h"
+#include "decoder/types.h"
 #include <array>
 #include <cmath>
 #include <iostream>
@@ -15,9 +15,9 @@ void require(bool value, const char* message) {
 }
 struct AlwaysOne {
     uint64_t calls = 0;
-    dec::result_type decode(dec::SyndromeRef, dec::ObsRef) {
+    dec::Result decode(dec::SyndromeRef, dec::ObsRef) {
         ++calls;
-        dec::result_type result;
+        dec::Result result;
         result.flipped_obs[0] = 1;
         return result;
     }

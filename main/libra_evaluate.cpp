@@ -193,7 +193,7 @@ void run_monte_carlo(const Options& o, const stim::DetectorErrorModel& dem,
             try {
                 const uint64_t worker_seed = o.seed + 0x9e3779b97f4a7c15ULL * uint64_t(worker + 1);
                 auto libra = make_libra(dem, o.seed, o.ensemble_size, latency);
-                dec::PyMatching pm(dem, false);
+                dec::PyMatching pm(dem);
                 libra.prepare_ensemble();
                 std::mt19937_64 rng(worker_seed);
                 stim::DemSampler<64> sampler(dem, std::move(rng), kBatchSize);
@@ -355,7 +355,7 @@ void run_rare(const Options& o, const stim::DetectorErrorModel& dem,
         threads.emplace_back([&, w, n] {
             try {
                 auto libra = make_libra(dem, o.seed, o.ensemble_size, false);
-                dec::PyMatching pm(dem, false);
+                dec::PyMatching pm(dem);
                 libra.prepare_ensemble();
                 std::mt19937_64 rng(o.seed + 0xd1b54a32d192ed03ULL * uint64_t(w + 1));
                 for (uint64_t i = 0; i < n; ++i) {
@@ -481,7 +481,7 @@ void run_rare_mix(const Options& o, const stim::DetectorErrorModel& dem,
         threads.emplace_back([&, w, n] {
             try {
                 auto libra = make_libra(dem, o.seed, o.ensemble_size, false);
-                dec::PyMatching pm(dem, false);
+                dec::PyMatching pm(dem);
                 libra.prepare_ensemble();
                 std::mt19937_64 rng(o.seed + 0xd1b54a32d192ed03ULL * uint64_t(w + 1));
                 std::discrete_distribution<size_t> choose_k(q.begin(), q.end());

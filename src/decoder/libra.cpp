@@ -5,7 +5,8 @@
  * */
 
 #include "decoder/libra.h"
-#include "decoder/libra_assignment.h"
+#include "decoder/libra/assignment.h"
+#include "globals.h"
 
 #include <pymatching/sparse_blossom/driver/mwpm_decoding.h>
 #include <pymatching/sparse_blossom/driver/user_graph.h>
@@ -917,11 +918,11 @@ Libra::decode_detailed(SyndromeRef syndrome)
     return impl_->decode(syndrome);
 }
 
-result_type
+Result
 Libra::decode(SyndromeRef syndrome, ObsRef)
 {
     auto result = decode_detailed(syndrome);
-    result_type out;
+    Result out;
     out.flipped_obs = ObsType(1);
     out.flipped_obs[0] = result.prediction;
     out.matching_data.frame_flips = out.flipped_obs;
