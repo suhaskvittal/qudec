@@ -1,0 +1,334 @@
+Libra with PyMatching assignment
+==============================
+
+This report documents the new implementation and repeats the accuracy
+measurements for that implementation. The earlier Libra.txt remains a record
+of the original Blossom V assignment backend. Existing project files and all
+13 source files in the saved original Libra manifest were preserved.
+
+Build: libra_pymatching/CMakeLists.txt. Link libra_pymatching_decoder, which
+implements the existing dec::Libra API, instead of libra_decoder. Do not link
+both implementations. See libra_pymatching/README.md for commands.
+New implementation: src/decoder/libra_pymatching.cpp.
+Assignment helper: src/decoder/libra_assignment_pymatching.h.
+
+The distance 17 evaluation survived a daemon restart and continued writing
+its original progress log. A duplicate started during recovery was stopped
+during initialization; its partial artifacts were preserved and none of its
+samples are used here. All accuracy tables use completed production outputs.
+
+1. Blossom V is optional
+-----------------------
+
+Libra does not require Blossom V. The main correlated detector-graph decodes
+already used PyMatching. Blossom V was used only for an auxiliary assignment:
+cover each selected CSS graph edge exactly once, with either an independent
+single channel or a correlated channel covering two graph edges. That graph
+already has explicit costs; its Blossom V solve used no Dijkstra preprocessing.
+
+The new implementation uses exact subset dynamic programming for auxiliary
+blocks of at most eight vertices and PyMatching for larger blocks. Existing
+one- and two-vertex shortcuts remain. There are no Blossom V symbols in the
+new Libra archive. The unchanged project still builds/links Blossom V for
+its other decoders; this Libra implementation makes no calls to it.
+
+Firing all assignment vertices in an unmodified PyMatching graph would
+enforce odd parity, which can permit degree three and give the wrong cover.
+For example, a four-vertex star with singles costing 10 and pairs costing 1
+has a parity solution costing 3 but an exact cover costing 21.
+
+Instead, quantize original costs to 1e-6, set C=1+max(single_cost), add boundary
+edges C+s_i and pair edges 2C+p_ij, then fire all vertices. At a vertex of
+degree>=3, removing two incident pair edges and toggling the boundary edges
+at their other endpoints preserves parity and decreases cost by at least
+2C-s_a-s_b>0. Thus every optimum has degree one. The added n*C cost is constant
+on exact covers, preserving the original optimum. Doubled integer weights
+make Sparse Blossom collision times integral. Large-block edge overflow is
+rejected instead of silently changing precision. Dominated/parallel pairs
+are pruned while retaining a cheapest original channel.
+
+All optimal assignment paths are direct edges. The compressed matched
+endpoints API supplies their identities without a SearchFlooder. The
+quadratic private-dummy clique of the previous formulation is eliminated.
+
+PyMatching's Sparse Blossom avoids an all-pairs shortest-path metric graph,
+and its ordinary observable-only decoder avoids recovering explicit paths.
+Libra needs the actual graph edges for correlated reweighting and matching
+synthesis, so its main edge-output calls still use PyMatching's Dijkstra-style
+path recovery. Replacing the auxiliary solver does not eliminate that work.
+
+2. Error configurations versus logical classes
+----------------------------------------------
+
+In this one-observable memory experiment, the two logical classes imply
+frame flip 0 or 1. The ideal objective is
+
+  P(L=l | s) proportional to sum_{e: D(e)=s, L(e)=l} exp(-W(e)),
+  W(e) = sum_{active channels i} log((1-p_i)/p_i).
+
+Core Libra synthesizes lower-weight representative error configurations
+for the classes. The enabled degeneracy extension approximates the sum
+using retained low-weight cycles around those representatives. A class
+containing several moderately likely configurations can beat a class
+containing the single most likely configuration.
+
+The algorithm does not enumerate every error or compute an exact posterior.
+DetailedResult.log_masses and matching_data.probability are unnormalized
+scores; the latter may underflow for large configuration weights. Normalizing
+the two log scores gives an approximate class probability, not a calibrated
+failure probability. The 20 dB gate can return the original unconstrained
+correlated matcher without running the ensemble.
+
+3. Correctness and tie sensitivity
+---------------------------------
+
+Both new CTest targets pass: the existing small-hypergraph Libra oracle
+linked to the new implementation, and 3000 exhaustive auxiliary assignment
+oracles, including odd sizes, zero costs, ties, duplicate pairs, the star
+counterexample, and the integer overflow guard.
+
+The old/new implementations were compared on 2176 syndromes per distance:
+2048 ordinary and 128 forced-ensemble shots, distances 5,7,...,17. All 15232
+predictions agreed; every returned assignment reconstructed its syndrome
+and logical parity. Some tied assignments differed while weights agreed
+within 1.14e-13 and gaps within 4.55e-13 dB. Degeneracy scores can differ because
+the synthesis/cycle history depends on tied representatives.
+
+A separate stress corpus of 32 shots per distance multiplied sampling-channel
+odds by 8, retained original decoding priors, and forced the ensemble. One
+of 224 predictions differed, at distance 15. Its initial gap was 0.222621 dB;
+different starting ties led synthesis to different final configurations.
+Both assignments were valid. Stress data are not an error-rate estimate at
+p=0.001. Production accuracy was therefore measured again for the new backend.
+
+4. New accuracy evaluations
+---------------------------
+
+SI1000 p=0.001, Z memory, rounds=distance, opposing-basis detectors enabled.
+Baseline: ordinary uncorrelated dec::PyMatching(dem,false).
+Libra: ensemble 60, gap gate 20 dB, degeneracy enabled, up to 30 positive cycles
+per class. Seed 20261001. Each comparison feeds both decoders the same sampled
+syndrome and observable truth; the decoder ignores the truth argument.
+
+Monte Carlo uses 63 workers and stops after at least 20 Libra failures and
+at least 20 baseline failures. Small excesses occur from concurrent workers.
+The baseline has more failures when its logical error rate is higher.
+
+ d       shots   PM failures  Libra failures      PM LER       Libra LER  PM/Libra
+--------------------------------------------------------------------------------
+ 5       26732           38              21  1.42152e-03     7.85575e-04      1.81
+ 7      165259           45              20  2.72300e-04     1.21022e-04      2.25
+ 9     1215258           78              20  6.41839e-05     1.64574e-05      3.90
+11    12494863          137              20  1.09645e-05     1.60066e-06      6.85
+
+Corrected rare-event evaluations use 64 chains, initial odds tilt theta=0.8,
+eight bridges to theta=0, burn in 1000, 512 records per chain per stage,
+stride 4, local swaps and systematic resampling. Initial tilted Monte Carlo
+targets 25 independent failures per decoder; each conditional stage has 32768
+correlated records. Priors used for decoding remain at the original p=0.001.
+The sampling event is the union of failures of the two decoders. Every
+recorded state is decoded by both, even when the fast proposal callback can
+establish union membership by testing PyMatching alone.
+
+The original src/sampler.cpp fixed-count generator incorrectly samples
+uniform subsets for unequal Bernoulli probabilities; the modal/truncated
+count summation also lacks a valid general tail bound. Those files were
+preserved and that sampler was not used. The corrected splitting kernel
+and heterogeneous conditional sampler remain the ones documented in Libra.txt.
+
+ d  tilted base shots  PM failures  Libra failures      PM LER       Libra LER  PM/Libra
+---------------------------------------------------------------------------------------
+13             212038          164              25  2.03782e-06     3.40859e-07      5.98
+15             434335          165              25  4.27106e-07     4.92384e-08      8.67
+17            1278721          230              25  1.21262e-07     8.32776e-09     14.56
+
+Rare-event mixing cross-checks and finite-particle diagnostics:
+
+ d  endpoint PM LER  endpoint Libra LER  weight ESS range  unique resampled states
+--------------------------------------------------------------------------------
+13      2.02258e-06         4.12919e-07   53.27-61.41                64-64
+15      4.40258e-07         3.75235e-08   39.08-56.09                64-64
+17      1.21377e-07         7.80571e-09   34.82-51.41                64-64
+
+Endpoint/bridge estimate ratios (PM, Libra):
+  distance 13: 0.993, 1.211.
+  distance 15: 1.031, 0.762.
+  distance 17: 1.001, 0.937.
+
+These are finite-sample observations. Monte Carlo stopping counts are small;
+rare-event chains are correlated and finite-population resampling can drift.
+Endpoint checks are diagnostics, not independent replicates or exact
+confidence intervals. The paired data support lower observed Libra rates
+at every measured distance. No statistical certainty is claimed.
+
+The old and new rare-event runs are not a controlled paired comparison of
+assignment backends: adaptive stopping/resampling and changed predictions
+can alter their sampled populations even with the same seed. Their rate
+differences cannot be attributed entirely to the backend. Within each new
+run, PyMatching and Libra are evaluated on the same configurations.
+
+5. Decoding latency and small-block optimization
+-----------------------------------------------
+
+4096 ordinary Monte Carlo syndromes per distance, CPU 62, one decoder worker,
+seed 20261001, prepare_ensemble outside timing, profile=false, validate=false.
+The timed call is decode_detailed. Sampling, circuit/model generation and
+decoder construction are excluded. Old and new runs are separate sequential
+passes over the same syndromes, with no other task evaluation concurrently
+running. Background host load may vary. These are mean times per complete
+d-round history, not per-round measurements or streaming benchmarks.
+
+ d  original backend us  new backend us  original/new  new ensemble shots
+------------------------------------------------------------------------
+ 5               68.023          69.087         0.985                  31
+ 7              186.356         188.977         0.986                   5
+ 9              412.118         408.764         1.008                   0
+11              867.179         868.722         0.998                   0
+13             1772.943        2257.435         0.785                   0
+15             3471.626        3569.953         0.972                   0
+17             7197.320        7677.496         0.937                   0
+
+There is no large overall speedup. Most decoding work is the complementary
+correlated matching and path recovery, which already used PyMatching.
+Single timing passes do not establish that every difference is caused solely
+by the auxiliary backend. In particular, the distance 13 timing differs more
+than the surrounding distances. The original/new dependency builds select
+C++23/C++20 for PyMatching respectively, with otherwise matching flags;
+both Libra implementations and the rest of the project use C++23.
+
+The subset-DP shortcut was added before production evaluation after a
+synthetic assignment benchmark showed high PyMatching setup overhead on
+tiny explicit-cost graphs. Constructor/setup and solving are included below.
+Sixteen sparse bipartite graphs per size use identical costs with both
+backends, and every optimum/checksum agrees. CPU 61, fixed seed 20261007.
+
+ vertices   Blossom V us  new solver us  new small-block method
+-------------------------------------------------------------
+        3          0.964          0.217  subset DP
+        4          1.111          0.368  subset DP
+        8          1.829          6.329  subset DP
+       16          4.813         41.824  PyMatching
+       32         15.487         90.972  PyMatching
+       64         54.592        185.701  PyMatching
+      128        236.619        397.276  PyMatching
+      256       1496.160        828.383  PyMatching
+
+Blossom V can be faster on these small explicit-cost assignments. PyMatching
+does not automatically make every matching formulation faster. The new
+large-block formulation removes quadratic dummy storage and the new decoder
+does not use Blossom V; the small-block shortcut reduces its setup overhead.
+
+6. GPU feasibility, hot loops, and B200 capacity assumptions
+----------------------------------------------------------
+
+The complete algorithm can be implemented on a GPU. The current C++ code is
+a CPU implementation; a GPU port must replace pointers, dynamic containers,
+and allocators with indexed arrays and device arenas. Sparse Blossom's
+priority queues and contraction/augmentation steps are irregular and
+partly sequential within a matching job. GPU feasibility alone does not
+establish a speedup or a latency bound.
+
+Straightforward parallel work:
+  * Independent shots and the two initial complementary classes.
+  * The 60 independent perturbed matching jobs on an ensemble-triggered shot.
+    Their outputs must be applied in the original order during synthesis.
+  * Independent assignment components; the new sparse auxiliary graph has
+    no dummy clique. Tiny subset-DP states can be evaluated by cardinality.
+  * Hyperedge weight sums, observable XOR, sparse difference construction,
+    incidence/connected-component work, and fixed-base cycle deltas.
+  * Independent connected cycle groups and their configuration enumeration,
+    with parallel log-sum-exp reductions. Small groups enumerate unique
+    spans of rank<10; larger groups use the existing truncated cycle sums.
+
+Candidate-to-candidate representative updates, positive-cycle heap resets,
+and the second correlated pass depend on prior results and cannot simply
+be run concurrently. Scratch such as edge_position and det_owner must be
+private to jobs; sharing the current CPU instance would race.
+
+NVIDIA reports 148 SMs for B200, with 64 warps, 65536 32-bit registers, 32 blocks,
+and 228 KiB shared memory per SM, and up to 180 GB HBM. Primary sources:
+[NVIDIA SM count](https://developer.nvidia.com/blog/scaling-autonomous-ai-agents-and-workloads-with-nvidia-dgx-spark/)
+[NVIDIA occupancy and HBM limits](https://docs.nvidia.com/cuda/archive/13.2.1/blackwell-tuning-guide/index.html)
+
+The following is an unmeasured CUDA allocation plan, not sizeof the CPU
+objects or a proven worst-case bound. D=detectors, H=canonical hyperedges,
+E=graph edges, R=directed correlation rules, B=ceil(H/8). Graph and prior tables
+are shared by instances using the same model and perturbation seed.
+32-bit indices/weights, 64-bit time accumulators, and double hyperedge scores
+are assumed. The original compact budget is supplemented with an explicit
+arena provision for the new auxiliary graph (n<=E,m<=H):
+
+  T =48H+32E+12R+4(D+1)+60*(8H+4E+4R), shared tables.
+  W =256D+32E+8R, main matching job scratch.
+  A =512E+128H, additional auxiliary arena provision.
+  S =124B+8H+8D+32768, per-shot candidate/cycle scratch.
+  Parallel 60-member instance =60*(W+A)+S.
+  Streaming instance =(W+A)+S.
+
+A deliberately charges the full model's possible auxiliary vertices/pairs
+to every matching job, although actual assignment blocks are much smaller
+and main/auxiliary arenas could be reused. Its coefficients are design
+provisions that must be validated during a port. The bounded small-block
+DP's cost/choice/pair tables use about 3.25 KiB, shared by its cooperating
+threads. Large graph/queue arrays live in HBM. Sampling/rare-event state
+and CUDA context overhead are excluded.
+
+ d  shared MiB  auxiliary MiB/job  parallel MiB/instance  streaming MiB/instance
+-----------------------------------------------------------------------------
+ 5       1.983              0.450                 31.656                   0.596
+ 7       6.635              1.429                100.265                   1.825
+ 9      15.613              3.276                229.731                   4.145
+11      30.332              6.269                439.327                   7.902
+13      52.207             10.681                748.325                  13.443
+15      82.654             16.789               1176.000                  21.112
+17     123.087             24.867               1741.624                  31.257
+
+At distance 17, this plan gives 123.087 MiB shared tables, 1741.624 MiB per fully
+parallel instance or 31.257 MiB per streaming instance. Reserving 20% of the
+decimal 180 GB HBM allows 78 parallel or 4389 streaming workspaces. These are
+stored workspaces, not the number that can execute at once.
+
+For a proposed 128-thread matching block using 64 registers/thread and 8 KiB
+shared scratch, register allocation limits residency to 8 blocks/SM. A
+shared-memory carveout of at least 100 KiB accommodates the blocks and CUDA's
+per-block reservation. 148*8=1184 matching jobs can be resident, allowing
+floor(1184/60)=19 complete hard-shot Libra ensembles with every member
+running simultaneously, or 1184 streaming instances with one active matching
+job apiece. Both counts fit the expanded distance 17 HBM plan. The ordinary
+two complementary jobs can run together; the fallback is chosen after the
+gap is known, so it is a later dependency rather than a third independent
+initial job.
+
+Register sensitivity under the same 128 threads per block and 8 KiB scratch design:
+
+ registers/thread  blocks/SM  matching jobs  complete 60-member ensembles
+------------------------------------------------------------------------
+               32         16           2368                           39
+               64          8           1184                           19
+               96          5            740                           12
+              128          4            592                            9
+              255          2            296                            4
+
+The 32-register row requires at least 164 KiB shared-memory carveout. Actual
+register use, spills, buffer high-water marks, scheduling of synthesis and
+assignment kernels, and memory-access efficiency require a compiled CUDA
+implementation. Thus 19 fully parallel or 1184 streaming instances are
+conditional design estimates, not measured B200 decoder concurrency.
+
+7. Reproducibility artifacts
+---------------------------
+
+.agentic_artifacts/libra_pymatching/source_manifest.json
+  New source/archive hashes, original source preservation, and symbol check.
+.agentic_artifacts/libra_pymatching/compare/
+  Comparative validation/stress corpora, latency data, and benchmark source.
+.agentic_artifacts/libra_pymatching/production/
+  New Monte Carlo and corrected rare-event outputs and progress logs.
+.agentic_artifacts/libra_pymatching/recovery/
+  Unused partial duplicate artifacts, stopped after the daemon restart.
+.agentic_artifacts/libra_pymatching/assignment_benchmark_optimized.csv
+  Synthetic exact-assignment costs and timings.
+.agentic_artifacts/libra_pymatching/gpu_plan.py and gpu_plan.json
+  Reproducible capacity assumptions and occupancy arithmetic.
+
+No GPU port or GPU latency was measured. No existing project file was edited.

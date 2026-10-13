@@ -1,0 +1,225 @@
+Libra: fallback, uncorrelated matching, and Hamming-weight experiments
+Follow-up to Libra.txt and Libra-PyMatching.txt; existing files are preserved.
+Experiment date: 2026-10-07. Only new project files were created.
+
+Decisions
+=========
+Retain the extra high-gap unconstrained correlated MWPM call in original Libra.
+Removing it increased the d9 observed failures from 20 to 23 on identical shots.
+Keep uncorrelated matching as an experimental configuration: it was faster and
+beat ordinary PyMatching at d5/d7/d9, but had more failures than original Libra.
+An adaptive detector-HW rule is promising at d5. Conservative d7/d9 thresholds
+cover about 12% of shots; their low-HW samples show no failures for any decoder,
+so they do not establish a low-HW advantage over PyMatching.
+
+Model, pairing, and meanings
+============================
+Surface-code SI1000, physical error rate p=0.001, Z memory, rounds=distance,
+opposing basis detectors enabled. Monte Carlo samples the decomposed Stim DEM.
+Every comparison uses exactly the same sampled syndrome and logical truth for
+both Libra variants and ordinary uncorrelated PyMatching. Truth only scores errors.
+Accuracy runs use 64 worker threads on CPUs 0-63, stopping after both Libra
+variants have at least 20 failures, or at 10 million requested shots. A weaker
+variant naturally accumulates more than 25 failures while original Libra reaches
+20. These are observed counts and point estimates; no significance claim is made.
+Worker sampling streams use seed + 0x9e3779b97f4a7c15*(worker+1). Scheduling can
+change stream lengths and the endpoint. Each failed shot records worker/local
+index, detector and error-channel IDs for replay. Decoders always share each shot.
+Ensemble: 60 members, gap threshold 20 dB, 30 positive cycles/class, degeneracy on.
+Selection data: sample seed=ensemble seed=20261001. Fixed-prior holdout: sample
+seed=20261002, ensemble seed=20261001. A supplemental run also changes ensemble
+seed to 20261002; it is reported separately.
+Detector Hamming weight (HW) is the total number of fired detectors in BOTH
+bases over the ENTIRE d-round history. It is observed and usable for dispatch.
+DEM fault HW counts sampled independent DEM channels. It is a simulation
+diagnostic, unavailable to a real decoder, and not an exact physical gate-fault
+count. Channels can combine physical mechanisms or multiple graph components.
+
+1. Removing the extra call: first experiment, completed before correlation runs
+===============================================================================
+d  shots      with extra  without  with-only  without-only  LER with     LER without
+-  ---------  ----------  -------  ---------  ------------  -----------  -----------
+5  40,382     21          21       1          1             0.000520034  0.000520034
+7  198,662    22          20       4          2             0.000110741  0.000100674
+9  1,278,762  20          23       2          5             1.56401e-05  1.79861e-05
+d5 tied in total failures, exchanging one error each. d7 without the call had
+20 versus 22 failures. d9 without it had 23 versus 20, with five newly incorrect
+shots and two newly corrected shots. The condition to remove it at all three
+distances was not met. Existing stable original Libra remains unchanged.
+The no-fallback configuration is still available for experiments.
+On the large-gap branch it returns the lower original-hyperedge-weight
+constrained representative; the small-gap branch is unchanged. Each candidate
+call contains correlated two-pass matching, edge recovery, and exact auxiliary
+hyperedge assignment. The two complementary candidate calls remain the main
+cost: previous phase profiles assign 79%-94% of total Libra time to them. Those
+timers do not separate matching from edge recovery and assignment.
+
+2. Replacing correlated matching with uncorrelated matching
+===========================================================
+Only matching changes: graphs disable correlation rules and all complementary,
+ensemble, and large-gap fallback candidates use PyMatching single-pass MWPM.
+Hyperedge assignment, correlated channel weights, perturbations, synthesis,
+degeneracy, and fallback policy are retained. This variant still uses correlation
+information when assigning/scoring hyperedges. It is not a fully independent
+fault model. Changing matching can change the gap and ensemble trigger.
+d  shots      corr errors  unc errors  PM errors  corr LER     unc LER      PM LER       unc/corr
+-  ---------  -----------  ----------  ---------  -----------  -----------  -----------  --------
+5  35,930     20           26          44         0.000556638  0.000723629  0.0012246    1.30    
+7  159,742    20           31          44         0.000125202  0.000194063  0.000275444  1.55    
+9  1,269,260  20           49          79         1.57572e-05  3.86052e-05  6.2241e-05   2.45    
+Uncorrelated Libra had 30%, 55%, and 145% more failures than original Libra,
+respectively, while ordinary PyMatching had 1.69x, 1.42x, and 1.61x its failures.
+
+3. Where uncorrelated Libra fails: Hamming-weight distributions
+===============================================================
+d  mean det HW  median  p90   det range  mean DEM HW  median  DEM range
+-  -----------  ------  ----  ---------  -----------  ------  ---------
+5  3.826        4.0     8.0   0..18      2.012        2.0     0..10    
+7  10.990       11.0    18.0  0..39      5.420        5.0     0..18    
+9  23.936       24.0    34.0  0..68      11.405       11.0    0..31    
+d  decoder       failures  failure det HW  median  failure DEM HW  median
+-  ------------  --------  --------------  ------  --------------  ------
+5  correlated    20        3..17           9.0     3..8            5.0   
+5  uncorrelated  26        3..18           9.0     3..8            5.0   
+5  PyMatching    44        3..18           9.0     3..8            5.0   
+7  correlated    20        4..31           19.0    4..16           10.5  
+7  uncorrelated  31        4..29           20.0    4..16           10.0  
+7  PyMatching    44        4..29           18.0    4..13           9.0   
+9  correlated    20        17..43          31.5    11..21          16.5  
+9  uncorrelated  49        16..58          31.0    9..26           15.0  
+9  PyMatching    79        16..58          33.0    9..26           16.0  
+The distributions overlap. Total HW does not fully determine whether the
+extra correlation pass is useful; the geometry and correlation pattern matter.
+Exact per-HW shot counts and conditional errors are in *_hw.csv, *_fault_hw.csv,
+and *_joint_hw.csv. Failed-shot syndromes and mechanisms are in *_failures.csv.
+Observed detector HW values for correlated-correct / uncorrelated-incorrect
+shots (selection dataset; repeated values represent different shots):
+  d5: 9, 10, 10, 12, 14, 18
+  d7: 6, 13, 16, 16, 18, 18, 20, 20, 23, 23, 24, 26, 27, 28, 29, 29
+  d9: 16, 17, 19, 22, 22, 25, 27, 28, 28, 29, 29, 29, 30, 30, 30, 30, 31, 31, 33, 33, 33, 33, 33, 34, 34, 36, 38, 38, 38, 38, 43, 43, 48, 58
+Discordant and gate diagnostics, selection dataset:
+d  corr-only fail  unc-only fail  neither ens  corr ens only  unc ens only  both ens  correct initial overwritten
+-  --------------  -------------  -----------  -------------  ------------  --------  ---------------------------
+5  0               6              5            1              0             0         5                          
+7  5               16             11           3              0             2         13                         
+9  5               34             27           4              0             3         28                         
+Most additional uncorrelated failures took its large-gap fallback: 5/6, 14/16,
+and 31/34. In 5, 13, and 28 of these cases, that fallback overwrote a correct
+initial constrained prediction. A separate no-fallback experiment for the
+UNCORRELATED variant may be useful. These failure records alone cannot measure
+its complete LER: correct final shots could have incorrect initial predictions.
+Original correlated Libra and this uncorrelated substitution retain the same
+fallback policy in the reported correlation experiment.
+
+4. Adaptive rule: freeze thresholds, then test independent samples
+==================================================================
+Rule: use uncorrelated Libra when detector HW <= T_d, otherwise original Libra.
+Selection rule: largest threshold with zero uncorrelated-only failures below it
+in the first dataset. Frozen thresholds: T_5=8, T_7=5, T_9=15.
+Thresholds were saved before holdout sampling. They were not retuned afterwards.
+Selection results (below-threshold counts; adaptive totals over ALL shots):
+d  T   low-HW shots  unc dispatch  corr low  unc low  PM low  adaptive total  corr total
+-  --  ------------  ------------  --------  -------  ------  --------------  ----------
+5  8   33542         93.35%        9         9        16      20              20        
+7  5   20057         12.56%        2         2        2       20              20        
+9  15  155383        12.24%        0         0        0       20              20        
+Fixed-prior independent holdout aggregate results:
+d  shots      corr errors  unc errors  PM errors  corr LER     unc LER      PM LER     
+-  ---------  -----------  ----------  ---------  -----------  -----------  -----------
+5  19,365     20           23          32         0.00103279   0.00118771   0.00165247 
+7  236,314    20           38          61         8.46332e-05  0.000160803  0.000258131
+9  1,024,183  20           38          48         1.95278e-05  3.71027e-05  4.68666e-05
+Frozen-threshold holdout results:
+d  T   low-HW shots  unc dispatch  corr low  unc low  PM low  corr-only low  unc-only low  adaptive total  corr total
+-  --  ------------  ------------  --------  -------  ------  -------------  ------------  --------------  ----------
+5  8   18145         93.70%        12        12       18      1              1             20              20        
+7  5   29331         12.41%        0         0        0       0              0             20              20        
+9  15  125460        12.25%        0         0        0       0              0             20              20        
+At d5, low-HW uncorrelated Libra matched original Libra (12 errors each) and
+beat PyMatching (18). It corrected one original-only failure at HW=4 and added
+one failure at HW=6. Thus the equal-error-count property held on these samples;
+the stronger zero-additional-failures property from selection did not generalize.
+At d7/d9, all low-HW decoders had zero holdout errors. These bins support a
+conservative option with limited coverage, but no strict superiority over PM.
+All three adaptive complete-history error totals matched original Libra and
+were lower than complete-history PyMatching totals (32, 61, and 48).
+These are candidate operating thresholds at p=0.001 and rounds=d, not guaranteed
+bounds or validated thresholds for other rates, rounds, bases, or distances.
+Supplemental prior-seed sensitivity (sample=ensemble seed=20261002):
+d  shots      corr errors  unc errors  PM errors  corr/unc/PM low  adaptive total
+-  ---------  -----------  ----------  ---------  ---------------  --------------
+5  25,244     21           29          36         11/11/17         21            
+7  247,861    20           38          64         0/0/0            20            
+9  1,005,212  20           37          49         0/0/0            20            
+
+5. Decoding latency and adaptive timing estimate
+================================================
+8192 paired Monte Carlo shots per distance; CPU 62; sample seed=20261003,
+ensemble seed=20261001; graph and ensemble preparation outside timing; validation
+and phase profiling off. Alternating which Libra variant decodes first. Times
+cover the ENTIRE d-round history, NOT one round. No simulation/transpose/HW-count
+time is included. These runs measure timing only, not rare failure rates.
+d  corr us  unc us   unc speedup  adaptive us  adaptive saving  PM us 
+-  -------  -------  -----------  -----------  ---------------  ------
+5  67.599   35.135   1.92x        40.568       39.99%           1.971 
+7  191.045  99.103   1.93x        180.943      5.29%            6.583 
+9  420.599  212.495  1.98x        397.422      5.51%            14.436
+Adaptive time is the offline sum of the selected per-shot measured decoder
+times. Predictions were likewise selected offline. An integrated adaptive
+dispatcher has not been benchmarked: HW popcount/dispatch, cache behavior, and
+maintaining both decoder workspaces can change actual latency and memory use.
+A CPU63 timing attempt was roughly twice as slow for all decoders including PM;
+its data are retained but not used here. CPU62 matches the core used for the
+previous Libra latency benchmark. Both variants use the same core and shots.
+
+Implementation, verification, and reproducing these experiments
+===============================================================
+New source/API: src/decoder/libra_variant.h and src/decoder/libra_variant.cpp.
+Defaults reproduce original PyMatching-backed Libra. Config switches:
+  correlated_matching=true/false; large_gap_fallback=true/false.
+Current stable original decoder remains src/decoder/libra_pymatching.cpp;
+its large-gap fallback was retained. New variants are experimental alternatives.
+New evaluator: main/libra_variant_evaluate.cpp. Build: libra_variants/CMakeLists.txt.
+Usage and output-column descriptions: libra_variants/README.md.
+Validation: tests/libra_variant_test.cpp passed on 6240 paired surface-code shots
+including 96 forced-ensemble shots, with exact default-versus-preserved agreement
+for predictions, assignments, class weights, gaps, and class masses. Both-class
+and returned-assignment syndrome checks passed for all matching/fallback variants.
+Fifteen independent-DEM syndromes also agreed between matching APIs. Output
+histogram totals, failure traces, and cumulative threshold counters were checked.
+Model dimensions are cached in the evaluator and test, avoiding repeated DEM
+scans. The decoder changes only the two explicit options and initial-prediction
+diagnostics; assignment and synthesis algorithms match the preserved source.
+Build:
+  cmake -S libra_variants -B .agentic_artifacts/libra_variants/build
+    -DCMAKE_BUILD_TYPE=Release -DENABLE_MPI=OFF
+    -DCMAKE_CXX_COMPILER=/nethome/svittal8/gcc/bin/g++
+  cmake --build .agentic_artifacts/libra_variants/build
+    --target libra_variant_evaluate libra_variant_test -j 16
+  ctest --test-dir .agentic_artifacts/libra_variants/build -R '^libra_variant_' --output-on-failure
+Evaluator CLI (PREFIX must not already exist):
+  libra_variant_evaluate fallback|correlation DIST WORKERS MAX_SHOTS SAMPLE_SEED
+    PREFIX ERROR_TARGET KEEP_FALLBACK [ENSEMBLE_SEED]
+Accuracy arguments: 64 10000000 20261001 PREFIX 20 1; holdout sample seed20261002
+with explicit final ensemble seed20261001. Pin accuracy jobs to CPUs0-63.
+Timing: correlation DIST 1 8192 20261003 PREFIX 999999 1 20261001, pinned CPU62.
+The sample seed and ensemble seed default to the same value when the final
+argument is omitted. Holdout explicitly retains ensemble priors.
+
+Artifacts
+=========
+All generated outputs/logs: .agentic_artifacts/libra_variants/.
+  production/fallback_d{5,7,9}.*: initial extra-call comparisons.
+  production/correlation_d{5,7,9}.*: correlation substitution / selection dataset.
+  production/holdout_correlation_d{5,7,9}.*: fixed-prior independent holdout.
+  production/validation_correlation_d{5,7,9}.*: supplemental prior-seed sensitivity.
+  production/frozen_thresholds.json: thresholds recorded before holdout.
+  production/{fallback,correlation,holdout,seed_sensitivity}_analysis/: TXT and JSON.
+  latency/correlation_cpu62_d{5,7,9}.*: primary timing data.
+Each prefix has .txt, _hw.csv, _fault_hw.csv, _joint_hw.csv, _failures.csv,
+_thresholds.csv, and .log. Histograms include all-shot denominators, exact
+per-decoder errors, paired disagreements, ensemble triggers, and timing.
+Analysis helper: .agentic_artifacts/libra_variants/summarize_hamming.py.
+The prior full d5..17 comparison, rare-event sampling, and GPU resource discussion
+remain in Libra.txt and Libra-PyMatching.txt. This follow-up makes no new claims
+about high-distance error rates, rare-event sampling, or a GPU implementation.

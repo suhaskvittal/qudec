@@ -1,0 +1,503 @@
+LIBRA: IMPLEMENTATION, EVALUATION, AND GPU RESOURCE ANALYSIS
+==========================================================
+Evaluation dates: 2026-10-01 to 2026-10-02
+
+Results for SI1000 p=0.001, opposing basis detectors enabled:
+
+ d   method       PyMatching LER      Libra LER   PM/Libra   Libra mean us
+----------------------------------------------------------------------------
+ 5 MC                8.4057e-04     5.8840e-04       1.43          69.266
+ 7 MC                3.0675e-04     1.3633e-04       2.25         191.023
+ 9 MC                6.1340e-05     1.5933e-05       3.85         446.382
+11 MC                1.0860e-05     1.6208e-06       6.70        1011.274
+13 splitting         2.2610e-06     3.2317e-07       7.00        2131.906
+15 splitting         3.1028e-07     1.6162e-08      19.20        4148.366
+17 splitting         7.1618e-08     8.1922e-09       8.74        7127.620
+
+All rates refer to complete d-round Z memory experiments. Sampling
+uncertainty and rare event mixing limits are described below. Four
+validation tests pass. All lasting project changes are new files.
+The original rare event sampler bug is flagged below and that sampler
+was not used. CPU latencies are measured; GPU figures are estimates.
+
+Implementation
+--------------
+New decoder: src/decoder/libra.h and src/decoder/libra.cpp.
+New independent build entry point: libra/CMakeLists.txt.
+New evaluators: main/libra_evaluate.cpp and main/libra_splitting_evaluate.cpp.
+New corrected samplers: src/libra_rare_event.h and src/libra_splitting.h.
+The latter is extended by local moves in src/libra_local_splitting.h.
+Usage documentation: libra/README.md.
+Existing project files, including the original sampler and build files, were
+left unchanged. Builds, measurements, exploratory programs, and logs are in
+.agentic_artifacts/libra/.
+
+The decoder implements the matching synthesis algorithm in Sections III-V of
+C. Jones, "Improved accuracy for decoding surface codes with matching
+synthesis", docs/papers/libra-2408.12135.pdf (arXiv:2408.12135):
+
+* Recover physical hyperedge detector/observable parity from the decomposed
+  Stim DEM. Split channels by CSS graph component, rather than trusting the
+  separator pieces: some Stim decompositions contain redundant graph pieces.
+  Merge channels with identical full parity using Bernoulli XOR probabilities.
+* Initialize both logical classes with correlated complementary matching on
+  the original prior. Folding L0 into an explicit detector constrains parity.
+* Convert matched graph edges to hyperedges using a minimum cost assignment
+  with single channels and correlated pairs. Independent connected assignment
+  components are solved separately with Blossom V and private boundary dummies.
+  Assignment costs are quantized at 1e-6; evaluations use original double
+  hyperedge weights ln((1-p_i)/p_i).
+* Invoke a fixed ensemble of 60 correlated, two-pass PyMatching decoders when
+  the original assignment weight gap is below 20 dB. Half the ensemble uses
+  probability perturbations exp(Normal(0,ln(2)^2)); half uses ln(4).
+  Perturbed probabilities are clipped below 1/2 to keep matcher weights
+  nonnegative. Perturbed priors generate candidates; original priors score them.
+* Split symmetric differences into components connected through detectors.
+  Apply improving observable-neutral components. For the one-observable case,
+  pairs of logical components also make valid neutral cycles; the minimum cost
+  even subset gives the improving choice.
+* Retain up to 30 distinct small positive cycles per logical class, clearing
+  the heap when its base changes. Perform two synthesis passes. Connect stored
+  cycles by shared hyperedges; enumerate each group's unique GF(2) span when it
+  has fewer than 10 cycles, otherwise use singleton and pair combinations.
+  Multiply independent group masses, using log arithmetic for stable comparison.
+
+This is the paper's Libra with degeneracy estimation. It is a heuristic,
+not an exact maximum likelihood decoder. The empty syndrome returns identity.
+For a complementary gap of at least 20 dB, it returns the original
+unconstrained correlated MWPM prediction, as in the paper's experiments.
+The ensemble is fixed across shots; its seed is fixed across worker instances.
+These implementation choices mean this is not a byte-for-byte
+reproduction of the author's implementation or published experiment.
+
+Scope: one observable, at most two graphlike CSS components per channel,
+observable crossings on single-detector boundary components, and an independent
+single-edge channel for each component. Unsupported models are rejected.
+One mutable decoder instance is required per worker. No observed logical truth
+is used to select corrections.
+
+Validation
+----------
+All four Release CTests pass:
+  libra_small_hypergraph_oracle
+  libra_conditional_sampler_oracle
+  libra_splitting_sampler_oracle
+  libra_local_splitting_sampler_oracle
+
+The decoder oracle exhaustively enumerates 512 configurations of a correlated
+nine-channel model. Both logical classes attain the exact minimum weight for
+all 15 nonempty syndromes. Degeneracy masses are bounded by the corresponding
+exact class masses and do not count duplicate span elements. A truth-independence
+test checks that changing the supplied observable cannot change the correction.
+An independent correlated matcher checks the large-gap fallback prediction
+for all 15 nonempty syndromes of the same small model.
+Additional forced-ensemble tests check returned detector parity, observable
+parity, and deterministic repeated decoding for 64 shots at every odd distance
+from 3 through 17. These are consistency and small-model accuracy checks; Libra
+does not promise globally optimal corrections for arbitrary large syndromes.
+
+The conditional sampler is checked against an unequal-probability enumerable
+model, its exact count polynomial, all possible counts, and 300,000 conditional
+draws. The splitting kernel is checked on an enumerable model with 300,000
+Metropolis steps for both the conditional distribution and likelihood ratio.
+The local swap extension is checked against a four-channel exhaustive
+conditional distribution over one million steps, including its bridge ratio.
+Checks remain enabled in Release builds.
+
+Experimental setup
+------------------
+All reported comparisons use sc_si1000(d,d,1e-3,false,true): rotated surface
+code Z memory, d syndrome rounds, SI1000 physical parameter p=0.001, and
+opposing basis detectors enabled. Stim decomposed detector error models are
+sampled with their full correlated physical-channel parity retained.
+
+The baseline is the repository's ordinary dec::PyMatching(dem,false), which
+does not perform correlated reweighting. The paper compared to correlated MWPM;
+the improvement ratios here refer to the requested existing PyMatching decoder.
+They include the benefits of correlation handling and complementary matching
+as well as synthesis and degeneracy; they do not isolate synthesis's benefit.
+Every LER is per complete d-round memory experiment, not per syndrome round.
+Both decoders process exactly the same sampled configurations, syndromes, and
+observable truth. Sampling seed 20261001 is shared; worker streams are derived
+from it, and Libra's ensemble seed is the same for every worker. Parallel
+stopping and scheduling can change the final shot count between reruns.
+
+Hardware: 80 Arm Neoverse N1 CPU cores, advertised maximum 3 GHz, approximately
+502 GiB RAM. Evaluations use at most 64 worker cores. Compiler:
+/nethome/svittal8/gcc/bin/g++ (GCC 15), Release, native architecture and LTO
+through the existing project configuration. GPU figures below are analytical
+planning estimates; there was no GPU implementation or GPU benchmark.
+
+Shared-sample Monte Carlo (LER per memory experiment):
+
+ d       shots   PM errors  Libra errors      PM LER    Libra LER   PM/Libra
+---------------------------------------------------------------------------
+ 5      35,690          30            21  8.4057e-04   5.8840e-04       1.43
+ 7     146,698          45            20  3.0675e-04   1.3633e-04       2.25
+ 9   1,255,292          77            20  6.1340e-05   1.5933e-05       3.85
+11  12,339,249         134            20  1.0860e-05   1.6208e-06       6.70
+
+Paired discordant and common failures:
+d=5: PM-only 16, Libra-only 7, both 14.
+d=7: PM-only 32, Libra-only 7, both 13.
+d=9: PM-only 63, Libra-only 6, both 14.
+d=11: PM-only 121, Libra-only 7, both 13.
+
+Records: .agentic_artifacts/libra/mc_paper_d{5,7,9,11}.txt.
+
+The shared stopping rule targets 20 Libra failures and at least 20 PyMatching
+failures. PyMatching naturally accumulates more failures on those same shots.
+All four distances show an observed Libra improvement. As requested, these
+are small-error-count experiments, with no formal statistical significance
+claim. A shared seed gives paired comparisons but does not remove sampling
+uncertainty. Twenty independent failures imply roughly 22% relative count
+noise before stopping effects.
+
+Rare event sampler correction and method
+---------------------------------------
+Flagged for follow-up: src/sampler.cpp samples uniformly chosen k-element
+subsets in generate_syndromes_with_k_errors. For unequal probabilities the
+correct conditional probability is proportional to
+  product_{i in subset} p_i/(1-p_i),
+not uniform. SI1000 DEM channels have unequal probabilities. The count
+polynomial alone does not correct this mismatch. src/sampler.tpp also starts
+at the modal count and skips lower counts, and truncates the upper range;
+the omitted failure contribution is not automatically zero. The original
+files were not modified and their subset sampler was not used for these rates.
+It additionally skips count levels whose probability is below the running
+LER estimate, without an aggregate bound on their omitted contributions.
+
+src/libra_rare_event.h supplies exact fixed-count conditional sampling via a
+normalized Poisson binomial convolution tree. It reuses the correct count
+polynomial routine from sampler.h. The rare_mix evaluator adds proposal
+weights and reports its omitted count tail. Conditioning only on total count
+is inefficient at large distances: many unrelated errors raise the total count
+without forming a logical fault. For production results a second corrected
+method, failure-conditioned likelihood-ratio splitting, is used.
+
+Splitting intermediate priors multiply each ORIGINAL DEM channel's odds by
+exp(theta); the decoder prior always stays at p=0.001. The initial theta=0.8
+distribution is sampled independently with Stim until both decoders reach 25
+failures. Subsequent distributions decrease theta to zero in eight steps.
+The event sampled is the UNION of PyMatching and Libra failures, so both
+decoders are compared on the same Markov states. A birth/death Metropolis
+kernel has the exact conditional distribution as its invariant distribution.
+
+For n active raw DEM instructions, the likelihood ratio is
+  R = exp((theta_next-theta)*n + log M(theta) - log M(theta_next)),
+  M(theta) = product_i (1-p_i+p_i*exp(theta)).
+At each bridge, workers keep four independent ratio-weighted reservoirs and
+resample the next population in proportion to total ratio weight. The primary
+decoder estimates use the last bridge's mean(R * decoder_failure), multiplied
+by the union rate before that bridge. Endpoint theta=0 labels provide a
+separate mixing check. No count tail is omitted by this splitting method.
+
+A reassessment adds local count-preserving swaps with probability 1/2,
+leaving global births and deaths with probability 1/4 each. Pick an active
+instruction a uniformly, then an inactive instruction b sharing a detector
+with a, weighted by odds_b. Let Z_a be the total eligible neighbor odds before
+the swap and Z_b the reverse total after it. The target odds ratio cancels
+the proposal odds ratio, giving acceptance min(1,Z_a/Z_b). Moves leaving the
+failure union are rejected. This gives the same target and bridge ratios,
+with more opportunities to move nearby fault configurations. Final runs also
+use systematic population resampling: one random CDF offset followed by evenly
+spaced weighted draws over the four reservoirs per worker, then shuffled
+assignment to workers. This reduces finite population drift. Sampling stream
+seeds use a bijective SplitMix64 mapping of distinct phase/worker keys in a
+domain separate from the ensemble seed.
+
+Each production run uses 64 parallel chains, 512 recorded states per chain
+per stage, 1,000 burn-in proposals per stage, and four proposals between records.
+The initial independent error targets are 25 per decoder; the many conditional
+failure records are correlated and are not additional independent rare errors.
+Finite chain mixing, finite population resampling, and the error-based stopping
+of the initial pool all introduce uncertainty. Worker-weight ESS measures
+importance-weight balance, not the number of independent Markov samples.
+
+Rare event estimates with local moves, systematic resampling,
+and unique RNG streams for the final corrected decoder
+(primary weighted last bridge):
+
+ d  tilted shots  PM base errors  Libra base errors      PM LER    Libra LER   PM/Libra
+--------------------------------------------------------------------------------------
+13       211,353             166                 25  2.2610e-06   3.2317e-07       7.00
+15       334,611             130                 25  3.1028e-07   1.6162e-08      19.20
+17     1,284,963             232                 25  7.1618e-08   8.1922e-09       8.74
+
+Endpoint mixing checks and population diagnostics:
+
+ d  endpoint PM LER  endpoint Libra LER    worker ESS/64 unique states    wall s
+--------------------------------------------------------------------------------
+13       2.2374e-06          3.4150e-07  53.36-60.89        64-64      424.1
+15       3.0364e-07          3.2713e-08  42.48-58.84        63-64      692.2
+17       7.1881e-08          7.9866e-09  34.09-54.14        64-64     1287.2
+
+d=13: endpoint/primary ratios are 0.99 for PM and 1.06 for Libra.
+d=15: endpoint/primary ratios are 0.98 for PM and 2.02 for Libra.
+d=17: endpoint/primary ratios are 1.00 for PM and 0.97 for Libra.
+
+ESS and unique-state ranges cover the eight bridge stages. Unique
+states count resampled error configurations, not independent ancestry.
+
+Both primary and endpoint estimates show fewer Libra failures at every
+production distance.
+The endpoint figures are checks, not additional
+independent estimates. Differences between them expose residual mixing
+and finite population variation. These comparisons use the requested
+small-error-count standard; exact confidence is not claimed.
+
+Records: .agentic_artifacts/libra/splitting_paper_d{13,15,17}.txt.
+The initial tilted prior is an artificial DEM odds tilt, not a circuit
+generated by simply multiplying the SI1000 parameter. The final target
+distribution is exactly the original DEM prior.
+
+Exploratory measurements are archived under .agentic_artifacts/libra/.
+They exposed substantial bridge/endpoint variation and motivated local
+moves and larger populations. A prior worker-seed formula reused streams
+across stages; the final bijective mapping corrects that issue. A final
+paper review also corrected the large-gap fallback. The tables above
+use the final code throughout; earlier decoder variants are excluded.
+
+Performance optimizations
+-------------------------
+Implemented cheap decoder optimizations include sparse bit scanning of the
+syndrome, sparse symmetric differences, touched-detector scratch instead of
+clearing the entire detector graph, direct singleton/two-vertex assignments,
+and exclusion of correlated pair assignments that cost more than two singles.
+The last exclusion is exact: replacing an expensive pair by the two private
+single assignments always decreases cost. Consecutive duplicate candidates are
+skipped; nonconsecutive duplicates remain because the synthesis base may change.
+Match graphs and random perturbations are cached and prepared once per worker.
+The paper's gap gate makes the expensive ensemble rare on ordinary low-noise
+shots. Unique cycle spans and log sums avoid duplicate probability counting
+and numerical underflow.
+
+A preliminary same-seed d=7 ablation before profitable-pair pruning and duplicate
+skipping measured 171.122 us, versus 168.118 us after them (about 1.8% lower average).
+The synthesis phase decreased from 13.13 ms to 10.74 ms across 65,536 shots.
+Both versions recorded 24 PyMatching and 9 Libra failures on that latency
+sample. This modest average timing difference is subject to core/run variation;
+the source-level work reduction is more useful on ensemble-triggering cases.
+That ablation preceded the correction to the paper's large-gap fallback and
+does not measure the final decoder. Final decoder latencies are below.
+
+The fast splitting evaluator first tests PyMatching during a Metropolis
+proposal. A PyMatching failure already proves union membership, so that
+proposal can skip Libra. EVERY recorded state is decoded with both
+decoders before accumulating weighted indicators. The transition
+distribution and estimator are unchanged. This shortcut speeds the
+evaluation rather than changing Libra. All final rare event runs use
+this shortcut together with the local-swap mixture.
+
+  d=13: skipped 1,262,950/1,511,519 proposal Libra calls (83.6%).
+    Added 294,912 full record decodes; net conditional-phase Libra call reduction 64.0%.
+  d=15: skipped 1,326,959/1,525,124 proposal Libra calls (87.0%).
+    Added 294,912 full record decodes; net conditional-phase Libra call reduction 67.7%.
+  d=17: skipped 1,377,918/1,535,001 proposal Libra calls (89.8%).
+    Added 294,912 full record decodes; net conditional-phase Libra call reduction 70.6%.
+  These call counts exclude baseline sampling and initial-state checks.
+
+Mean single-core decoding latency (microseconds):
+
+ d     MC shots   PyMatching       Libra   ensemble-trigger fraction
+--------------------------------------------------------------------
+ 5       65,536        2.096      69.266                 0.007843018
+ 7       65,536        6.806     191.023                  0.00112915
+ 9       65,536       18.806     446.382                0.0001373291
+11       65,536       44.116    1011.274                3.051758e-05
+13       32,768       81.939    2131.906                           0
+15       16,384      119.131    4148.366                6.103516e-05
+17       16,384      131.370    7127.620                           0
+
+Records: .agentic_artifacts/libra/latency_paper_d{5,7,...,17}.txt.
+
+Latency is wall-clock duration of an individual decode on a pinned single CPU
+core, averaged over ordinary Monte Carlo samples from the original p=0.001
+model. It excludes sampling, decoder construction, and preparing the ensemble;
+it includes result allocation and optional per-phase profiling clock reads.
+Measurements through d=15 overlapped with the paired Monte Carlo job on up
+to 63 other cores. The d=17 timing ran after that job finished. The timing
+thread had its own pinned core throughout; these results include shared
+memory/cache contention and are not isolated-machine latency measurements.
+These are mean latencies, not tail-latency guarantees. The small latency samples
+at high distances may contain no ensemble triggers; this is expected at this
+noise rate and must not be read as the ensemble having zero cost.
+
+Matching phase share of total measured Libra decode time:
+ d  complementary %  unconstrained fallback %
+ 5            78.99                      6.73
+ 7            88.11                      9.02
+ 9            88.53                     10.97
+11            87.71                     12.05
+13            89.11                     10.74
+15            91.53                      8.34
+17            94.28                      5.63
+
+Further large average speedups require improving the matching backend
+or complementary graph construction. Adding threads to synthesis alone
+would have little effect on ordinary low-noise shots.
+
+GPU parallelism and feasibility
+------------------------------
+Easy parallel work:
+* Independent shots and the 60 ensemble matching jobs for a hard shot.
+* The two constrained complementary matching jobs, with separate workspaces.
+  The unconstrained correlated fallback can also run independently once its
+  gate is known; running all three before the gate trades work for parallelism.
+* Graph correlation rule updates, detector incidence processing, sparse
+  differences, component labeling, and component/relative-weight reductions.
+* Independent assignment components, and the two class synthesis chains.
+* Independent overlap groups and the <=512 unique configurations of a group
+  with fewer than 10 cycles. Large groups use at most 466 singleton/pair/null
+  candidates before deduplication when the entire 30-cycle heap is connected.
+
+Concrete loop sites are Impl::prepare (independent ensemble members),
+Impl::candidate (correlation updates and edge-to-channel translation),
+Impl::assign (independent assignment blocks), Impl::difference (detector
+incidence and component weights), and Impl::log_mass (independent overlap
+groups and relative-weight sums). Each class's synthesize calls depend on its
+updated representative, so their order is preserved within a class.
+Threading the current CPU ensemble loop requires private assignment scratch:
+Impl::edge_position is shared today. Parallel class synthesis also requires
+private detector-owner scratch. Overlapping correlation updates need per-edge
+minimum reductions before starting the next matching pass.
+
+Sequential work remains inside each sparse blossom matcher's priority queue,
+alternating-tree updates, blossom contraction/expansion, and inside the ordered
+synthesis updates for each class. Parallelizing weight reductions is easy;
+efficiently parallelizing a single matching job is substantially harder.
+The paper's binary-tree synthesis offers logarithmic depth, but changes the
+heuristic synthesis order and requires another accuracy evaluation. It should
+not be assumed to produce the identical CPU prediction.
+
+The whole algorithm can be implemented on a GPU: it consists of graph matching,
+component processing, XOR, reductions, and bounded cycle enumeration. A useful
+port needs fixed-array graph/blossom workspaces, explicit queues, index-based
+memory pools, and batched kernels. The current CPU PyMatching and Blossom V
+objects use pointers, dynamic allocations, and host containers, and cannot be
+used directly in a CUDA kernel. Tensor cores do not naturally accelerate these
+irregular graph operations. Many independent shots are needed to hide memory
+latency and divergence. GPU speedup and register counts cannot be determined
+from FLOPS specifications alone.
+A persistent queue of matching jobs can use available SMs for members of
+ensemble-heavy shots. This handles uneven work from gap gating and reduces
+the stragglers seen with one CPU decoder per Markov chain. Synthesis starts
+after the required member outputs for a shot are complete.
+
+B200 resource estimate -- explicit proposed CUDA layout, not a measured port:
+
+NVIDIA lists 148 SMs for B200. Its SM 10.0 limits include 64 warps, 65,536
+32-bit registers, 32 blocks, and 228 KiB shared memory per SM; B200 HBM is
+up to 180 GB. Sources:
+[NVIDIA B200 SM count](https://developer.nvidia.com/blog/scaling-autonomous-ai-agents-and-workloads-with-nvidia-dgx-spark/)
+[NVIDIA Blackwell tuning guide](https://docs.nvidia.com/cuda/archive/13.2.1/blackwell-tuning-guide/index.html)
+
+Let D=detectors, H=canonical hyperedges, E=graph edges, R=directed correlation
+rule entries, and B=ceil(H/8). The graph/prior tables are shared by all shots.
+The model budgets 32-bit graph indices and quantized matching weights, double
+original/perturbed hyperedge weights, and bitsets for candidate/cycle parity.
+Matching distance and dual accumulators use 64 bits to avoid path-sum overflow:
+
+  Shared tables T = 48H + 32E + 12R + 4(D+1)
+                    + 60*(8H + 4E + 4R) bytes.
+  Mutable per-matching-job workspace W = 256D + 32E + 8R bytes.
+  Per-shot outputs/synthesis scratch S = 124B + 8H + 8D + 32768 bytes.
+  Fully parallel ensemble instance = 60W + S.
+  Streaming ensemble instance = W + S (matching jobs reuse the workspace).
+
+The 124 bitsets cover 60 candidates, two representatives, two 30-cycle heaps,
+and two temporary buffers. W is a proposed compact graph/queue/blossom scratch
+budget reused between matching and assignment, rather than sizeof the CPU
+objects. A port should use sparse maximum-benefit matching with unmatched
+vertices permitted for hyperedge assignment, avoiding the CPU implementation's
+materialized dummy clique. Dense dummy-clique storage can grow quadratically
+on a giant assignment component and is not covered by this linear budget.
+For these two-basis CSS models the assignment graph is bipartite: a correlated
+pair joins an X graph edge to a Z graph edge. Its benefit is the cost of the
+two singles minus the correlated-channel cost. A sparse bipartite matching
+or min-cost flow implementation can replace the general assignment blossom.
+Worst-case buffer occupancy and precision must be validated during the port.
+These formulas are capacity planning assumptions, not a proven allocation bound.
+The proposed original and folded baseline views share channel/rule tables and
+remap logical-boundary endpoints instead of duplicating complete graph tables.
+Cycle spans can use a GF(2) basis and <=30-bit coefficient coordinates for
+exact deduplication; configurations are streamed rather than storing hundreds
+of full hyperedge bitsets. These budgets cover the decoder, not Stim sampling
+or the separate rare event Markov model and its local-neighbor tables.
+
+Measured problem sizes:
+ d       D       H       E        R
+------------------------------------
+ 5     120    1677     502     4193
+ 7     336    5471    1558    14459
+ 9     720   12705    3534    34521
+11    1320   24483    6718    67643
+13    2184   41909   11398   117089
+15    3360   66087   17862   186123
+17    4896   98121   26398   278009
+
+Memory budgets and theoretical HBM resident capacity:
+
+ d  shared MiB  parallel instance MiB  streaming instance MiB  HBM parallel  HBM streaming
+---------------------------------------------------------------------------------------
+ 5       1.983                  4.666                   0.146        36,787      1,172,533
+ 7       6.635                 14.550                   0.396        11,797        433,108
+ 9      15.613                 33.142                   0.869         5,179        197,614
+11      30.332                 63.192                   1.633         2,716        105,072
+13      52.207                107.449                   2.762         1,597         62,142
+15      82.654                168.663                   4.323         1,017         39,685
+17     123.087                249.585                   6.390           687         26,846
+
+HBM bounds are floor((180e9-T)/instance_bytes), using decimal GB and binary
+MiB. They assume one shared model and omit CUDA/context overhead and reserve.
+Reserving 20% of HBM reduces the d=17 capacities to about 549 parallel
+workspaces or 21,473 streaming workspaces. Mixed code distances require summing
+their separate model and workspace budgets.
+
+How many instances can execute concurrently?
+Under a concrete launch assumption of one matching job per 128-thread block,
+64 registers/thread, and 8 KiB shared/block, registers limit residency to
+8 blocks/SM: 65,536/(128*64)=8. Shared-memory and warp limits permit more.
+This assumes a shared-memory carveout of at least 100 KiB/SM, sufficient for
+eight 8 KiB allocations plus CUDA's per-block shared-memory reservation.
+Across 148 SMs this permits 1,184 resident matching jobs, hence floor(1184/60)
+= 19 complete hard-shot Libra ensembles executing all 60 members at once.
+This compute limit is tighter than the memory budget at every evaluated
+distance. The same launch can execute up to 1,184 streaming instances with
+one active matching job each, while more workspaces wait in HBM. On ordinary
+shots the ensemble is gated off; scheduling two complementary jobs plus the
+original fallback simultaneously would permit floor(1184/3)=394 such shots.
+Sequential reuse of a matching workspace supports the streaming count above.
+
+These are design estimates of resident work, not measured throughput or a
+hardware-fixed number of Libra decoders. For example 32 registers/thread with
+a shared-memory carveout of at least 164 KiB/SM would allow 16 blocks/SM and
+at most 39 complete 60-member ensembles, while
+additional registers, larger shared allocations, or several blocks per matcher
+would reduce concurrency. Kernels for synthesis and assignment consume their
+own resources and can be scheduled after matching. CUDA occupancy measurements
+and worst-case workspace tests are required to turn the estimates into actual
+deployment limits. There is no implemented CUDA Libra decoder in this change,
+so no measured B200 latency or concurrent-instance count is claimed.
+
+Resource-model record: .agentic_artifacts/libra/gpu_resource_model.json.
+
+Reproduction
+------------
+See libra/README.md for commands and API usage. The independent build used:
+  cmake -S libra -B .agentic_artifacts/libra/build -DCMAKE_BUILD_TYPE=Release
+        -DENABLE_MPI=OFF -DCMAKE_CXX_COMPILER=/nethome/svittal8/gcc/bin/g++
+  cmake --build .agentic_artifacts/libra/build --target libra_evaluate
+        libra_splitting_evaluate libra_splitting_evaluate_fast
+        libra_splitting_evaluate_local libra_splitting_evaluate_systematic
+        libra_test libra_rare_event_test
+        libra_splitting_test libra_local_splitting_test -j8
+  ctest --test-dir .agentic_artifacts/libra/build --output-on-failure
+
+Measurement records and progress logs are stored under .agentic_artifacts/libra/.
+Those artifacts are ignored by Git; this report preserves the essential results.
+Source and evaluator binary SHA-256 hashes and the RNG audit are recorded in
+.agentic_artifacts/libra/source_manifest.json.
+The report tables distinguish ordinary independent Monte Carlo estimates,
+correlated rare event estimates, measured CPU latency, and hypothetical GPU
+resource budgets.
