@@ -3,6 +3,12 @@
  *  date:   16 May 2026
  * */
 
+#include "rare_event.h"
+#include <algorithm>
+#include <cmath>
+#include <iomanip>
+#include <stdexcept>
+
 #if defined(ENABLE_MPI)
 #include <mpi.h>
 #endif
@@ -62,8 +68,11 @@ monte_carlo_sampler(const stim::DetectorErrorModel& dem,
         auto detector_table = sampler.det_buffer.transposed();
         auto obs_table = sampler.obs_buffer.transposed();
 
+        const int64_t batch_samples = std::min<int64_t>(conf.monte_carlo.max_samples - t,
+                                                       world_size * SHOTS_PER_BATCH);
+        const size_t local_samples = batch_samples / world_size + (world_rank < batch_samples % world_size);
         uint64_t new_errors{0};
-        for (size_t i = 0; i < SHOTS_PER_BATCH; i++)
+        for (size_t i = 0; i < local_samples; i++)
         {
             auto result = decoder.decode(detector_table[i], obs_table[i]);
             if (is_decoding_error(result, obs_table[i], num_observables))
@@ -78,7 +87,7 @@ monte_carlo_sampler(const stim::DetectorErrorModel& dem,
         MPI_Allreduce(MPI_IN_PLACE, &new_errors, 1, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);
 #endif
         errors += new_errors;
-        t += world_size*SHOTS_PER_BATCH;
+        t += batch_samples;
 
         if (can_print_progress)
         {
@@ -105,108 +114,63 @@ rare_event_sampler(const stim::DetectorErrorModel& dem,
                     ExperimentConfig conf, 
                     const ErrorCallback& error_callback)
 {
-    // generate probability polynomial: 
-    Poly prob_x = compute_probability_polynomial(dem, conf.rare_event.max_level);
+    if (conf.rare_event.start_level != 0 || conf.rare_event.skip_levels_after_no_errors_found != 0)
+        throw std::invalid_argument("rare_event must include levels starting at K=0; skipping levels biases the estimate");
+    if (conf.rare_event.max_level <= 0 || conf.rare_event.samples_per_level <= 0 ||
+        conf.rare_event.max_errors_per_level <= 0 ||
+        !std::isfinite(conf.rare_event.tail_tolerance) || conf.rare_event.tail_tolerance < 0 ||
+        conf.rare_event.tail_tolerance >= 1)
+        throw std::invalid_argument("Invalid rare_event sample counts, count limit, or tail tolerance");
 
-    // now start sampling DEM for errors:
-    double ler{0.0};
-
-    int world_rank{0};
-    int world_size{1};
+    int world_rank = 0, world_size = 1;
 #if defined(ENABLE_MPI)
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 #endif
-    const bool can_print_progress = (conf.print_progress && conf.verbosity == 0 && world_rank == 0);
-
-    // choose start level to be `k` with highest `prob_x[k]`
-    for (size_t k = conf.rare_event.start_level; k < conf.rare_event.max_level; k++)
-        if (prob_x[k] > prob_x[conf.rare_event.start_level])
-            conf.rare_event.start_level = k;
-
-    std::mt19937_64 rng;
-    rng.seed(conf.seed + world_rank);
-    bool no_errors_found_yet{true};
-    for (size_t k = conf.rare_event.start_level; k < conf.rare_event.max_level; k++)
-    {
-        if (prob_x[k] < ler)
-            continue;
-
-        int local_samples = conf.rare_event.samples_per_level;
-#if defined(ENABLE_MPI)
-        local_samples = (local_samples/world_size) + (world_rank==0 ? (local_samples % world_size) : 0);
-#endif
-        auto [syndromes, obs_array] = generate_syndromes_with_k_errors(dem, k, local_samples, rng);
-
-        if (world_rank == 0)
-        {
-            if (can_print_progress)
-                (std::cout << "[ sampling " << k << " errors ]: ").flush();
-            else
-                std::cout << "[ ERROR COUNT = " << k << " ] ==========================\n";
-        }
-
-        // decode the given syndromes and estimate the LER for `k` errors
-        uint64_t error_count{0};
-        uint64_t samples{0};
-
-        uint64_t prev_progress_error_count{0};
-        int local_max_errors = conf.rare_event.max_errors_per_level;
-#if defined(ENABLE_MPI)
-        local_max_errors = std::max(conf.rare_event.max_errors_per_level / world_size, int64_t{4});
-#endif
-        int progress_print_frequency = local_samples / 20;
-        for (int i = 0; i < local_samples && error_count < local_max_errors; i++)
-        {
-#if !defined(ENABLE_MPI)
-            if (can_print_progress && (i % progress_print_frequency == 0))
-            {
-                int progress_tick_value = error_count - prev_progress_error_count;
-                if (progress_tick_value > 0)
-                    std::cout << " " << progress_tick_value;
-                else
-                    std::cout << " .";
-                std::cout.flush();
-                prev_progress_error_count = error_count;
+    const size_t limit = std::min<size_t>(conf.rare_event.max_level, dem.count_errors() + 1);
+    ConditionalErrorSampler conditional(dem, limit);
+    const double tail_bound = conditional.tail_probability_bound(limit);
+    if (tail_bound > conf.rare_event.tail_tolerance)
+        throw std::invalid_argument("rare_event omitted-count bound exceeds --rare-tail-tolerance; increase --rare-max-level");
+    const auto& probabilities = conditional.count_probabilities();
+    const size_t observables = dem.count_observables();
+    Rng rng(static_cast<uint64_t>(conf.seed) + world_rank);
+    double ler = 0;
+    constexpr uint64_t batch_size = 256;
+    const bool progress = conf.print_progress && world_rank == 0;
+    for (size_t k = 0; k < limit; ++k) {
+        if (!(probabilities[k] > 0)) continue;
+        uint64_t samples = 0, errors = 0;
+        const uint64_t maximum = conf.rare_event.samples_per_level;
+        // Synchronize batch stopping across ranks, using global errors/counts.
+        while (samples < maximum && errors < uint64_t(conf.rare_event.max_errors_per_level)) {
+            const uint64_t count = std::min<uint64_t>(maximum - samples, batch_size * world_size);
+            const size_t local = count / world_size + (uint64_t(world_rank) < count % world_size);
+            auto [syndromes, truths] = conditional.sample_syndromes(k, local, rng);
+            uint64_t new_errors = 0;
+            for (size_t i = 0; i < local; ++i) {
+                auto result = decoder.decode(syndromes[i], truths[i]);
+                if (is_decoding_error(result, truths[i], observables)) {
+                    ++new_errors;
+                    if (conf.verbosity) error_callback(syndromes[i], truths[i], result);
+                }
             }
-#endif
-
-            // decode and determine if logical error occurred:
-            auto result = decoder.decode(syndromes[i], obs_array[i]);
-            if (is_decoding_error(result, obs_array[i], dem.count_observables()))
-            {
-                error_count++;
-                if (conf.verbosity)
-                    error_callback(syndromes[i], obs_array[i], result);
-            }
-            samples++;
-        }
-
 #if defined(ENABLE_MPI)
-        MPI_Allreduce(MPI_IN_PLACE, &error_count, 1, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);
-        MPI_Allreduce(MPI_IN_PLACE, &samples,      1, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);
+            MPI_Allreduce(MPI_IN_PLACE, &new_errors, 1, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);
 #endif
-
-        double ler_given_k_errors = static_cast<double>(error_count) / static_cast<double>(samples);
-        double contrib = ler_given_k_errors * prob_x[k];
-
-        ler += contrib;
-
-        if (can_print_progress)
-        {
-            std::cout << "\t" << error_count << " of " << samples << " samples had errors"
-                        << ", P(error | " << k << " errors) = " << ler_given_k_errors
-                        << ", P(" << k << " errors) = " << prob_x[k]
-                        << ", total contribution = " << contrib
-                        << ", cumulative LER = " << ler
-                        << "\n";
+            samples += count;
+            errors += new_errors;
         }
-
-        // skip levels if there are no errors
-        no_errors_found_yet &= (error_count == 0);
-        if (no_errors_found_yet)
-            k += conf.rare_event.skip_levels_after_no_errors_found;
+        const double conditional_rate = double(errors) / samples;
+        ler += probabilities[k] * conditional_rate;
+        if (progress)
+            std::cout << "[K=" << k << "] samples=" << samples << " errors=" << errors
+                      << " probability=" << probabilities[k] << " contribution="
+                      << probabilities[k] * conditional_rate << '\n';
     }
+    if (world_rank == 0)
+        std::cout << std::setprecision(12) << "Rare-event omitted-count contribution bound: "
+                  << tail_bound << " (K >= " << limit << ")\n";
 
     return ler;
 }

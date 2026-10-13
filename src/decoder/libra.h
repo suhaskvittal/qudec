@@ -50,6 +50,9 @@ public:
     Libra(const Libra&) = delete;
     Libra& operator=(const Libra&) = delete;
 
+    // ObsRef is ground truth for the generic sampler API; prediction ignores it.
+    // matching_data.gap is the unsigned initial complementary gap in dB.
+    // matching_data.probability is an unnormalized class score, not confidence.
     result_type decode(SyndromeRef, ObsRef);
     DetailedResult decode_detailed(SyndromeRef);
     // Prepare immutable perturbed priors before timing decoding.
@@ -57,7 +60,7 @@ public:
     Dimensions dimensions() const;
     Statistics statistics() const;
     void print_stats(std::ostream&) const;
-    void mpi_accumulate() {}
+    void mpi_accumulate();
     // Reconstruct a returned error assignment for correctness checks.
     std::pair<SyndromeType, bool> syndrome_of(const std::vector<uint32_t>&) const;
 private:

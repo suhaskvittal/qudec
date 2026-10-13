@@ -1,6 +1,4 @@
-// Alternative implementation of dec::Libra with PyMatching assignment.
-// All other decoding logic matches libra.cpp. Link one implementation only.
-// Kept in a new file to honor the request to preserve existing project files.
+// Production Libra implementation: PyMatching assignment and small-block DP.
 #include "decoder/libra.h"
 #include <pymatching/sparse_blossom/driver/mwpm_decoding.h>
 #include <pymatching/sparse_blossom/driver/user_graph.h>
@@ -239,10 +237,28 @@ Libra::Libra(const stim::DetectorErrorModel& dem,Config config):num_detectors(de
 Libra::~Libra()=default;
 Libra::Libra(Libra&&) noexcept=default;
 Libra::DetailedResult Libra::decode_detailed(SyndromeRef syn){return impl_->decode(syn);}
-result_type Libra::decode(SyndromeRef syn,ObsRef){auto r=decode_detailed(syn);result_type out;out.flipped_obs=ObsType(1);out.flipped_obs[0]=r.prediction;out.matching_data.gap=r.gap_db;out.matching_data.probability=std::exp(r.log_masses[r.prediction]);return out;}
+result_type Libra::decode(SyndromeRef syn,ObsRef){auto r=decode_detailed(syn);result_type out;out.flipped_obs=ObsType(1);out.flipped_obs[0]=r.prediction;out.matching_data.frame_flips=out.flipped_obs;out.matching_data.gap=r.gap_db;out.matching_data.probability=std::exp(r.log_masses[r.prediction]);return out;}
 void Libra::prepare_ensemble(){for(size_t i=0;i<impl_->members.size();++i)impl_->prepare(i);}
 Libra::Dimensions Libra::dimensions() const {return {num_detectors,impl_->hyper.size(),impl_->gedges.size(),impl_->rules};}
 Libra::Statistics Libra::statistics() const{return impl_->stats;}
 std::pair<SyndromeType,bool> Libra::syndrome_of(const Ids& errors)const{return impl_->syndrome(errors);}
-void Libra::print_stats(std::ostream& out)const {auto s=statistics();out<<"Libra shots="<<s.shots<<" ensemble_shots="<<s.ensemble_shots<<" improving_cycles="<<s.improving_cycles<<" complementary_ns="<<s.complementary_ns<<" ensemble_ns="<<s.ensemble_ns<<" synthesis_ns="<<s.synthesis_ns<<" degeneracy_ns="<<s.degeneracy_ns<<'\n';}
+void Libra::mpi_accumulate() {
+#if defined(ENABLE_MPI)
+    auto& s = impl_->stats;
+    uint64_t counters[] = {s.shots, s.ensemble_shots, s.fallback_shots, s.improving_cycles,
+        s.complementary_ns, s.ensemble_ns, s.synthesis_ns, s.degeneracy_ns, s.fallback_ns};
+    MPI_Allreduce(MPI_IN_PLACE, counters, 9, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);
+    s = {counters[0], counters[1], counters[2], counters[3], counters[4],
+         counters[5], counters[6], counters[7], counters[8]};
+#endif
+}
+void Libra::print_stats(std::ostream& out)const {
+    const auto s = statistics();
+    out << "Libra shots=" << s.shots << " ensemble_shots=" << s.ensemble_shots
+        << " fallback_shots=" << s.fallback_shots << " improving_cycles=" << s.improving_cycles << '\n';
+    if (impl_->config.profile)
+        out << "Libra phase times (ns): complementary=" << s.complementary_ns
+            << " fallback=" << s.fallback_ns << " ensemble=" << s.ensemble_ns
+            << " synthesis=" << s.synthesis_ns << " degeneracy=" << s.degeneracy_ns << '\n';
+}
 }

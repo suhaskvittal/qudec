@@ -1,49 +1,16 @@
 # Libra with PyMatching assignment
 
-This build uses `src/decoder/libra_pymatching.cpp` as an alternative
-implementation of the existing `dec::Libra` API. It replaces the auxiliary
-Blossom V assignment solver with PyMatching. Assignments with at most eight
-vertices use an exact subset dynamic program to avoid solver setup overhead.
-All other matching synthesis, correlation handling, gap gating, and degeneracy
-logic follows the original implementation.
+The stable implementation is now part of the normal `qudeclib` library.
+It uses `src/decoder/libra_pymatching.cpp`, PyMatching auxiliary assignment,
+and exact subset dynamic programming for components with at most eight vertices.
+The correlated matching, synthesis, degeneracy, and large-gap fallback are retained.
 
-Existing source, build files, and `Libra.txt` remain available. The new results
-and algorithm explanation are in [Libra-PyMatching.txt](../Libra-PyMatching.txt).
-
-## Build and test
-
-```sh
-cmake -S libra_pymatching -B .agentic_artifacts/libra_pymatching/build \
-  -DCMAKE_BUILD_TYPE=Release -DENABLE_MPI=OFF
-cmake --build .agentic_artifacts/libra_pymatching/build -j8 \
-  --target libra_pymatching_evaluate libra_pymatching_splitting_evaluate \
-           libra_pymatching_test libra_pymatching_assignment_test
-ctest --test-dir .agentic_artifacts/libra_pymatching/build \
-  -R '^libra_pymatching_' --output-on-failure
-```
-
-Use a C++23 compiler. Link `libra_pymatching_decoder` instead of `libra_decoder`;
-both implement the same class and must not be linked into one executable.
-The included project still builds and links its existing Blossom V library
-for other decoders. This Libra implementation makes no Blossom V calls.
-
-The evaluators accept the same arguments as the original
-[Libra evaluators](../libra/README.md). The new splitting target enables the
-corrected sampler's fast failure callback, local swaps, and systematic
-resampling:
-
-```sh
-.agentic_artifacts/libra_pymatching/build/libra_pymatching_evaluate mc \
-  9 64 10000000 20261001 .agentic_artifacts/libra_pymatching/example_mc.txt \
-  --max-errors 20
-
-taskset -c 0 .agentic_artifacts/libra_pymatching/build/libra_pymatching_evaluate latency \
-  9 1 65536 20261001 .agentic_artifacts/libra_pymatching/example_latency.txt
-
-.agentic_artifacts/libra_pymatching/build/libra_pymatching_splitting_evaluate \
-  13 64 3000000 20261001 .agentic_artifacts/libra_pymatching/example_splitting.txt \
-  0.8 8 1000 512 4
-```
+See [the integration guide](../docs/libra.md) for normal build commands, the
+`qudec libra` CLI, corrected rare event sampling, and evaluation targets.
+`libra_decoder` and `libra_pymatching_decoder` are compatibility aliases for
+`qudeclib`; the historical CMake entry points forward to the normal project.
+Only the stable implementation is compiled. Historical measurements remain in
+[Libra-PyMatching.txt](../Libra-PyMatching.txt).
 
 ## Exact assignment reduction
 

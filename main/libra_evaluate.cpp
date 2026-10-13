@@ -451,8 +451,7 @@ void run_rare_mix(const Options& o, const stim::DetectorErrorModel& dem,
     }
     if (!(q_sum > 0)) throw std::runtime_error("rare_mix proposal has no support");
     for (double& probability : q) probability /= q_sum;
-    const double tail_bound = std::clamp(1.0 - covered_mass +
-        64 * std::numeric_limits<double>::epsilon() * pk.size(), 0.0, 1.0);
+    const double tail_bound = conditional.tail_probability_bound(o.max_count);
     const auto patterns = make_error_patterns(dem);
     const uint64_t base = o.shots / o.workers, rem = o.shots % o.workers;
     struct WorkerStats {

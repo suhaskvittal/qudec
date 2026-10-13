@@ -39,7 +39,7 @@
 namespace
 {
 
-struct VertexData { };
+struct VertexData { bool is_boundary{false}; };
 struct EdgeData { double pr; };
 
 // Reject raw DEM terms exceeding the graph's supported hyperedge order.
@@ -181,7 +181,7 @@ build_affinity_graph(const stim::DetectorErrorModel& dem)
     for (uint64_t i = 0; i < dem.count_detectors(); ++i)
         graph.add_vertex(VertexData{});
     const auto boundary_id = static_cast<hg::id_type>(dem.count_detectors());
-    if (graph.add_vertex(VertexData{}) != boundary_id)
+    if (graph.add_vertex(VertexData{.is_boundary = true}) != boundary_id)
         throw std::runtime_error("failed to assign boundary detector ID");
 
     std::map<std::vector<hg::id_type>, double> merged;

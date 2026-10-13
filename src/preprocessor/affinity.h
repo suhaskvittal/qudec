@@ -108,8 +108,8 @@ AffinityResult impl_dijkstra(const G&, const std::vector<hg::id_type>& syndrome)
  * General function that converts DEMs into a hypergraph. We assume a max order of 16 in
  * our construction. 
  * */
-struct v_data_type { bool is_boundary{false}; }
-struct e_data_type { double pr; }
+struct v_data_type { bool is_boundary{false}; };
+struct e_data_type { double pr; };
 constexpr size_t HG_ORDER{16};
 using hg_type = Hypergraph<v_data_type, e_data_type, HG_ORDER>;
 

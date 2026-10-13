@@ -37,8 +37,11 @@ struct ExperimentConfig
     {
         int64_t samples_per_level{10'000};
         int64_t max_errors_per_level{25};
-        int64_t start_level{1};
+        int64_t start_level{0};
         int64_t max_level{128};
+        // Upper bound on the contribution omitted at K >= max_level.
+        double tail_tolerance{1e-12};
+        // Retained for source compatibility; nonzero values are rejected.
         int64_t skip_levels_after_no_errors_found{0};
     } rare_event;
 };
@@ -96,8 +99,9 @@ using Rng = std::mt19937_64;
  * the product of terms of the form:
  *      `(1-p) + p*x`
  * for each error in the DEM (`p` is the probability of the error). We
- * truncate the polynomial to a size of `max_errors` since the 
- * probablility of `K` errors is `O(p^K)`.
+ * truncate the polynomial to a size of `max_errors` (an exclusive count
+ * limit). Coefficients are not renormalized. A count-tail bound is needed
+ * before using a truncated sum as a logical-error-rate estimate.
  *
  * This array is need for accurately estimating the logical error rate.
  * */
@@ -105,7 +109,8 @@ Poly compute_probability_polynomial(const stim::DetectorErrorModel& dem, size_t 
 
 /*
  * Returns `count` randomly generated syndromes, each with `k` errors, from the given
- * DEM.
+ * DEM, with the correct heterogeneous Bernoulli distribution conditioned
+ * on exactly k active channels. Impossible counts are rejected.
  * */
 Problem generate_syndromes_with_k_errors(const stim::DetectorErrorModel&, size_t k, size_t count, Rng&);
 
