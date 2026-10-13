@@ -1,4 +1,8 @@
 /*
+ *  contributor: OpenAI Codex
+ * */
+
+/*
  * Standalone Libra / PyMatching SI1000 evaluator.
  *
  * Usage:

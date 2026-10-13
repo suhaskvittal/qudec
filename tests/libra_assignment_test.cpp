@@ -1,4 +1,9 @@
-#include "decoder/libra_assignment_pymatching.h"
+/*
+ *  contributor: OpenAI Codex
+ *  date:        13 October 2026
+ * */
+
+#include "decoder/libra_assignment.h"
 #include <bit>
 #include <iostream>
 #include <random>

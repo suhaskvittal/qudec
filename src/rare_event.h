@@ -1,3 +1,7 @@
+/*
+ *  contributor: OpenAI Codex
+ * */
+
 #ifndef QUDEC_RARE_EVENT_H
 #define QUDEC_RARE_EVENT_H
 

@@ -1,20 +1,38 @@
+/*
+ *  contributor: OpenAI Codex
+ *  date:        13 October 2026
+ *  purpose:     Expose the Libra matching-synthesis decoder.
+ * */
+
 #ifndef QUDEC_DECODER_LIBRA_H
 #define QUDEC_DECODER_LIBRA_H
 
 #include "decoder/common.h"
-#include <memory>
+
 #include <cstdint>
 #include <iosfwd>
+#include <memory>
 #include <vector>
 
-namespace dec {
+namespace dec
+{
 
-// Matching synthesis, C. Jones, arXiv:2408.12135 (Sections III--V).
-// A single logical observable and graphlike components in each CSS basis
-// are required. Instances own mutable matching workspaces: one per worker.
-class Libra {
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
+/*
+ * Matching synthesis, C. Jones, arXiv:2408.12135 (Sections III--V).
+ *
+ * Libra requires a single logical observable and graphlike components in each
+ * CSS basis. Each instance owns mutable matching workspaces: use one instance
+ * per worker. Returned error ids refer to the canonicalized error channels,
+ * which merge DEM instructions with identical detector and observable action.
+ * */
+class Libra
+{
 public:
-    struct Config {
+    struct Config
+    {
         size_t ensemble_size = 60;
         double gap_threshold_db = 20;
         size_t positive_cycle_capacity = 30;
@@ -23,7 +41,9 @@ public:
         bool validate = false;
         bool profile = false;
     };
-    struct DetailedResult {
+
+    struct DetailedResult
+    {
         bool prediction = false;
         bool ensemble_used = false;
         bool fallback_used = false;
@@ -32,14 +52,25 @@ public:
         double log_masses[2]{};
         std::vector<uint32_t> errors;
     };
-    struct Dimensions {
+
+    struct Dimensions
+    {
         size_t detectors, hyperedges, graph_edges, correlation_rules;
     };
-    struct Statistics {
-        uint64_t shots = 0, ensemble_shots = 0, fallback_shots = 0, improving_cycles = 0;
-        uint64_t complementary_ns = 0, ensemble_ns = 0, synthesis_ns = 0, degeneracy_ns = 0;
+
+    struct Statistics
+    {
+        uint64_t shots = 0;
+        uint64_t ensemble_shots = 0;
+        uint64_t fallback_shots = 0;
+        uint64_t improving_cycles = 0;
+        uint64_t complementary_ns = 0;
+        uint64_t ensemble_ns = 0;
+        uint64_t synthesis_ns = 0;
+        uint64_t degeneracy_ns = 0;
         uint64_t fallback_ns = 0;
     };
+
     const size_t num_detectors;
     const size_t num_observables;
 
@@ -50,22 +81,32 @@ public:
     Libra(const Libra&) = delete;
     Libra& operator=(const Libra&) = delete;
 
-    // ObsRef is ground truth for the generic sampler API; prediction ignores it.
-    // matching_data.gap is the unsigned initial complementary gap in dB.
-    // matching_data.probability is an unnormalized class score, not confidence.
+    /*
+     * ObsRef is ground truth for the generic sampler API; prediction ignores it.
+     * matching_data.gap is the unsigned initial complementary gap in dB.
+     * matching_data.probability is an unnormalized class score, not confidence.
+     * */
     result_type decode(SyndromeRef, ObsRef);
     DetailedResult decode_detailed(SyndromeRef);
+
     // Prepare immutable perturbed priors before timing decoding.
     void prepare_ensemble();
+
     Dimensions dimensions() const;
     Statistics statistics() const;
     void print_stats(std::ostream&) const;
     void mpi_accumulate();
+
     // Reconstruct a returned error assignment for correctness checks.
     std::pair<SyndromeType, bool> syndrome_of(const std::vector<uint32_t>&) const;
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };
-}
-#endif
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
+} // namespace dec
+
+#endif // QUDEC_DECODER_LIBRA_H

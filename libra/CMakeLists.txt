@@ -1,3 +1,4 @@
+# Contributor: OpenAI Codex (Libra build entry point).
 cmake_minimum_required(VERSION 3.20.3)
 project(qudec_libra_compat LANGUAGES CXX)
 # Compatibility entry point: the normal library owns the stable implementation.

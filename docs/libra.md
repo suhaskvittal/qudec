@@ -1,7 +1,7 @@
 # Libra decoder and corrected rare event sampling
 
 The normal `qudeclib` library includes `dec::Libra`, implemented in
-`src/decoder/libra_pymatching.cpp`. Its auxiliary assignment uses PyMatching
+`src/decoder/libra.cpp`. Its auxiliary assignment uses PyMatching
 and exact subset dynamic programming for components with at most eight
 selected CSS edges. The decoder retains correlated matching, a 60-member
 ensemble, a 20 dB gap gate, degeneracy scoring with up to 30 positive cycles
@@ -18,10 +18,11 @@ ctest --test-dir .agentic_artifacts/build --output-on-failure
 ```
 
 Use `-DENABLE_MPI=OFF` for a serial build. `BUILD_TESTING=OFF` omits the test
-executables. The historical `libra/` and `libra_pymatching/` CMake entry points
-forward to the normal project; their binaries are in the build's `qudec/`
-subdirectory. Both library aliases now refer to `qudeclib`, which owns one
-Libra implementation. Experimental variants are outside the normal build.
+executables. The `libra/` CMake entry point forwards to the normal project;
+its binaries are in the build's `qudec/` subdirectory. The `libra_decoder`
+library alias refers to `qudeclib`, which owns the single Libra implementation.
+
+The Libra implementation and integration were contributed by OpenAI Codex.
 
 ## Monte Carlo through the normal CLI
 

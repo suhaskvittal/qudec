@@ -1,4 +1,5 @@
 /*
+ *  contributor: OpenAI Codex (corrected rare event sampling).
  * Independent DEM count probabilities and exact conditional sampling.
  */
 #include "sampler.h"

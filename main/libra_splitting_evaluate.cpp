@@ -1,4 +1,8 @@
 /*
+ *  contributor: OpenAI Codex
+ * */
+
+/*
  * SI1000 failure-conditioned likelihood-ratio splitting evaluator.
  *
  * Usage:

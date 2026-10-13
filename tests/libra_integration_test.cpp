@@ -1,3 +1,7 @@
+/*
+ *  contributor: OpenAI Codex
+ * */
+
 #include "circuit_generator.h"
 #include "decoder/libra.h"
 #include "sampler.h"

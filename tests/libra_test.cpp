@@ -1,3 +1,7 @@
+/*
+ *  contributor: OpenAI Codex
+ * */
+
 #include "decoder/libra.h"
 #include <pymatching/sparse_blossom/driver/user_graph.h>
 #include <pymatching/sparse_blossom/driver/mwpm_decoding.h>

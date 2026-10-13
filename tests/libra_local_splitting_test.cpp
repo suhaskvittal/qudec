@@ -1,3 +1,7 @@
+/*
+ *  contributor: OpenAI Codex
+ * */
+
 #include "libra_local_splitting.h"
 #include <array>
 #include <iostream>

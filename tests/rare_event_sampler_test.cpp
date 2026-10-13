@@ -1,3 +1,7 @@
+/*
+ *  contributor: OpenAI Codex
+ * */
+
 #include "sampler.h"
 #include "decoder/common.h"
 #include <array>

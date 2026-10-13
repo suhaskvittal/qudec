@@ -1,3 +1,7 @@
+/*
+ *  contributor: OpenAI Codex
+ * */
+
 #ifndef QUDEC_LIBRA_SPLITTING_H
 #define QUDEC_LIBRA_SPLITTING_H
 

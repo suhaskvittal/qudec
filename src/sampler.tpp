@@ -1,4 +1,5 @@
 /*
+ *  contributor: OpenAI Codex (corrected rare event sampling).
  *  author: Suhas Vittal
  *  date:   16 May 2026
  * */
