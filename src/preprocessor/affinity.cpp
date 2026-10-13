@@ -1,5 +1,6 @@
 /*
  *  author: Suhas Vittal
+ *  contributor: OpenAI Codex
  *  date:   24 September 2026
  * */
 
@@ -23,18 +24,52 @@ namespace
 
 using dem_type = stim::DetectorErrorModel;
 
-template <size_t W> AffinityTable::value_type
-_quantize(int x)
+AffinityTable::value_type
+_quantize(int distance)
 {
-    assert(x >= 0 && x < 16);
-    constexpr size_t BUCKET_WIDTH = 16 / W;
-    return (x / BUCKET_WIDTH);
+    // One bucket per hop; reserve the largest value for saturated/disconnected paths.
+    return static_cast<AffinityTable::value_type>(std::min(distance, int(AffinityTable::MASK)));
 }
 
-constexpr size_t
-_data_width(size_t d) 
-{ 
-    return d * d * BIT_WIDTH;   // note that `d` is actually `(d+1) - 1` since we have an extra boundary index
+size_t
+_data_width(size_t num_detectors)
+{
+    constexpr size_t CELLS_PER_WORD = 8 / AffinityTable::BIT_WIDTH;
+    if (num_detectors == std::numeric_limits<size_t>::max())
+        throw std::length_error("affinity table is too large");
+    const size_t n = num_detectors + 1; // Include the shared boundary.
+    if (n > std::numeric_limits<size_t>::max() / n)
+        throw std::length_error("affinity table is too large");
+    const size_t cells = n * n;
+    return cells / CELLS_PER_WORD + (cells % CELLS_PER_WORD != 0);
+}
+
+void
+_read(gzFile& file, void* data, size_t size)
+{
+    auto* bytes = static_cast<unsigned char*>(data);
+    while (size)
+    {
+        const unsigned chunk = static_cast<unsigned>(std::min(size, size_t(1 << 20)));
+        if (gzread(file, bytes, chunk) != static_cast<int>(chunk))
+            throw std::runtime_error("unable to read affinity table");
+        bytes += chunk;
+        size -= chunk;
+    }
+}
+
+void
+_write(gzFile& file, const void* data, size_t size)
+{
+    const auto* bytes = static_cast<const unsigned char*>(data);
+    while (size)
+    {
+        const unsigned chunk = static_cast<unsigned>(std::min(size, size_t(1 << 20)));
+        if (gzwrite(file, bytes, chunk) != static_cast<int>(chunk))
+            throw std::runtime_error("unable to write affinity table");
+        bytes += chunk;
+        size -= chunk;
+    }
 }
 
 } // anon
@@ -50,11 +85,11 @@ AffinityTable::AffinityTable(const dem_type& dem)
 
     // Run floyd-warshall to get all pairs distances
     const size_t n = gr.N();
-    std::vector<int> dist(n*n, 16);
+    std::vector<int> dist(n*n, int(AffinityTable::MASK));
 
     // define `dist` to be `1` wherever two nodes share a hyperedge
     for (hg::id_type v = 0; v < n; v++)
-        dist[v][v] = 0;
+        dist[v*n+v] = 0;
 
     for (hg::id_type e = 0; e < gr.M(); e++)
     {
@@ -62,7 +97,7 @@ AffinityTable::AffinityTable(const dem_type& dem)
         for (auto v : supp)
             for (auto w : supp)
                 if (v != w && !gr.v(v).is_boundary)  // do not set dist[B][*] = 1 
-                    dist[v][w] = 1;
+                    dist[v*n+w] = 1;
     }
 
     for (size_t k = 0; k < n; k++)
@@ -74,16 +109,17 @@ AffinityTable::AffinityTable(const dem_type& dem)
     // now we have the distances, we can populate `data_`
     for (size_t i = 0; i < n; i++)
         for (size_t j = i+1; j < n; j++)
-            set( i, j, _quantize<BIT_WIDTH>(dist[i][j]) );
+            set( i, j, _quantize(dist[i*n+j]) );
 }
 
 AffinityTable::AffinityTable(gzFile& f)
     :num_detectors_{0}
 {
-    // get `num_detectors_` (4B) and `data_`
-    gzread(f, &num_detectors_, 4);
+    uint32_t count;
+    _read(f, &count, sizeof(count));
+    num_detectors_ = count;
     data_.resize(_data_width(num_detectors_));
-    gzread(f, &data_[0], data_.size() * sizeof(value_type));
+    _read(f, data_.data(), data_.size() * sizeof(value_type));
 }
 
 ////////////////////////////////////////////////////////////////
@@ -92,18 +128,27 @@ AffinityTable::AffinityTable(gzFile& f)
 AffinityTable::value_type
 AffinityTable::operator()(size_t i, size_t j) const
 {
-    auto [word_idx, bit_idx] = index(i,j);
-    return (data_[word_idx] >> bit_idx) & MASK;
+    if (i > num_detectors_ || j > num_detectors_)
+        throw std::out_of_range("affinity table detector ID is out of range");
+    if (i == j)
+        return 0;
+    if (i > j)
+        std::swap(i, j);
+    const auto [word_idx, bit_idx] = index(i,j);
+    return (static_cast<uint8_t>(data_[word_idx]) >> bit_idx) & MASK;
 }
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
-det_id_typevoid
+void
 AffinityTable::write_to_file(gzFile& f)
 {
-    gzwrite(f, &num_detectors_, 4);
-    gzwrite(f, &data_[0], data_.size() * sizeof(value_type));
+    if (num_detectors_ > std::numeric_limits<uint32_t>::max())
+        throw std::length_error("affinity table detector count exceeds file format");
+    const uint32_t count = static_cast<uint32_t>(num_detectors_);
+    _write(f, &count, sizeof(count));
+    _write(f, data_.data(), data_.size() * sizeof(value_type));
 }
 
 ////////////////////////////////////////////////////////////////
@@ -113,7 +158,9 @@ void
 AffinityTable::set(size_t i, size_t j, value_type x)
 {
     auto [word_idx, bit_idx] = index(i,j);
-    data_[word_idx] = ~(MASK << bit_idx) | ((x & MASK) << bit_idx);
+    const auto word = static_cast<uint8_t>(data_[word_idx]);
+    data_[word_idx] = static_cast<value_type>(
+            (word & ~(MASK << bit_idx)) | ((x & MASK) << bit_idx));
 }
 
 ////////////////////////////////////////////////////////////////
@@ -124,7 +171,7 @@ AffinityTable::index(size_t i, size_t j) const
 {
     constexpr size_t BITS_PER_WORD{sizeof(value_type) * 8};
     constexpr size_t CELLS_PER_WORD{BITS_PER_WORD / BIT_WIDTH};
-    const size_t n = num_detectors();
+    const size_t n = num_detectors() + 1;
     const size_t cell = i * n + j;                 // linear cell index
     return { cell / CELLS_PER_WORD,                // word index in data_
              (cell % CELLS_PER_WORD) * BIT_WIDTH }; // bit offset within word

@@ -22,6 +22,15 @@ struct AlwaysOne {
         return result;
     }
 };
+struct PerfectDecoder {
+    uint64_t calls = 0;
+    dec::Result decode(dec::SyndromeRef, dec::ObsRef truth) {
+        ++calls;
+        dec::Result result;
+        result.flipped_obs = truth;
+        return result;
+    }
+};
 void run(int rank) {
     // All channels flip L0, so error conditional on K is deterministic for
     // this decoder. K=0 is essential; starting at the mode biases the sum.
@@ -29,6 +38,7 @@ void run(int rank) {
     AlwaysOne decoder;
     ExperimentConfig config;
     config.method = "rare_event";
+    config.rare_event.relative_tail_tolerance = 0;
     config.rare_event.max_level = 3;
     config.rare_event.samples_per_level = 17;
     config.rare_event.max_errors_per_level = 1000;
@@ -39,6 +49,28 @@ void run(int rank) {
     MPI_Allreduce(MPI_IN_PLACE, &calls, 1, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);
 #endif
     require(calls == 51, "Per-level global sample limit was not respected");
+    // At K=2, the remaining mass is 0.04 and the accumulated estimate is 0.54.
+    // A 10% tolerance skips that level; disabling the rule above includes it.
+    AlwaysOne early_decoder;
+    config.rare_event.relative_tail_tolerance = 0.1;
+    const double partial = estimate_logical_error_rate(dem, early_decoder, config);
+    require(std::abs(partial - 0.54) < 1e-13, "Relative tail stop returned an incorrect partial estimate");
+    uint64_t early_calls = early_decoder.calls;
+#if defined(ENABLE_MPI)
+    MPI_Allreduce(MPI_IN_PLACE, &early_calls, 1, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);
+#endif
+    require(early_calls == 34, "Relative tail rule did not skip the remaining level");
+    require(estimate - partial < 0.1 * partial, "Omitted contribution exceeded the relative tolerance");
+    // A zero estimate must not trigger the relative rule or skip unseen failures.
+    PerfectDecoder perfect;
+    require(estimate_logical_error_rate(dem, perfect, config) == 0,
+            "Perfect decoder had a nonzero estimate");
+    uint64_t perfect_calls = perfect.calls;
+#if defined(ENABLE_MPI)
+    MPI_Allreduce(MPI_IN_PLACE, &perfect_calls, 1, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);
+#endif
+    require(perfect_calls == 51, "Zero estimate prematurely stopped the count sum");
+    config.rare_event.relative_tail_tolerance = 0;
     config.rare_event.max_level = 2;
     bool rejected = false;
     try { estimate_logical_error_rate(dem, decoder, config); }

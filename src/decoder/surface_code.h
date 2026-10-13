@@ -14,6 +14,7 @@
 #include <pymatching/sparse_blossom/driver/mwpm_decoding.h>
 
 #include <iosfwd>
+#include <limits>
 #include <vector>
 
 namespace dec
@@ -31,6 +32,14 @@ public:
         // Report matched detector endpoints and each pair's observable parity.
         // Boundary endpoints use -1. Weights are not populated in this mode.
         bool report_matching_data{false};
+    };
+
+    struct Statistics
+    {
+        uint64_t timed_shots{0};
+        uint64_t decode_total_ns{0};
+        uint64_t decode_min_ns{std::numeric_limits<uint64_t>::max()};
+        uint64_t decode_max_ns{0};
     };
 
     const size_t num_detectors;
@@ -56,6 +65,7 @@ private:
     const size_t obs_det_id_;
 
     pm::Mwpm mwpm_;
+    Statistics stats_;
 
     /*
      * Weight->decibel conversion factor read from the matching graph's normalising
@@ -70,15 +80,9 @@ public:
 
     Result decode(SyndromeRef, ObsRef);
 
+    Statistics statistics() const;
     void print_stats(std::ostream&) const;
-    
-    void 
-    mpi_accumulate()
-    {
-        s_signed_gap.mpi_accumulate();
-        s_unsigned_gap.mpi_accumulate();
-        s_unsigned_gap_errors.mpi_accumulate();
-    }
+    void mpi_accumulate();
 private:
     Result internal_decode(SyndromeRef, bool fire_obs_det, pm::total_weight_int& weight_out,
                                 bool report_matching_data=false);

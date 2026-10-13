@@ -1,5 +1,6 @@
 /*
  * author: OpenAI GPT-6-Luna
+ * contributor: OpenAI Codex (template macro cleanup).
  * purpose: Provide template definitions for the standalone global Hypergraph.
  */
 
@@ -199,3 +200,6 @@ TEMPL_CLASS::validate_vertex_list(std::string_view caller_id, const std::vector<
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
+
+#undef TEMPL_PARAM
+#undef TEMPL_CLASS

@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <iosfwd>
 #include <memory>
+#include <limits>
 #include <vector>
 
 namespace dec
@@ -69,6 +70,12 @@ public:
         uint64_t synthesis_ns = 0;
         uint64_t degeneracy_ns = 0;
         uint64_t fallback_ns = 0;
+        // Full wall time of public decode() calls, including empty syndromes.
+        // decode_detailed() calls are not included in these timing counters.
+        uint64_t timed_shots = 0;
+        uint64_t decode_total_ns = 0;
+        uint64_t decode_min_ns = std::numeric_limits<uint64_t>::max();
+        uint64_t decode_max_ns = 0;
     };
 
     const size_t num_detectors;

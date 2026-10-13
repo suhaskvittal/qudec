@@ -921,6 +921,7 @@ Libra::decode_detailed(SyndromeRef syndrome)
 Result
 Libra::decode(SyndromeRef syndrome, ObsRef)
 {
+    const auto start = Clock::now();
     auto result = decode_detailed(syndrome);
     Result out;
     out.flipped_obs = ObsType(1);
@@ -928,6 +929,12 @@ Libra::decode(SyndromeRef syndrome, ObsRef)
     out.matching_data.frame_flips = out.flipped_obs;
     out.matching_data.gap = result.gap_db;
     out.matching_data.probability = std::exp(result.log_masses[result.prediction]);
+    const auto elapsed_ns = elapsed_nanoseconds(start);
+    auto& stats = impl_->stats;
+    ++stats.timed_shots;
+    stats.decode_total_ns += elapsed_ns;
+    stats.decode_min_ns = std::min(stats.decode_min_ns, elapsed_ns);
+    stats.decode_max_ns = std::max(stats.decode_max_ns, elapsed_ns);
     return out;
 }
 
@@ -948,7 +955,10 @@ Libra::dimensions() const
 Libra::Statistics
 Libra::statistics() const
 {
-    return impl_->stats;
+    auto stats = impl_->stats;
+    if (!stats.timed_shots)
+        stats.decode_min_ns = 0;
+    return stats;
 }
 
 std::pair<SyndromeType, bool>
@@ -963,10 +973,14 @@ Libra::mpi_accumulate()
 #if defined(ENABLE_MPI)
     auto& stats = impl_->stats;
     uint64_t counters[] = {stats.shots, stats.ensemble_shots, stats.fallback_shots, stats.improving_cycles,
-        stats.complementary_ns, stats.ensemble_ns, stats.synthesis_ns, stats.degeneracy_ns, stats.fallback_ns};
-    MPI_Allreduce(MPI_IN_PLACE, counters, 9, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);
+        stats.complementary_ns, stats.ensemble_ns, stats.synthesis_ns, stats.degeneracy_ns, stats.fallback_ns,
+        stats.timed_shots, stats.decode_total_ns};
+    MPI_Allreduce(MPI_IN_PLACE, counters, 11, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, &stats.decode_min_ns, 1, MPI_UINT64_T, MPI_MIN, MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, &stats.decode_max_ns, 1, MPI_UINT64_T, MPI_MAX, MPI_COMM_WORLD);
     stats = {counters[0], counters[1], counters[2], counters[3], counters[4],
-             counters[5], counters[6], counters[7], counters[8]};
+             counters[5], counters[6], counters[7], counters[8], counters[9], counters[10],
+             stats.decode_min_ns, stats.decode_max_ns};
 #endif
 }
 
@@ -976,6 +990,13 @@ Libra::print_stats(std::ostream& out) const
     const auto stats = statistics();
     out << "Libra shots=" << stats.shots << " ensemble_shots=" << stats.ensemble_shots
         << " fallback_shots=" << stats.fallback_shots << " improving_cycles=" << stats.improving_cycles << '\n';
+    const double average_us = stats.timed_shots
+        ? double(stats.decode_total_ns) / double(stats.timed_shots) / 1000.0 : 0.0;
+    out << "Libra decode latency (us): timed_shots=" << stats.timed_shots
+        << " average=" << average_us
+        << " min=" << double(stats.decode_min_ns) / 1000.0
+        << " max=" << double(stats.decode_max_ns) / 1000.0
+        << " includes_empty_syndromes=true scope=full_history\n";
     if (impl_->config.profile)
         out << "Libra phase times (ns): complementary=" << stats.complementary_ns
             << " fallback=" << stats.fallback_ns << " ensemble=" << stats.ensemble_ns

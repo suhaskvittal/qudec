@@ -75,11 +75,13 @@ channel probabilities.
 
 The estimator sums `P(K) * P(decoder failure | K)` from K=0 through the
 exclusive `--rare-max-level` limit, clipped to the DEM's possible count range.
-It never drops low-count levels or prunes levels based on an observed error
-rate. A Chernoff bound on omitted count probability also bounds its omitted
-logical-error contribution. If that bound exceeds `--rare-tail-tolerance`,
-the command fails and asks for a larger count limit. The reported tail bound
-does not describe Monte Carlo uncertainty within sampled levels.
+It starts at K=0 and can stop early when the remaining probability bound is
+below `--rare-relative-tail-tolerance` times the accumulated estimate (see
+below). A Chernoff bound beyond the configured count limit is checked against
+`--rare-tail-tolerance` before sampling begins; exceeding this absolute bound
+requires a larger count limit. The reported omitted-contribution bound includes
+any levels skipped by early stopping and does not describe Monte Carlo
+uncertainty within sampled levels.
 
 Sample and error budgets are global across MPI ranks. Error stopping occurs
 after synchronized batches and can overshoot the error target; the sample
@@ -139,3 +141,18 @@ single-edge explanation for each CSS edge. Unsupported models are rejected.
 The current toric generator has two observables and is outside this support.
 
 Historical measurements remain in `Libra-PyMatching.txt` and `Libra.txt`.
+
+### Rare-event early stopping
+
+Contributor: OpenAI Codex.
+
+`--rare-relative-tail-tolerance` defaults to `0.1`. Before sampling the next count
+level, the sampler stops if an upper bound on the total remaining count probability
+is less than 10% of the accumulated logical error rate. This bounds the omitted
+logical-error contribution because conditional failure probabilities are at most 1.
+The returned estimate is the partial sum; it is not renormalized. The actual first
+omitted level and contribution bound are printed. This criterion does not bound
+sampling uncertainty in levels already sampled. A zero running estimate does not
+trigger relative early stopping. Set the option to `0` to sample all configured
+levels. `--rare-tail-tolerance` still checks the absolute tail beyond the configured
+maximum count before sampling begins.

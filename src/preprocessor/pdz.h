@@ -1,5 +1,6 @@
 /*
  *  author: Suhas Vittal
+ *  contributor: OpenAI Codex
  *  date:   13 October 2026
  * */
 
@@ -9,6 +10,7 @@
 #include "decoder/types.h"
 #include "preprocessor/affinity.h"
 
+#include <limits>
 #include <unordered_map>
 #include <optional>
 
@@ -42,7 +44,7 @@ public:
 
     /*
      * `aff_match` is the affinity of the matched detectors.
-     * `aff_compl_*` is the max affinity of either of the detectors to the rest of the
+     * `aff_compl_*` is the minimum quantized distance of either of the detectors to the rest of the
      *              flipped detectors. We track affinity for same basis and opposing
      *              basis detectors separately.
      * `aff_opposite_basis_match` is the match affinity of the opposing basis detector considered
@@ -52,18 +54,18 @@ public:
     struct score_type
     {
         value_type aff_match{},
-                   aff_compl_same_basis{},
-                   aff_compl_opp_basis{};
+                   aff_compl_same_basis =std::numeric_limits<value_type>::max(),
+                   aff_compl_opp_basis =std::numeric_limits<value_type>::max();
     
         std::optional<det_id_type> compl_same_basis_det_id,
                                    compl_opp_basis_det_id;
 
-        value_type aff_opp_basis_match;
+        value_type aff_opp_basis_match{};
 
         /*
          * updates `aff_compl_same_basis` and `compl_same_basis_det_id` by first checking
-         * if `aff_1` or `aff_2` are larger than `aff_compl_same_basis`. If so, `aff_compl_same_basis`
-         * is set to the larger of the two and `compl_same_basis_det_id` is set.
+         * if `aff_1` or `aff_2` are smaller than `aff_compl_same_basis`. If so, `aff_compl_same_basis`
+         * is set to the smaller of the two and `compl_same_basis_det_id` is set.
          * */
         void update_same_basis_affinity(det_id_type, value_type aff_1, value_type aff_2);
 
@@ -84,6 +86,7 @@ public:
      * */
 private:
     AffinityTable aff_;
+    std::vector<bool> opposing_basis_;
 
     mutable std::vector<det_id_type> same_basis_events_, 
                                      opp_basis_events_;
@@ -98,17 +101,21 @@ private:
      * */
     mutable std::unordered_map<det_id_type, value_type> aff_match_map_;
 public:
-    PDZ(const stim::DetectorErrorModel&, config_type={});
-    PDZ(const stim::DetectorErrorModel&, gzFile&, config_type={});
-    PDZ(const stim::DetectorErrorModel&, AffinityTable, config_type={});
+    PDZ(const stim::DetectorErrorModel&);
+    PDZ(const stim::DetectorErrorModel&, config_type);
+    PDZ(const stim::DetectorErrorModel&, gzFile&);
+    PDZ(const stim::DetectorErrorModel&, gzFile&, config_type);
+    PDZ(const stim::DetectorErrorModel&, AffinityTable);
+    PDZ(const stim::DetectorErrorModel&, AffinityTable, config_type);
 
     /*
-     * `apply()` modifies the input syndrome and returns the partial syndrome
-     * post-modification.
+     * `apply()` removes accepted matching endpoints from the input syndrome and
+     * returns their matching data and observable correction. Combine this correction
+     * with the decoder result for the remaining syndrome. One instance is not thread safe.
      * */
     dec::Result apply(dec::SyndromeRef, const dec::Result& prev_dec_result) const;
 private:
-    score_type score_match(det_id_type, det_id_type, const dec::Result&) const;
+    score_type score_match(det_id_type, det_id_type) const;
     bool is_opposing_basis_detector(det_id_type) const;
 
     // wrapper for `aff_` that translates signed IDs to unsigned IDs.

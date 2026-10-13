@@ -42,6 +42,9 @@ struct ExperimentConfig
         int64_t max_level{128};
         // Upper bound on the contribution omitted at K >= max_level.
         double tail_tolerance{1e-12};
+        // Stop before a level when the remaining contribution bound is below
+        // this fraction of the accumulated LER. Zero disables early stopping.
+        double relative_tail_tolerance{0.1};
         // Retained for source compatibility; nonzero values are rejected.
         int64_t skip_levels_after_no_errors_found{0};
     } rare_event;

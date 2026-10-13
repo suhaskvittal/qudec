@@ -1,5 +1,6 @@
 /*
  *  author: Suhas Vittal
+ *  contributor: OpenAI Codex
  *  date:   24 September 2026
  * */
 
@@ -8,9 +9,11 @@
 
 #include "hypergraph.h"
 
+#include <stim.h>
 #include <zlib.h>
 
 #include <vector>
+#include <tuple>
 
 namespace pp
 {
@@ -49,13 +52,16 @@ AffinityResult measure_affinity(const G&, const std::vector<hg::id_type>& syndro
 
 /*
  * In practice, we want to maintain a lookup table for pairwise-affinity. This table
- * is quantized.
+ * stores hop distance in five bits: 0..30 are exact distances and 31 represents
+ * 31 or more hops (including disconnected pairs). Smaller values are closer.
+ * Each value occupies one byte; the upper three bits are unused.
+ * Detector index num_detectors() represents the shared boundary.
  * */
 class AffinityTable
 {
 public:
     using value_type = int8_t;
-    constexpr static size_t BIT_WIDTH{2};
+    constexpr static size_t BIT_WIDTH{5};
     constexpr static value_type MASK = static_cast<value_type>( (1<<BIT_WIDTH)-1 );
 
 private: 

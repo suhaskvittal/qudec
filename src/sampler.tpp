@@ -120,7 +120,9 @@ rare_event_sampler(const stim::DetectorErrorModel& dem,
     if (conf.rare_event.max_level <= 0 || conf.rare_event.samples_per_level <= 0 ||
         conf.rare_event.max_errors_per_level <= 0 ||
         !std::isfinite(conf.rare_event.tail_tolerance) || conf.rare_event.tail_tolerance < 0 ||
-        conf.rare_event.tail_tolerance >= 1)
+        conf.rare_event.tail_tolerance >= 1 ||
+        !std::isfinite(conf.rare_event.relative_tail_tolerance) ||
+        conf.rare_event.relative_tail_tolerance < 0 || conf.rare_event.relative_tail_tolerance > 1)
         throw std::invalid_argument("Invalid rare_event sample counts, count limit, or tail tolerance");
 
     int world_rank = 0, world_size = 1;
@@ -134,12 +136,35 @@ rare_event_sampler(const stim::DetectorErrorModel& dem,
     if (tail_bound > conf.rare_event.tail_tolerance)
         throw std::invalid_argument("rare_event omitted-count bound exceeds --rare-tail-tolerance; increase --rare-max-level");
     const auto& probabilities = conditional.count_probabilities();
+    // Sum backwards instead of subtracting from 1: small tail masses would
+    // otherwise lose precision. Include the bound beyond the configured limit.
+    std::vector<double> remaining_bounds(limit + 1, tail_bound);
+    long double remaining = tail_bound;
+    for (size_t k = limit; k-- > 0;)
+    {
+        remaining += probabilities[k];
+        remaining_bounds[k] = std::nextafter(double(std::min(remaining, 1.0L)), 1.0);
+    }
+    size_t first_omitted = limit;
+    double omitted_bound = tail_bound;
     const size_t observables = dem.count_observables();
     Rng rng(static_cast<uint64_t>(conf.seed) + world_rank);
     double ler = 0;
     constexpr uint64_t batch_size = 256;
     const bool progress = conf.print_progress && world_rank == 0;
     for (size_t k = 0; k < limit; ++k) {
+        if (conf.rare_event.relative_tail_tolerance > 0 && ler > 0 &&
+                remaining_bounds[k] < conf.rare_event.relative_tail_tolerance * ler)
+        {
+            first_omitted = k;
+            omitted_bound = remaining_bounds[k];
+            if (world_rank == 0)
+                std::cout << "Rare-event early stop: first_omitted_level=" << k
+                          << " accumulated_ler=" << ler
+                          << " remaining_contribution_bound=" << omitted_bound
+                          << " relative_tail_tolerance=" << conf.rare_event.relative_tail_tolerance << '\n';
+            break;
+        }
         if (!(probabilities[k] > 0)) continue;
         uint64_t samples = 0, errors = 0;
         const uint64_t maximum = conf.rare_event.samples_per_level;
@@ -171,7 +196,7 @@ rare_event_sampler(const stim::DetectorErrorModel& dem,
     }
     if (world_rank == 0)
         std::cout << std::setprecision(12) << "Rare-event omitted-count contribution bound: "
-                  << tail_bound << " (K >= " << limit << ")\n";
+                  << omitted_bound << " (K >= " << first_omitted << ")\n";
 
     return ler;
 }

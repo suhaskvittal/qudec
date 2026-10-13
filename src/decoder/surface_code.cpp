@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <cmath>
 #include <limits>
 #include <queue>
@@ -124,11 +125,24 @@ PyMatching::PyMatching(const stim::DetectorErrorModel& dem, config_type conf)
 Result
 PyMatching::decode(SyndromeRef syn, ObsRef obs)
 {
+    const auto start = std::chrono::steady_clock::now();
+    auto record_latency = [&]
+    {
+        const auto elapsed_ns = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now() - start).count());
+        ++stats_.timed_shots;
+        stats_.decode_total_ns += elapsed_ns;
+        stats_.decode_min_ns = std::min(stats_.decode_min_ns, elapsed_ns);
+        stats_.decode_max_ns = std::max(stats_.decode_max_ns, elapsed_ns);
+    };
     pm::total_weight_int w_primary = 0;
     auto out = internal_decode(syn, /*fire_obs_det=*/false, w_primary,
                                conf.report_matching_data && !conf.enable_gap_estimation);
     if (!conf.enable_gap_estimation)
+    {
+        record_latency();
         return out;
+    }
 
     // Complementary pass: fire the observable detector to force the opposite parity class.
     pm::total_weight_int w_complement = 0;
@@ -166,6 +180,7 @@ PyMatching::decode(SyndromeRef syn, ObsRef obs)
     out.matching_data.gap = g;
     s_signed_gap.add(g);
 
+    record_latency();
     return out;
 }
 
@@ -239,9 +254,42 @@ PyMatching::internal_decode(SyndromeRef syn, bool fire_obs_det, pm::total_weight
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
+PyMatching::Statistics
+PyMatching::statistics() const
+{
+    auto stats = stats_;
+    if (!stats.timed_shots)
+        stats.decode_min_ns = 0;
+    return stats;
+}
+
+void
+PyMatching::mpi_accumulate()
+{
+#if defined(ENABLE_MPI)
+    uint64_t sums[]{stats_.timed_shots, stats_.decode_total_ns};
+    MPI_Allreduce(MPI_IN_PLACE, sums, 2, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);
+    stats_.timed_shots = sums[0];
+    stats_.decode_total_ns = sums[1];
+    MPI_Allreduce(MPI_IN_PLACE, &stats_.decode_min_ns, 1, MPI_UINT64_T, MPI_MIN, MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, &stats_.decode_max_ns, 1, MPI_UINT64_T, MPI_MAX, MPI_COMM_WORLD);
+#endif
+    s_signed_gap.mpi_accumulate();
+    s_unsigned_gap.mpi_accumulate();
+    s_unsigned_gap_errors.mpi_accumulate();
+}
+
 void
 PyMatching::print_stats(std::ostream& ostrm) const
 {
+    const auto stats = statistics();
+    const double average_us = stats.timed_shots
+        ? double(stats.decode_total_ns) / double(stats.timed_shots) / 1000.0 : 0.0;
+    ostrm << "PyMatching decode latency (us): timed_shots=" << stats.timed_shots
+          << " average=" << average_us
+          << " min=" << double(stats.decode_min_ns) / 1000.0
+          << " max=" << double(stats.decode_max_ns) / 1000.0
+          << " includes_empty_syndromes=true scope=full_history\n";
     // The gap histogram is only populated when complementary-gap estimation is enabled;
     // otherwise it is empty (and its mean would divide by a zero count).
     if (conf.enable_gap_estimation)
