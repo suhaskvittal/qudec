@@ -29,6 +29,7 @@ struct Options
     ExperimentConfig experiment;
     pp::PDZ::config_type pdz;
     dec::Libra::Config libra;
+    double pdz_removal_threshold{0.5};
 };
 
 void
@@ -43,6 +44,7 @@ print_usage(std::ostream& out)
         << "  --mc-max-samples N             default: 1000000\n"
         << "  --mc-stop-at-errors N          default: 25 (checked per batch)\n"
         << "  --aff-keep-threshold N         default: 2\n"
+        << "  --pdz-removal-threshold P      default: 0.5 (1 requires empty residual)\n"
         << "  --libra-ensemble-size N        default: 60\n"
         << "  --rare-samples-per-level N     default: 10000\n"
         << "  --rare-max-errors-per-level N  default: 25\n"
@@ -76,6 +78,7 @@ parse_options(int argc, char** argv)
         const std::string value = argv[i];
         if (option == "--rounds") out.rounds = positive_u32(value);
         else if (option == "--p") out.physical_error_rate = std::stod(value);
+        else if (option == "--pdz-removal-threshold") out.pdz_removal_threshold = std::stod(value);
         else if (option == "--seed") out.experiment.seed = std::stoll(value);
         else if (option == "--method") out.experiment.method = value;
         else if (option == "--mc-max-samples") out.experiment.monte_carlo.max_samples = positive_u32(value);
@@ -131,11 +134,12 @@ run(int argc, char** argv, int rank, int workers)
                   << " memory_basis=" << (options.memory_x ? 'X' : 'Z')
                   << " opposing_basis_detectors=true ignore_opposing_basis_detectors=true"
                   << " aff_keep_threshold=" << int(options.pdz.aff_keep_threshold)
+                  << " pdz_removal_threshold=" << options.pdz_removal_threshold
                   << " ensemble_size=" << options.libra.ensemble_size
                   << " seed=" << options.experiment.seed << " workers=" << workers
                   << " method=" << options.experiment.method << '\n';
 
-    dec::PDZLibra decoder(dem, options.pdz, options.libra);
+    dec::PDZLibra decoder(dem, options.pdz, options.libra, options.pdz_removal_threshold);
     const double ler = estimate_logical_error_rate(dem, decoder, options.experiment);
     decoder.mpi_accumulate();
     if (!rank)

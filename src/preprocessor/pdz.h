@@ -38,8 +38,9 @@ public:
 
     struct config_type
     {
-        value_type  aff_keep_threshold{2};
-        bool        ignore_opposing_basis_detectors{true};
+        int64_t aff_keep_threshold{2};
+        bool    ignore_opposing_basis_detectors{true};
+        bool    check_affinity_of_compl_match{false};
     };
 
     /*
@@ -60,19 +61,10 @@ public:
         std::optional<det_id_type> compl_same_basis_det_id,
                                    compl_opp_basis_det_id;
 
-        value_type aff_opp_basis_match{};
+        value_type aff_same_basis_match{},
+                   aff_opp_basis_match{};
 
-        /*
-         * updates `aff_compl_same_basis` and `compl_same_basis_det_id` by first checking
-         * if `aff_1` or `aff_2` are smaller than `aff_compl_same_basis`. If so, `aff_compl_same_basis`
-         * is set to the smaller of the two and `compl_same_basis_det_id` is set.
-         * */
-        void update_same_basis_affinity(det_id_type, value_type aff_1, value_type aff_2);
-
-        /*
-         * Same as above but with more info
-         * */
-        void update_opp_basis_affinity(det_id_type, value_type aff_1, value_type aff_2, value_type aff_opp_m);
+        void update_affinity(det_id_type, value_type aff_1, value_type aff_2, value_type aff_m, bool same_basis);
     };
 
     const config_type conf;
@@ -114,9 +106,11 @@ public:
      * with the decoder result for the remaining syndrome. One instance is not thread safe.
      * */
     dec::Result apply(dec::SyndromeRef, const dec::Result& prev_dec_result) const;
+    // Read-only basis classification used by pipeline statistics. "Same basis"
+    // means the memory basis; an opposing-basis pair is not counted as same basis.
+    bool is_opposing_basis_detector(det_id_type) const;
 private:
     score_type score_match(det_id_type, det_id_type) const;
-    bool is_opposing_basis_detector(det_id_type) const;
 
     // wrapper for `aff_` that translates signed IDs to unsigned IDs.
     value_type affinity(det_id_type, det_id_type) const;

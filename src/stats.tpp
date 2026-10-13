@@ -1,6 +1,7 @@
 /*
  *  author: Suhas Vittal
  *  date: 25 May 2026
+ *  contributor: OpenAI Codex (omit empty histogram bins).
  * */
 
 #define TEMPL_PARAM template <class T>
@@ -113,22 +114,31 @@ TEMPL_PARAM std::string
 TEMPL_CLASS::to_string_full() const
 {
     std::stringstream strm;
-    strm << name << " =================================\n"
-            << "mean = " << mean() 
+    strm << name << " =================================\n";
+    if (!count_)
+    {
+        strm << "count = 0\n";
+        return strm.str();
+    }
+    strm << "mean = " << mean()
             << ", std = " << std() 
             << ", min = " << min() 
             << ", max = " << max() 
             << ", count = " << count_
             << "\n";
 
-    strm << "<" << range_min << ":\t" << underflow_count() << "\n";
+    if (underflow_count())
+        strm << "<" << range_min << ":\t" << underflow_count() << "\n";
     for (size_t i = 0; i < num_buckets; i++)
     {
+        if (!buckets_[i])
+            continue;
         T from = range_min + bucket_width*i,
           to = range_min + bucket_width*(i+1);
         strm << from << " <= X < " << to << ":\t" << buckets_[i] << "\n";
     }
-    strm << ">=" << range_max << ":\t" << overflow_count() << "\n";
+    if (overflow_count())
+        strm << ">=" << range_max << ":\t" << overflow_count() << "\n";
     return strm.str();
 }
 

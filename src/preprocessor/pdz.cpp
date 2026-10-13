@@ -128,25 +128,19 @@ PDZ::PDZ(const stim::DetectorErrorModel& model, AffinityTable table, config_type
 ////////////////////////////////////////////////////////////////
 
 void
-PDZ::score_type::update_same_basis_affinity(det_id_type x, value_type aff_1, value_type aff_2)
+PDZ::score_type::update_affinity(det_id_type x, value_type aff_1, value_type aff_2, value_type aff_m, bool same_basis)
 {
     value_type a = std::min(aff_1, aff_2);
-    if (a < aff_compl_same_basis)
-    {
-        aff_compl_same_basis = a;
-        compl_same_basis_det_id = x;
-    }
-}
+    
+    auto& aff_curr =    same_basis ? aff_compl_same_basis : aff_compl_opp_basis;
+    auto& det_id =      same_basis ? compl_same_basis_det_id : compl_opp_basis_det_id;
+    auto& aff_curr_m =  same_basis ? aff_same_basis_match : aff_opp_basis_match;
 
-void
-PDZ::score_type::update_opp_basis_affinity(det_id_type x, value_type aff_1, value_type aff_2, value_type aff_opp_m)
-{
-    value_type a = std::min(aff_1, aff_2);
-    if (a < aff_compl_opp_basis)
+    if (a < aff_curr)
     {
-        aff_compl_opp_basis = a;
-        compl_opp_basis_det_id = x;
-        aff_opp_basis_match = aff_opp_m;
+        aff_curr = a;
+        det_id = x;
+        aff_curr_m = aff_m;
     }
 }
 
@@ -196,8 +190,15 @@ PDZ::apply(dec::SyndromeRef s, const dec::Result& prev) const
         const auto x = score_match(a.d1, a.d2);
         // Preserve the existing scoring rule. A negative margin rejects the
         // assignment; it is not an invalid decoder result.
-        const int diff = int(x.aff_compl_same_basis) - int(x.aff_match);
-        if (diff >= conf.aff_keep_threshold)
+        auto diff = x.aff_compl_same_basis - x.aff_match;
+        bool ok = (diff >= conf.aff_keep_threshold);
+        if (ok && diff == 1 && conf.check_affinity_of_compl_match)
+        {
+            bool retain = (x.aff_same_basis_match != x.aff_match) || (x.aff_match >= 2);
+            ok = ok && retain;
+        }
+
+        if (ok)
         {
             out.matching_data.add(a);
             out.flipped_obs ^= a.frame_flips;
@@ -234,11 +235,11 @@ PDZ::score_match(det_id_type a, det_id_type b) const
     const auto& opposite = opposing ? same_basis_events_ : opp_basis_events_;
     for (det_id_type x : same)
         if (x != a && x != b)
-            out.update_same_basis_affinity(x, affinity(a,x), affinity(b,x));
+            out.update_affinity(x, affinity(a,x), affinity(b,x), aff_match_map_[x], true);
 
     if (!conf.ignore_opposing_basis_detectors)
         for (det_id_type x : opposite)
-            out.update_opp_basis_affinity(x, affinity(a,x), affinity(b,x), aff_match_map_.at(x));
+            out.update_affinity(x, affinity(a,x), affinity(b,x), aff_match_map_[x], false);
 
     return out;
 }
