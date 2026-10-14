@@ -277,6 +277,7 @@ PDZLibra::print_stats(std::ostream& out) const
         << " mean_when_called=" << stats.libra_mean_latency_us
         << " weighted=" << stats.libra_weighted_latency_us
         << " scope=full_history excludes_initial_pymatching=true\n";
+    /*
     out << "PDZ histograms: X = removed syndrome bits / 2; bin k covers "
            "2k or 2k+1 removed bits (boundary matches can remove one bit)\n";
     out << s_pdz_removed_pairs.to_string_full();
@@ -296,6 +297,7 @@ PDZLibra::print_stats(std::ostream& out) const
     out << s_ensemble_frame_changes_by_post_pdz_hamming_weight.to_string_full();
     initial_.print_stats(out);
     residual_.print_stats(out);
+    */
 }
 
 void
