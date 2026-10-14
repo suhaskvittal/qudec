@@ -151,7 +151,9 @@ PDZLibra::PDZLibra(const stim::DetectorErrorModel& dem, pp::PDZ::config_type pdz
             "PDZ_LIBRA_ENSEMBLE_FRAME_CHANGES_BY_POST_PDZ_HAMMING_WEIGHT", 0,
             double(dem.count_detectors() + 1), dem.count_detectors() + 1),
     initial_(dem, {.enable_gap_estimation=false, .report_matching_data=true}),
-    predecoder_(dem, pdz_config), residual_(dem, libra_config), removal_threshold_(removal_threshold)
+    residual_(dem, libra_config),
+    pipeline_(dem, &initial_, &residual_, pdz_config, removal_threshold, "pymatching", "libra"),
+    removal_threshold_(removal_threshold)
 {
     if (!std::isfinite(removal_threshold_) || removal_threshold_ < 0 || removal_threshold_ > 1)
         throw std::invalid_argument("PDZ removal threshold must be in [0, 1]");
@@ -165,8 +167,8 @@ PDZLibra::record_syndromes(const std::string& path, uint32_t rank)
 {
     if (recorder_ || counts_[0])
         throw std::logic_error("PDZ syndrome recording must start once, before decoding");
-    recorder_ = std::make_unique<SyndromeRecorder>(path, predecoder_.num_detectors,
-                                                  predecoder_.num_observables, rank);
+    recorder_ = std::make_unique<SyndromeRecorder>(path, pipeline_.predecoder().num_detectors,
+                                                  pipeline_.predecoder().num_observables, rank);
 }
 
 void
@@ -183,37 +185,25 @@ Result
 PDZLibra::decode(SyndromeRef syndrome, ObsRef truth)
 {
     // Preserve the original sample for the sampler and its error callbacks.
-    const auto initial = initial_.decode(syndrome, truth);
-    SyndromeType remaining(predecoder_.num_detectors);
-    remaining = syndrome;
-    const auto partial = predecoder_.apply(remaining, initial);
+    auto decoded = pipeline_.decode_detailed(syndrome, truth);
+    const auto& initial = decoded.initial;
+    const auto& remaining = decoded.remaining;
+    const auto& partial = decoded.partial;
     const auto input_events = syndrome.popcnt();
     const auto residual_events = remaining.popcnt();
     const double removed_pairs = double(input_events - residual_events) / 2.0;
     size_t same_basis_removed_events = 0;
     for (const auto& assignment : partial.matching_data.assignments)
         for (auto d : {assignment.d1, assignment.d2})
-            if (d >= 0 && !predecoder_.is_opposing_basis_detector(d))
+            if (d >= 0 && !pipeline_.predecoder().is_opposing_basis_detector(d))
                 same_basis_removed_events++;
     const double same_basis_removed_pairs = double(same_basis_removed_events) / 2.0;
 
-    const bool bypassed = residual_events == 0 || (input_events > 0 &&
-            double(input_events - residual_events) >= removal_threshold_ * double(input_events));
-    auto result = initial;
-    bool ensembled = false;
+    const bool bypassed = decoded.bypassed;
+    auto result = std::move(decoded.result);
+    const bool ensembled = decoded.ensembled;
     if (bypassed)
         counts_[4]++;
-    else
-    {
-        ObsType residual_truth(predecoder_.num_observables);
-        residual_truth = truth;
-        residual_truth ^= partial.flipped_obs;
-        const auto ensemble_shots_before = residual_.statistics().ensemble_shots;
-        result = residual_.decode(remaining, residual_truth);
-        ensembled = residual_.statistics().ensemble_shots > ensemble_shots_before;
-        result.flipped_obs ^= partial.flipped_obs;
-        result.matching_data.frame_flips = result.flipped_obs;
-    }
     s_pdz_removed_pairs.add(removed_pairs);
     s_post_pdz_hamming_weight.add(residual_events);
     s_pdz_same_basis_removed_pairs.add(same_basis_removed_pairs);
@@ -239,7 +229,7 @@ PDZLibra::decode(SyndromeRef syndrome, ObsRef truth)
                        result.flipped_obs[0], truth[0], bypassed);
 
     bool failed = false;
-    for (size_t i = 0; i < predecoder_.num_observables; i++)
+    for (size_t i = 0; i < pipeline_.predecoder().num_observables; i++)
         failed |= result.flipped_obs[i] != truth[i];
     counts_[0]++;
     counts_[1] += failed;
@@ -315,8 +305,7 @@ PDZLibra::mpi_accumulate()
     s_post_pdz_hamming_weight.mpi_accumulate();
     s_ensemble_by_post_pdz_hamming_weight.mpi_accumulate();
     s_ensemble_frame_changes_by_post_pdz_hamming_weight.mpi_accumulate();
-    initial_.mpi_accumulate();
-    residual_.mpi_accumulate();
+    pipeline_.mpi_accumulate();
 }
 
 ////////////////////////////////////////////////////////////////

@@ -11,6 +11,7 @@
 #include <map>
 #include <numeric>
 #include <ostream>
+#include <optional>
 #include <stdexcept>
 
 #if defined(ENABLE_MPI)
@@ -100,6 +101,8 @@ UnionFind::UnionFind(const stim::DetectorErrorModel& dem, config_type conf)
     {
         if (p == 0)
             continue;
+        if (conf.report_matching_data && p > 0.5)
+            throw std::invalid_argument("UnionFind matched-endpoint reporting requires channel probabilities <= 1/2");
 
         // For p > 1/2, decode the complementary error variable with probability
         // 1-p and apply this channel as a fixed baseline correction.
@@ -230,7 +233,8 @@ UnionFind::grow_clusters()
 }
 
 void
-UnionFind::peel_forest(std::vector<uint8_t>& syndrome, ObsRef correction) const
+UnionFind::peel_forest(std::vector<uint8_t>& syndrome, ObsRef correction,
+                       std::vector<size_t>* selected_edges) const
 {
     using neighbor_type = std::pair<size_t, size_t>; // Vertex, edge ID.
     std::vector<std::vector<neighbor_type>> neighbors(num_vertices_);
@@ -279,6 +283,8 @@ UnionFind::peel_forest(std::vector<uint8_t>& syndrome, ObsRef correction) const
             if (!syndrome[v])
                 continue;
             const auto& edge = edges_[parent_edge[v]];
+            if (selected_edges)
+                selected_edges->push_back(parent_edge[v]);
             for (size_t obs : edge.observables)
                 correction[obs] ^= true;
             syndrome[tree_parent[v]] ^= true;
@@ -312,7 +318,10 @@ UnionFind::decode(SyndromeRef syndrome, ObsRef /* actual_observables */)
     grow_clusters();
     Result result;
     result.flipped_obs = baseline_observables_;
-    peel_forest(remaining, result.flipped_obs);
+    std::vector<size_t> selected_edges;
+    peel_forest(remaining, result.flipped_obs, conf.report_matching_data ? &selected_edges : nullptr);
+    if (conf.report_matching_data)
+        report_matching(syndrome, selected_edges, result);
     result.matching_data.frame_flips = result.flipped_obs;
     result.matching_data.gap = 0;
 
@@ -324,6 +333,76 @@ UnionFind::decode(SyndromeRef syndrome, ObsRef /* actual_observables */)
     stats_.decode_max_ns = std::max(stats_.decode_max_ns, elapsed);
     result.decode_latency_ns = elapsed;
     return result;
+}
+
+void
+UnionFind::report_matching(SyndromeRef syndrome, const std::vector<size_t>& selected,
+                           Result& result) const
+{
+    // The correction is a subforest. Pair paths at their meeting vertices,
+    // carrying a single unpaired detector and its observable parity upward.
+    // Different valid path decompositions can exist at branching vertices;
+    // this deterministic decomposition preserves the chosen UF correction.
+    using neighbor_type = std::pair<size_t, size_t>;
+    struct path_type { int64_t detector; ObsType frame; };
+    std::vector<std::vector<neighbor_type>> neighbors(num_vertices_);
+    for (size_t id : selected)
+    {
+        const auto& edge = edges_[id];
+        neighbors[edge.u].push_back({edge.v, id});
+        neighbors[edge.v].push_back({edge.u, id});
+    }
+    std::vector<std::optional<path_type>> pending(num_vertices_);
+    const size_t unseen = std::numeric_limits<size_t>::max();
+    std::vector<size_t> parent(num_vertices_, unseen), parent_edge(num_vertices_, unseen);
+    std::vector<size_t> roots, order;
+    for (size_t v = num_detectors; v < num_vertices_; ++v) roots.push_back(v);
+    for (size_t v = 0; v < num_detectors; ++v) roots.push_back(v);
+
+    const auto consume = [&](size_t v, path_type path)
+    {
+        if (v >= num_detectors)
+            result.matching_data.add({.d1=path.detector, .d2=-1, .pr=1, .w_qu=0,
+                                      .frame_flips=std::move(path.frame)});
+        else if (pending[v])
+        {
+            path.frame ^= pending[v]->frame;
+            result.matching_data.add({.d1=pending[v]->detector, .d2=path.detector,
+                                      .pr=1, .w_qu=0, .frame_flips=std::move(path.frame)});
+            pending[v].reset();
+        }
+        else
+            pending[v] = std::move(path);
+    };
+    for (size_t root : roots)
+    {
+        if (parent[root] != unseen) continue;
+        order.clear();
+        parent[root] = root;
+        order.push_back(root);
+        for (size_t i = 0; i < order.size(); ++i)
+            for (const auto& [next, id] : neighbors[order[i]])
+                if (parent[next] == unseen)
+                {
+                    parent[next] = order[i];
+                    parent_edge[next] = id;
+                    order.push_back(next);
+                }
+        for (size_t i = order.size(); i > 0; --i)
+        {
+            const size_t v = order[i - 1];
+            if (v < num_detectors && syndrome[v])
+                consume(v, {static_cast<int64_t>(v), ObsType(num_observables)});
+            if (!pending[v]) continue;
+            if (v == root)
+                throw std::logic_error("UnionFind path decomposition left an unmatched detector");
+            auto path = std::move(*pending[v]);
+            pending[v].reset();
+            for (size_t obs : edges_[parent_edge[v]].observables)
+                path.frame[obs] ^= true;
+            consume(parent[v], std::move(path));
+        }
+    }
 }
 
 UnionFind::Statistics

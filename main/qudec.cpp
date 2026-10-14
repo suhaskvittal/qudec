@@ -59,6 +59,8 @@ run_cli(int argc, char* argv[], int world_rank)
     dec::Libra::Config libra_config;
     pp::PDZ::config_type pdz_config;
     double pdz_removal_threshold = 0.5;
+    std::string pdz_initial_decoder = "pymatching";
+    std::string pdz_residual_decoder = "correlated_pymatching";
     int64_t libra_ensemble_size = 60;
     int64_t libra_seed = static_cast<int64_t>(libra_config.seed);
     int64_t uf_weight_scale = 1024;
@@ -70,7 +72,7 @@ run_cli(int argc, char* argv[], int world_rank)
     std::string harmony_pooling = "sum_likelihood";
 
     ARGPARSE()
-        .required("decoder-name", "Decoder: pymatching, blossom5, tesseract, libra, pdz_libra, uf, harmony", decoder_name)
+        .required("decoder-name", "Decoder: pymatching, blossom5, tesseract, libra, pdz_libra, pdz, uf, harmony", decoder_name)
         .required("code-distance", "Code distance of surface code", d)
         .optional("-p", "--physical-error-rate", "Physical error rate", p, 1e-3)
         .optional("-r", "--rounds", "Number of rounds (-1 = same as code distance)", r, -1)
@@ -86,7 +88,9 @@ run_cli(int argc, char* argv[], int world_rank)
         .optional("", "--uf-weight-scale", "Union-find: quantization units per natural-log weight", uf_weight_scale, 1024)
 
         .optional("", "--pdz-aff-keep-threshold", "PDZ: minimum competing-distance margin", pdz_config.aff_keep_threshold, 2)
-        .optional("", "--pdz-removal-threshold", "PDZ: fraction removed to return original PyMatching (default 0.5; 1 requires empty residual)", pdz_removal_threshold, 0.5)
+        .optional("", "--pdz-removal-threshold", "PDZ: fraction removed to return original initial decode (default 0.5; 1 requires empty residual)", pdz_removal_threshold, 0.5)
+        .optional("", "--pdz-initial-decoder", "PDZ: pymatching or uf", pdz_initial_decoder, "pymatching")
+        .optional("", "--pdz-residual-decoder", "PDZ: correlated_pymatching or libra", pdz_residual_decoder, "correlated_pymatching")
         .optional("", "--pdz-consider-compl-match", "PDZ: consider affinity of complementary match", pdz_config.check_affinity_of_compl_match, false)
 
         .optional("", "--libra-ensemble-size", "Libra: number of perturbed matchers", libra_ensemble_size, 60)
@@ -117,7 +121,7 @@ run_cli(int argc, char* argv[], int world_rank)
 
     if (decoder_name != "pymatching" && decoder_name != "blossom5" &&
         decoder_name != "tesseract" && decoder_name != "libra" && decoder_name != "pdz_libra" &&
-        decoder_name != "uf" && decoder_name != "harmony")
+        decoder_name != "uf" && decoder_name != "harmony" && decoder_name != "pdz")
     {
         throw std::invalid_argument("Unknown decoder name: " + decoder_name);
     }
@@ -134,6 +138,15 @@ run_cli(int argc, char* argv[], int world_rank)
         throw std::invalid_argument("--record-syndromes-dir requires --record-syndromes");
     if (!std::isfinite(pdz_removal_threshold) || pdz_removal_threshold < 0 || pdz_removal_threshold > 1)
         throw std::invalid_argument("PDZ removal threshold must be in [0, 1]");
+    if (decoder_name == "pdz")
+    {
+        if (pdz_initial_decoder != "pymatching" && pdz_initial_decoder != "uf")
+            throw std::invalid_argument("PDZ initial decoder must be pymatching or uf");
+        if (pdz_residual_decoder != "correlated_pymatching" && pdz_residual_decoder != "libra")
+            throw std::invalid_argument("PDZ residual decoder must be correlated_pymatching or libra");
+        if (uf_weight_scale <= 0)
+            throw std::invalid_argument("UnionFind weight scale must be positive");
+    }
 
     conf.rare_event.start_level = 0;
     libra_config.ensemble_size = static_cast<size_t>(libra_ensemble_size);
@@ -154,7 +167,8 @@ run_cli(int argc, char* argv[], int world_rank)
         else
             throw std::invalid_argument("Harmony pooling must be sum_likelihood or vote");
     }
-    if (decoder_name == "libra" || decoder_name == "pdz_libra" || decoder_name == "harmony" || correlated_pymatching)
+    if (decoder_name == "libra" || decoder_name == "pdz_libra" || decoder_name == "pdz" ||
+        decoder_name == "harmony" || correlated_pymatching)
         include_opposite_basis_detectors = true;
 
     auto circuit = sc_si1000(d, r, p, false, include_opposite_basis_detectors);
@@ -219,6 +233,45 @@ run_cli(int argc, char* argv[], int world_rank)
         dec::Libra libra(dem, libra_config);
         libra.prepare_ensemble();
         run(libra, [] (auto, auto, auto) {});
+    }
+    else if (decoder_name == "pdz")
+    {
+        if (world_rank == 0)
+            std::cout << "PDZ SI1000: distance=" << d << " rounds=" << r << " p=" << p
+                      << " opposite_basis_detectors=true initial=" << pdz_initial_decoder
+                      << " residual=" << pdz_residual_decoder
+                      << " sampling_seed=" << conf.seed << '\n';
+        auto run_with_initial = [&](auto& initial)
+        {
+            auto run_pipeline = [&](auto& residual)
+            {
+                dec::PDZDecoder pipeline(dem, &initial, &residual, pdz_config,
+                                         pdz_removal_threshold, pdz_initial_decoder, pdz_residual_decoder);
+                run(pipeline, [] (auto, auto, auto) {});
+            };
+            if (pdz_residual_decoder == "correlated_pymatching")
+            {
+                dec::PyMatching residual(dem, {.correlated=true});
+                run_pipeline(residual);
+            }
+            else
+            {
+                dec::Libra residual(dem, libra_config);
+                residual.prepare_ensemble();
+                run_pipeline(residual);
+            }
+        };
+        if (pdz_initial_decoder == "pymatching")
+        {
+            dec::PyMatching initial(dem, {.report_matching_data=true});
+            run_with_initial(initial);
+        }
+        else
+        {
+            dec::UnionFind initial(dem, {.weight_scale=static_cast<uint64_t>(uf_weight_scale),
+                                        .report_matching_data=true});
+            run_with_initial(initial);
+        }
     }
     else if (decoder_name == "pdz_libra")
     {

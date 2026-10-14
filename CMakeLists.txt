@@ -149,7 +149,7 @@ target_link_libraries(qudec_eval_gap PRIVATE qudeclib)
 include(CTest)
 if(BUILD_TESTING)
     # Contributor: OpenAI Codex (weighted union-find regression cases).
-    foreach(test IN ITEMS uf pdz pdz_libra libra libra_assignment libra_rare_event pymatching_reporting
+    foreach(test IN ITEMS uf pdz pdz_libra pdz_pipeline libra libra_assignment libra_rare_event pymatching_reporting
                           libra_splitting libra_local_splitting rare_event_sampler libra_integration)
         add_executable(${test}_test tests/${test}_test.cpp)
         target_compile_options(${test}_test PRIVATE ${COMPILE_OPTIONS} -fno-fast-math)

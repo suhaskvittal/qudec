@@ -6,7 +6,6 @@
 
 #include <cmath>
 #include <iostream>
-#include <sstream>
 #include <stdexcept>
 
 int
@@ -48,18 +47,15 @@ main(int argc, char** argv)
         throw std::runtime_error("Bypass did not retain the original PyMatching result");
     if (syndrome != original)
         throw std::runtime_error("Bypass changed the input syndrome");
-    std::ostringstream output;
-    at_threshold.print_stats(output);
-    if (output.str().find("Libra shots=0 ensemble_shots=0") == std::string::npos)
+    if (stats.libra_called_shots != 0 || stats.libra_mean_latency_us != 0)
         throw std::runtime_error("Bypass called Libra");
 
     dec::PDZLibra above_threshold(dem, {}, libra, std::nextafter(0.5, 1.0));
     above_threshold.decode(syndrome, truth);
     if (above_threshold.statistics().bypassed_shots)
         throw std::runtime_error("Removal below threshold bypassed Libra");
-    output.str("");
-    above_threshold.print_stats(output);
-    if (output.str().find("Libra shots=1") == std::string::npos)
+    if (above_threshold.statistics().libra_called_shots != 1 ||
+        above_threshold.statistics().libra_mean_latency_us <= 0)
         throw std::runtime_error("Below-threshold shot did not call Libra");
 
     dec::PDZLibra disabled(dem, {}, libra, 1);

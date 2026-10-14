@@ -37,6 +37,8 @@ public:
     struct config_type
     {
         uint64_t weight_scale{1024};
+        // Decompose the chosen correction into detector pairs for PDZ.
+        bool report_matching_data{false};
     };
 
     struct Statistics
@@ -86,7 +88,9 @@ private:
     size_t find_root(size_t);
     void merge_clusters(size_t edge_id);
     void grow_clusters();
-    void peel_forest(std::vector<uint8_t>& syndrome, ObsRef correction) const;
+    void peel_forest(std::vector<uint8_t>& syndrome, ObsRef correction,
+                     std::vector<size_t>* selected_edges = nullptr) const;
+    void report_matching(SyndromeRef, const std::vector<size_t>&, Result&) const;
 };
 
 ////////////////////////////////////////////////////////////////

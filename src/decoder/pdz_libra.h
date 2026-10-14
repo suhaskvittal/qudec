@@ -7,6 +7,7 @@
 #define DECODER_PDZ_LIBRA_h
 
 #include "decoder/libra.h"
+#include "decoder/pdz.h"
 #include "decoder/surface_code.h"
 #include "preprocessor/pdz.h"
 #include "stats.h"
@@ -85,8 +86,8 @@ private:
     struct SyndromeRecorder;
     std::unique_ptr<SyndromeRecorder> recorder_;
     PyMatching initial_;
-    pp::PDZ predecoder_;
     Libra residual_;
+    PDZDecoder<PyMatching, Libra> pipeline_;
     const double removal_threshold_;
     std::array<uint64_t, 5> counts_{};
 };
