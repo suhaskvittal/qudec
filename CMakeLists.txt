@@ -76,6 +76,7 @@ set(TESSERACT_FILES
 set(QUDEC_FILES
     src/circuit_generator.cpp
     src/decoder/surface_code.cpp
+    src/decoder/cluster_gap.cpp # Contributor: OpenAI Codex.
     src/decoder/uf.cpp # Contributor: OpenAI Codex (weighted union-find).
     src/decoder/libra.cpp
     src/decoder/harmony.cpp # Contributor: OpenAI Codex (Harmony ensemble).
@@ -99,7 +100,7 @@ target_include_directories(qudeclib PUBLIC "src" "deps" "deps/tesseract/src")
 target_compile_options(qudeclib PUBLIC ${COMPILE_OPTIONS})
 target_link_libraries(qudeclib PUBLIC libstim libpymatching blossom5 Threads::Threads ZLIB::ZLIB)
 # Matching scores and rare-event bounds use IEEE infinities and finite checks.
-set_source_files_properties(src/decoder/libra.cpp src/decoder/harmony.cpp src/decoder/uf.cpp src/sampler.cpp src/preprocessor/pdz.cpp src/preprocessor/affinity.cpp
+set_source_files_properties(src/decoder/cluster_gap.cpp src/decoder/surface_code.cpp src/decoder/libra.cpp src/decoder/harmony.cpp src/decoder/uf.cpp src/sampler.cpp src/preprocessor/pdz.cpp src/preprocessor/affinity.cpp
     PROPERTIES COMPILE_OPTIONS "-fno-fast-math")
 add_library(libra_decoder ALIAS qudeclib)
 if(ENABLE_MPI)
@@ -149,7 +150,7 @@ target_link_libraries(qudec_eval_gap PRIVATE qudeclib)
 include(CTest)
 if(BUILD_TESTING)
     # Contributor: OpenAI Codex (weighted union-find regression cases).
-    foreach(test IN ITEMS uf pdz pdz_libra pdz_pipeline libra libra_assignment libra_rare_event pymatching_reporting
+    foreach(test IN ITEMS cluster_gap uf pdz pdz_libra pdz_pipeline libra libra_assignment libra_rare_event pymatching_reporting
                           libra_splitting libra_local_splitting rare_event_sampler libra_integration)
         add_executable(${test}_test tests/${test}_test.cpp)
         target_compile_options(${test}_test PRIVATE ${COMPILE_OPTIONS} -fno-fast-math)

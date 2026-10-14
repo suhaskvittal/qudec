@@ -1,11 +1,12 @@
 /*
  *  contributor: OpenAI Codex
- *  purpose: Study uncorrelated PyMatching's complementary gap as a Libra gate.
+ *  purpose: Evaluate two-level first-decoder/Libra routing by complementary or cluster gap.
  * */
 
 #include "circuit_generator.h"
 #include "decoder/libra.h"
 #include "decoder/surface_code.h"
+#include "decoder/uf.h"
 #include "sampler.h"
 #include "stats.h"
 
@@ -64,28 +65,43 @@ class GapStudy
 {
 public:
     dec::PyMatching pymatching;
+    std::unique_ptr<dec::UnionFind> union_find;
     StatsHistogram<double> pm_high, pm_low, libra_low;
     size_t current_level{0};
 
     GapStudy(const stim::DetectorErrorModel& dem, double threshold, size_t levels,
-             int64_t max_us, int64_t bin_us, const std::filesystem::path& output, int rank)
-        :pymatching(dem, {.enable_gap_estimation=true}),
+             int64_t max_us, int64_t bin_us, const std::filesystem::path& output, int rank,
+             const std::string& first_decoder, const std::string& route_metric, int64_t uf_weight_scale)
+        :pymatching(dem, {.enable_gap_estimation=route_metric == "complementary" && first_decoder == "pymatching",
+                          .enable_cluster_gap=route_metric == "cluster" && first_decoder == "pymatching"}),
         pm_high("PYMATCHING_HIGH_GAP_LATENCY_US", 0, double(max_us), max_us / bin_us),
         pm_low("PYMATCHING_LOW_GAP_LATENCY_US", 0, double(max_us), max_us / bin_us),
         libra_low("LIBRA_ON_PYMATCHING_LOW_GAP_LATENCY_US", 0, double(max_us), max_us / bin_us),
         threshold_(threshold), counters_(levels * METRIC_COUNT, 0), output_(output), rank_(rank),
         bits_(output / ("low_gap_syndromes_rank_" + std::to_string(rank) + ".b8"), std::ios::binary)
     {
+        if (first_decoder == "uf")
+            union_find = std::make_unique<dec::UnionFind>(dem, dec::UnionFind::config_type{
+                .weight_scale=static_cast<uint64_t>(uf_weight_scale), .enable_cluster_gap=true});
+        first_decoder_ = first_decoder;
+        route_metric_ = route_metric;
+        pm_high.name = "FIRST_DECODER_HIGH_GAP_LATENCY_US";
+        pm_low.name = "FIRST_DECODER_LOW_GAP_LATENCY_US";
+        libra_low.name = "LIBRA_ON_FIRST_DECODER_LOW_GAP_LATENCY_US";
         if (!bits_)
             throw std::runtime_error("Cannot create low-gap syndrome file");
     }
 
     dec::Result decode(dec::SyndromeRef syndrome, dec::ObsRef truth)
     {
-        auto result = pymatching.decode(syndrome, truth);
-        // PyMatching signs its diagnostic gap using truth. Routing must ignore
-        // that sign and never use the actual logical frame.
-        const double gap_db = std::abs(result.matching_data.gap);
+        auto result = union_find ? union_find->decode(syndrome, truth) : pymatching.decode(syndrome, truth);
+        // The sign of the complementary gap reveals the true frame, so route on
+        // its magnitude. Cluster gap is already nonnegative and truth independent.
+        if (route_metric_ == "cluster" && (!result.has_cluster_gap || !std::isfinite(result.cluster_gap_db) ||
+                                            result.cluster_gap_db < 0))
+            throw std::runtime_error("First decoder did not return a finite nonnegative cluster gap");
+        const double gap_db = route_metric_ == "cluster" ? result.cluster_gap_db
+                                                          : std::abs(result.matching_data.gap);
         const bool low = gap_db < threshold_;
         const bool failed = result.flipped_obs[0] != truth[0];
         add(SHOTS, 1);
@@ -120,8 +136,8 @@ public:
         if (!bits_)
             throw std::runtime_error("Cannot finish low-gap syndrome file");
         std::ofstream records(output_ / ("low_gap_records_rank_" + std::to_string(rank_) + ".csv"));
-        records << "index,error_count_level,gap_db,pymatching_latency_ns,libra_latency_ns,"
-                   "pymatching_frame,libra_frame,true_frame\n";
+        records << "index,error_count_level,gap_db,first_decoder_latency_ns,libra_latency_ns,"
+                   "first_decoder_frame,libra_frame,true_frame\n";
         records << std::setprecision(17);
         if (!saved_.empty())
         {
@@ -168,6 +184,8 @@ private:
     std::vector<SavedShot> saved_;
     std::filesystem::path output_;
     int rank_;
+    std::string first_decoder_;
+    std::string route_metric_;
     std::ofstream bits_;
 
     void add(Metric metric, uint64_t value) { counters_[current_level * METRIC_COUNT + metric] += value; }
@@ -224,7 +242,7 @@ sample_rare(GapStudy& study, const ConditionalErrorSampler& sampler, const Exper
         }
         ler += probabilities[k] * double(errors) / shots;
         if (rank == 0 && conf.print_progress)
-            std::cout << "[K=" << k << "] samples=" << shots << " pymatching_errors=" << errors
+            std::cout << "[K=" << k << "] samples=" << shots << " first_decoder_errors=" << errors
                       << " probability=" << probabilities[k] << '\n';
     }
     return ler;
@@ -271,6 +289,8 @@ run(int argc, char** argv, int rank, int workers)
     bool memory_x = false;
     bool print_histograms = false;
     std::string output_directory;
+    std::string first_decoder = "pymatching", route_metric = "complementary";
+    int64_t uf_weight_scale = 1024;
     ExperimentConfig conf;
     dec::Libra::Config libra_config;
     ARGPARSE()
@@ -278,8 +298,11 @@ run(int argc, char** argv, int rank, int workers)
         .optional("-r", "--rounds", "Rounds (-1 = distance)", rounds, -1)
         .optional("-p", "--physical-error-rate", "SI1000 physical error rate", p, 0.001)
         .optional("", "--memory-x", "Use X memory (default: Z)", memory_x, false)
+        .optional("", "--first-decoder", "First-stage decoder: pymatching or uf", first_decoder, "pymatching")
+        .optional("", "--gap-metric", "Routing metric: complementary or cluster", route_metric, "complementary")
+        .optional("", "--uf-weight-scale", "UF quantization units per natural-log weight", uf_weight_scale, 1024)
         .optional("-m", "--method", "monte_carlo or rare_event", conf.method, "monte_carlo")
-        .optional("", "--gap-threshold-db", "Forward to Libra when abs(PyMatching gap) is below this threshold", threshold_db, 20.0)
+        .optional("", "--gap-threshold-db", "Forward to Libra when selected first-decoder gap is below this threshold", threshold_db, 20.0)
         .optional("", "--seed", "Sampling seed; ranks use distinct streams", conf.seed, 0)
         .optional("", "--mc-max-samples", "Global Monte Carlo shot budget", conf.monte_carlo.max_samples, 1000000)
         .optional("", "--mc-stop-at-errors", "Stop at this many first-stage PyMatching errors", conf.monte_carlo.stop_at_error_count, std::numeric_limits<int64_t>::max())
@@ -315,6 +338,14 @@ run(int argc, char** argv, int rank, int workers)
         throw std::invalid_argument("Invalid code, gap, sampling, or latency histogram parameters");
     if (conf.method != "monte_carlo" && conf.method != "rare_event")
         throw std::invalid_argument("Unknown sampling method: " + conf.method);
+    if (first_decoder != "pymatching" && first_decoder != "uf")
+        throw std::invalid_argument("First decoder must be pymatching or uf");
+    if (route_metric != "complementary" && route_metric != "cluster")
+        throw std::invalid_argument("Gap metric must be complementary or cluster");
+    if (route_metric == "complementary" && first_decoder != "pymatching")
+        throw std::invalid_argument("Complementary-gap routing requires --first-decoder pymatching");
+    if (uf_weight_scale <= 0)
+        throw std::invalid_argument("UF weight scale must be positive");
     libra_config.ensemble_size = size_t(ensemble_size);
     libra_config.seed = uint64_t(ensemble_seed);
     auto circuit = sc_si1000(distance, rounds, p, memory_x, true);
@@ -327,10 +358,12 @@ run(int argc, char** argv, int rank, int workers)
         conditional = std::make_unique<ConditionalErrorSampler>(dem, std::min<size_t>(conf.rare_event.max_level, dem.count_errors() + 1));
         probabilities = conditional->count_probabilities();
     }
-    GapStudy study(dem, threshold_db, probabilities.size(), latency_max_us, latency_bin_us, output, rank);
+    GapStudy study(dem, threshold_db, probabilities.size(), latency_max_us, latency_bin_us, output, rank,
+                   first_decoder, route_metric, uf_weight_scale);
     if (rank == 0)
-        std::cout << "PyMatching gap study: distance=" << distance << " rounds=" << rounds << " p=" << p
-                  << " opposite_basis_detectors=true correlated_pymatching=false gap_threshold_db=" << threshold_db
+        std::cout << "Two-level gap study: distance=" << distance << " rounds=" << rounds << " p=" << p
+                  << " opposite_basis_detectors=true first_decoder=" << first_decoder << " gap_metric=" << route_metric
+                  << " correlated_pymatching=false gap_threshold_db=" << threshold_db
                   << " sampler=" << conf.method << " ranks=" << workers << " output=" << output << '\n';
 
     size_t first_omitted = probabilities.size();
@@ -349,7 +382,7 @@ run(int argc, char** argv, int rank, int workers)
             low += stage_one[k * METRIC_COUNT + LOW_SHOTS];
         }
         std::cout << "Stage 1 complete: shots=" << shots << " low_gap_shots=" << low
-                  << " pymatching_logical_error_rate=" << pm_ler << '\n';
+                  << " first_decoder=" << first_decoder << " logical_error_rate=" << pm_ler << '\n';
         if (print_histograms)
         {
             print_histogram(std::cout, study.pm_high);
@@ -367,7 +400,7 @@ run(int argc, char** argv, int rank, int workers)
     double retained_probability = 0, low_probability = 0, weighted_ler = 0;
     double weighted_latency = 0, sequential_latency = 0;
     std::ofstream levels(output / "error_count_levels.csv");
-    levels << "level,probability,shots,low_shots,pymatching_errors,two_level_errors,high_pm_ns,low_pm_ns,low_libra_ns\n";
+    levels << "level,probability,shots,low_shots,first_decoder_errors,two_level_errors,high_first_decoder_ns,low_first_decoder_ns,low_libra_ns\n";
     levels << std::setprecision(17);
     for (size_t k = 0; k < probabilities.size(); k++)
     {
@@ -391,8 +424,8 @@ run(int argc, char** argv, int rank, int workers)
     report << std::setprecision(12)
            << "shots=" << totals[SHOTS] << " high_gap_shots=" << totals[SHOTS] - totals[LOW_SHOTS]
            << " low_gap_shots=" << totals[LOW_SHOTS] << '\n'
-           << "pymatching_logical_error_rate=" << pm_ler << '\n'
-           << "pymatching_errors=" << totals[PM_ERRORS] << " high_gap_errors=" << totals[HIGH_PM_ERRORS]
+           << "first_decoder_logical_error_rate=" << pm_ler << '\n'
+           << "first_decoder_errors=" << totals[PM_ERRORS] << " high_gap_errors=" << totals[HIGH_PM_ERRORS]
            << " low_gap_errors=" << totals[LOW_PM_ERRORS] << " libra_low_gap_errors=" << totals[LIBRA_ERRORS] << '\n'
            << "libra_frame_changes=" << totals[FRAME_CHANGES] << " errors_fixed=" << totals[FIXED]
            << " errors_introduced=" << totals[INTRODUCED] << '\n'
@@ -401,8 +434,8 @@ run(int argc, char** argv, int rank, int workers)
            << "two_level_sample_mean_latency_us=" << (double(totals[HIGH_PM_NS]) + double(totals[LOW_LIBRA_NS])) / totals[SHOTS] / 1000.0 << '\n'
            << "two_level_probability_weighted_mean_latency_us=" << weighted_latency << '\n'
            << "sequential_probability_weighted_mean_latency_us=" << sequential_latency << '\n'
-           << "Latency scope: full history; requested two-level mean uses PyMatching high-gap + Libra low-gap.\n"
-           << "Sequential mean additionally includes PyMatching gap estimation on low-gap shots.\n"
+           << "Latency scope: full history; requested two-level mean uses first-decoder high-gap + Libra low-gap.\n"
+           << "Sequential mean additionally includes first-decoder gap estimation on low-gap shots.\n"
            << "Histograms describe sampled shots; rare-event physical means use P(K) weighting without renormalizing.\n";
     if (conditional)
         report << "omitted_probability_bound=" << omitted_bound << " first_omitted_level=" << first_omitted
@@ -416,7 +449,8 @@ run(int argc, char** argv, int rank, int workers)
     print_histogram(report, study.libra_low);
     std::ofstream summary(output / "summary.txt");
     summary << "distance=" << distance << " rounds=" << rounds << " p=" << std::setprecision(17) << p
-            << " seed=" << conf.seed << " gap_threshold_db=" << threshold_db << " method=" << conf.method
+            << " seed=" << conf.seed << " first_decoder=" << first_decoder << " gap_metric=" << route_metric
+            << " uf_weight_scale=" << uf_weight_scale << " gap_threshold_db=" << threshold_db << " method=" << conf.method
             << " memory_basis=" << (memory_x ? 'X' : 'Z') << " opposite_basis_detectors=true"
             << " num_detectors=" << dem.count_detectors() << " num_observables=" << dem.count_observables()
             << " ensemble_size=" << ensemble_size << " ensemble_seed=" << ensemble_seed

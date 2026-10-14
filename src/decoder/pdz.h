@@ -81,8 +81,7 @@ public:
         out.partial = predecoder_.apply(out.remaining, out.initial);
         const size_t input_hw = syndrome.popcnt();
         const size_t post_hw = out.remaining.popcnt();
-        out.bypassed = post_hw == 0 || (input_hw > 0 &&
-            double(input_hw - post_hw) >= removal_threshold_ * double(input_hw));
+        out.bypassed = false;
         out.result = out.initial;
         if (!out.bypassed)
         {

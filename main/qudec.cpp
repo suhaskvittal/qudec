@@ -51,6 +51,8 @@ run_cli(int argc, char* argv[], int world_rank)
      * PyMatching parameters:
      * */
     bool enable_gap{false};
+    bool enable_cluster_gap{false};
+    bool print_cluster_gap_histogram{false};
     bool correlated_pymatching{false};
     bool record_syndromes{false};
     std::string recording_directory;
@@ -81,6 +83,8 @@ run_cli(int argc, char* argv[], int world_rank)
         .optional("-m", "--method", "Sampler method: monte_carlo or rare_event", conf.method, "monte_carlo")
         .optional("-pp", "--print-progress", "Print simulation progress", conf.print_progress, false)
         .optional("-g", "--gap", "Enable complementary gap estimation (pymatching only)", enable_gap, false)
+        .optional("", "--cluster-gap", "Full cluster soft output in dB (uncorrelated pymatching or uf)", enable_cluster_gap, false)
+        .optional("", "--cluster-gap-histogram", "Print cluster-gap bins (requires --cluster-gap)", print_cluster_gap_histogram, false)
         .optional("", "--correlated", "PyMatching: use two-pass correlated MWPM", correlated_pymatching, false)
         .optional("", "--record-syndromes", "PDZ + Libra: record every decoded syndrome to per-rank gzip files", record_syndromes, false)
         .optional("", "--record-syndromes-dir", "PDZ + Libra: run directory (default: unique subfolder of out/)", recording_directory, "")
@@ -130,6 +134,12 @@ run_cli(int argc, char* argv[], int world_rank)
         throw std::invalid_argument("Unknown sampler method: " + conf.method);
     if (correlated_pymatching && decoder_name != "pymatching")
         throw std::invalid_argument("--correlated is only available for pymatching");
+    if (enable_cluster_gap && (decoder_name != "pymatching" && decoder_name != "uf"))
+        throw std::invalid_argument("--cluster-gap supports only pymatching and uf");
+    if (enable_cluster_gap && (enable_gap || correlated_pymatching))
+        throw std::invalid_argument("--cluster-gap cannot be combined with --gap or --correlated");
+    if (print_cluster_gap_histogram && !enable_cluster_gap)
+        throw std::invalid_argument("--cluster-gap-histogram requires --cluster-gap");
     if (correlated_pymatching && enable_gap)
         throw std::invalid_argument("--correlated cannot currently be combined with --gap");
     if ((record_syndromes || !recording_directory.empty()) && decoder_name != "pdz_libra")
@@ -190,7 +200,9 @@ run_cli(int argc, char* argv[], int world_rank)
 
     if (decoder_name == "pymatching")
     {
-        run(dec::PyMatching(dem, {.enable_gap_estimation=enable_gap, .correlated=correlated_pymatching}),
+        run(dec::PyMatching(dem, {.enable_gap_estimation=enable_gap, .correlated=correlated_pymatching,
+                                      .enable_cluster_gap=enable_cluster_gap,
+                                      .print_cluster_gap_histogram=print_cluster_gap_histogram}),
             [] (auto, auto, auto) {});
     }
     else if (decoder_name == "harmony")
@@ -212,7 +224,9 @@ run_cli(int argc, char* argv[], int world_rank)
             std::cout << "UnionFind SI1000: distance=" << d << " rounds=" << r << " p=" << p
                       << " opposite_basis_detectors=" << (include_opposite_basis_detectors ? "true" : "false")
                       << " weight_scale=" << uf_weight_scale << " sampling_seed=" << conf.seed << '\n';
-        run(dec::UnionFind(dem, {.weight_scale=static_cast<uint64_t>(uf_weight_scale)}),
+        run(dec::UnionFind(dem, {.weight_scale=static_cast<uint64_t>(uf_weight_scale),
+                                .enable_cluster_gap=enable_cluster_gap,
+                                .print_cluster_gap_histogram=print_cluster_gap_histogram}),
             [] (auto, auto, auto) {});
     }
     else if (decoder_name == "blossom5")

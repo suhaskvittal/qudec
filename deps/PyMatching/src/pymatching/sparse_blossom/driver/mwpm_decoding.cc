@@ -1,4 +1,5 @@
 // Copyright 2022 PyMatching Contributors
+// Contributor: OpenAI Codex (optional final dual-state callback).
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -198,7 +199,8 @@ void pm::decode_detection_events(
     const std::vector<uint64_t>& detection_events,
     uint8_t* obs_begin_ptr,
     pm::total_weight_int& weight,
-    bool edge_correlations) {
+    bool edge_correlations,
+    const std::function<void(const pm::Mwpm&)>& before_extraction) {
     if (edge_correlations) {
         // Edge correlations might also be called 2-pass matching. This is the slowest and
         // highest-accuracy reweighting rule for correlated decoding in which we first decode to edges,
@@ -212,6 +214,11 @@ void pm::decode_detection_events(
 
     size_t num_observables = mwpm.flooder.graph.num_observables;
     process_timeline_until_completion(mwpm, detection_events);
+    if (before_extraction)
+    {
+        try { before_extraction(mwpm); }
+        catch (...) { mwpm.reset(); throw; }
+    }
 
     if (num_observables > sizeof(pm::obs_int) * 8) {
         mwpm.flooder.match_edges.clear();
@@ -247,11 +254,18 @@ void pm::decode_detection_events(
     }
 }
 
-void pm::decode_detection_events_to_match_edges(pm::Mwpm& mwpm, const std::vector<uint64_t>& detection_events) {
+void pm::decode_detection_events_to_match_edges(
+    pm::Mwpm& mwpm, const std::vector<uint64_t>& detection_events,
+    const std::function<void(const pm::Mwpm&)>& before_extraction) {
     if (mwpm.flooder.negative_weight_sum != 0)
         throw std::invalid_argument(
             "Decoding to matched detection events not supported for graphs containing edges with negative weights.");
     process_timeline_until_completion(mwpm, detection_events);
+    if (before_extraction)
+    {
+        try { before_extraction(mwpm); }
+        catch (...) { mwpm.reset(); throw; }
+    }
     mwpm.flooder.match_edges.clear();
     shatter_blossoms_for_all_detection_events_and_extract_match_edges(mwpm, detection_events);
 }

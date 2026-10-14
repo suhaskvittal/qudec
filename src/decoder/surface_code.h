@@ -8,6 +8,7 @@
 #define DECODER_SURFACE_CODE_h
 
 #include "decoder/types.h"
+#include "decoder/cluster_gap.h"
 #include "stats.h"
 
 #include <stim.h>
@@ -34,7 +35,12 @@ public:
         bool report_matching_data{false};
         // Use PyMatching's existing two-pass correlated MWPM backend.
         bool correlated{false};
+        bool enable_cluster_gap{false};
+        bool print_cluster_gap_histogram{false};
     };
+
+    // Full-value cluster output; histogram bins are printed only on request.
+    StatsHistogram<double> s_cluster_gap{"CLUSTER_GAP_DB", 0, 256, 256};
 
     struct Statistics
     {
@@ -67,6 +73,7 @@ private:
     const size_t obs_det_id_;
 
     pm::Mwpm mwpm_;
+    ClusterGapGraph cluster_gap_graph_;
     Statistics stats_;
 
     /*

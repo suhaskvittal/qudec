@@ -6,6 +6,9 @@
 #define DECODER_UF_h
 
 #include "decoder/types.h"
+#include "decoder/cluster_gap.h"
+
+#include "stats.h"
 
 #include <cstdint>
 #include <iosfwd>
@@ -39,7 +42,12 @@ public:
         uint64_t weight_scale{1024};
         // Decompose the chosen correction into detector pairs for PDZ.
         bool report_matching_data{false};
+        bool enable_cluster_gap{false};
+        bool print_cluster_gap_histogram{false};
     };
+
+    // Full-value cluster output; histogram bins are printed only on request.
+    StatsHistogram<double> s_cluster_gap{"CLUSTER_GAP_DB", 0, 256, 256};
 
     struct Statistics
     {
@@ -71,6 +79,8 @@ private:
         std::vector<size_t> observables;
     };
 
+    ClusterGapGraph cluster_gap_graph_;
+    std::vector<size_t> cluster_gap_edge_ids_;
     std::vector<edge_type> edges_;
     size_t num_vertices_;
     SyndromeType baseline_syndrome_;

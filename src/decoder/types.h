@@ -63,6 +63,10 @@ struct Result
     // Measured decoder latency in nanoseconds; zero when not instrumented.
     uint64_t decode_latency_ns{0};
 
+    // Nonnegative cluster soft output in decibels, distinct from the exact gap.
+    double cluster_gap_db{0.0};
+    bool has_cluster_gap{false};
+
     // Decoder specific parameters:
     MatchingData matching_data;
 };

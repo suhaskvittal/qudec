@@ -1,4 +1,5 @@
 // Copyright 2022 PyMatching Contributors
+// Contributor: OpenAI Codex (optional final dual-state callback).
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +18,7 @@
 
 #include "pymatching/sparse_blossom/matcher/mwpm.h"
 #include "stim.h"
+#include <functional>
 
 namespace pm {
 
@@ -65,12 +67,16 @@ void decode_detection_events(
     const std::vector<uint64_t>& detection_events,
     uint8_t* obs_begin_ptr,
     pm::total_weight_int& weight,
-    bool edge_correlations);
+    bool edge_correlations,
+    const std::function<void(const pm::Mwpm&)>& before_extraction = {});
 
 /// Decode detection events using a Mwpm object and vector of detection event indices
 /// Returns the compressed edges in the matching: the pairs of detection events that are
 /// matched to each other via paths.
-void decode_detection_events_to_match_edges(pm::Mwpm& mwpm, const std::vector<uint64_t>& detection_events);
+// Callback observes final dual state; it must not mutate the matching instance.
+void decode_detection_events_to_match_edges(
+    pm::Mwpm& mwpm, const std::vector<uint64_t>& detection_events,
+    const std::function<void(const pm::Mwpm&)>& before_extraction = {});
 
 /// Decode detection events using a Mwpm object and vector of detection event indices.
 /// Returns the edges in the matching: these are pairs of *detectors* forming *edges* in the

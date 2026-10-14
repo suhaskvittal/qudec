@@ -59,10 +59,13 @@ UnionFind::UnionFind(const stim::DetectorErrorModel& dem, config_type conf)
     :num_detectors(dem.count_detectors()),
     num_observables(dem.count_observables()),
     conf(conf),
+    cluster_gap_graph_(conf.enable_cluster_gap ? num_detectors : 0),
     num_vertices_(num_detectors),
     baseline_syndrome_(num_detectors),
     baseline_observables_(num_observables)
 {
+    if (conf.enable_cluster_gap)
+        validate_cluster_gap_dem(dem);
     if (!conf.weight_scale)
         throw std::invalid_argument("UnionFind weight_scale must be positive");
 
@@ -131,7 +134,17 @@ UnionFind::UnionFind(const stim::DetectorErrorModel& dem, config_type conf)
         // terminal would merge unrelated clusters through the physical boundary.
         const size_t v = channel.first.size() == 2 ? channel.first[1] : num_vertices_++;
         edges_.push_back({u, v, 2 * length, channel.second});
+        if (conf.enable_cluster_gap)
+        {
+            const size_t terminal = channel.second.empty() ? cluster_gap_graph_.boundary_zero
+                                                           : cluster_gap_graph_.boundary_one;
+            cluster_gap_edge_ids_.push_back(cluster_gap_graph_.edges.size());
+            cluster_gap_graph_.add_edge(u, channel.first.size() == 2 ? v : terminal, 2 * length);
+        }
     }
+
+    if (conf.enable_cluster_gap)
+        cluster_gap_graph_.finish();
 
     parent_.resize(num_vertices_);
     cluster_size_.resize(num_vertices_);
@@ -317,6 +330,16 @@ UnionFind::decode(SyndromeRef syndrome, ObsRef /* actual_observables */)
 
     grow_clusters();
     Result result;
+    if (conf.enable_cluster_gap)
+    {
+        auto& coverage = cluster_gap_graph_.reset_coverage();
+        for (size_t i = 0; i < edges_.size(); i++)
+            coverage[cluster_gap_edge_ids_[i]] = growth_[i];
+        result.cluster_gap_db = cluster_gap_graph_.gap(coverage)
+                * 10.0 / (2.0 * double(conf.weight_scale) * std::log(10.0));
+        result.has_cluster_gap = true;
+        s_cluster_gap.add(result.cluster_gap_db);
+    }
     result.flipped_obs = baseline_observables_;
     std::vector<size_t> selected_edges;
     peel_forest(remaining, result.flipped_obs, conf.report_matching_data ? &selected_edges : nullptr);
@@ -425,11 +448,21 @@ UnionFind::print_stats(std::ostream& ostrm) const
           << " min=" << double(stats.decode_min_ns) / 1000.0
           << " max=" << double(stats.decode_max_ns) / 1000.0
           << " includes_empty_syndromes=true scope=full_history\n";
+    if (conf.enable_cluster_gap)
+    {
+        ostrm << "Cluster gap (dB): count=" << stats.timed_shots;
+        if (stats.timed_shots)
+            ostrm << " " << s_cluster_gap.to_string_some();
+        ostrm << "\n";
+        if (conf.print_cluster_gap_histogram)
+            ostrm << s_cluster_gap.to_string_full() << "\n";
+    }
 }
 
 void
 UnionFind::mpi_accumulate()
 {
+    s_cluster_gap.mpi_accumulate();
 #if defined(ENABLE_MPI)
     uint64_t sums[]{stats_.timed_shots, stats_.decode_total_ns};
     MPI_Allreduce(MPI_IN_PLACE, sums, 2, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);

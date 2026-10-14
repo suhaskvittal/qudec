@@ -150,14 +150,12 @@ PDZ::score_type::update_affinity(det_id_type x, value_type aff_1, value_type aff
 dec::Result
 PDZ::apply(dec::SyndromeRef s, const dec::Result& prev) const
 {
-    if (s.num_bits_padded() < num_detectors)
-        std::cerr << "PDZ::apply(): syndrome is too short" << _die{};
-
-    // Clear at entry as well: validation can throw during the previous call.
     same_basis_events_.clear();
     opp_basis_events_.clear();
     assignment_map_.clear();
     aff_match_map_.clear();
+
+    // scan syndrome and identify detection events
     same_basis_events_.reserve(s.popcnt());
     opp_basis_events_.reserve(s.popcnt());
     for (size_t i = 0; i < num_detectors; i++)
@@ -169,8 +167,7 @@ PDZ::apply(dec::SyndromeRef s, const dec::Result& prev) const
         }
     }
 
-    // Validate before modifying the syndrome. The boundary can occur many times;
-    // each real detector must occur exactly once in the supplied matching.
+    // look through matchings and identify matching affinities.
     assignment_map_.reserve(s.popcnt());
     aff_match_map_.reserve(s.popcnt());
     for (size_t i = 0; i < prev.matching_data.assignments.size(); i++)
@@ -190,13 +187,20 @@ PDZ::apply(dec::SyndromeRef s, const dec::Result& prev) const
         const auto x = score_match(a.d1, a.d2);
         // Preserve the existing scoring rule. A negative margin rejects the
         // assignment; it is not an invalid decoder result.
-        auto diff = x.aff_compl_same_basis - x.aff_match;
-        bool ok = (diff >= conf.aff_keep_threshold);
-        if (ok && diff == 1 && conf.check_affinity_of_compl_match)
+//      bool ok = (x.aff_compl_same_basis - x.aff_match >= 1)
+//              && (x.aff_match + x.aff_opp_basis_match <= x.aff_compl_opp_basis);
+        bool ok{true};
+        if (x.compl_opp_basis_det_id.has_value())
         {
-            bool retain = (x.aff_same_basis_match != x.aff_match) || (x.aff_match >= 2);
-            ok = ok && retain;
+            ok = (x.aff_compl_same_basis - x.aff_match) < x.aff_compl_opp_basis/2;
         }
+
+        /*
+        std::cout << "aff_match = " << (x.aff_match+0)
+                    << ", opp basis match = " << (x.aff_opp_basis_match+0)
+                    << ", compl opp basis = " << (x.aff_compl_opp_basis+0)
+                    << "\n";
+        */
 
         if (ok)
         {
@@ -237,9 +241,8 @@ PDZ::score_match(det_id_type a, det_id_type b) const
         if (x != a && x != b)
             out.update_affinity(x, affinity(a,x), affinity(b,x), aff_match_map_[x], true);
 
-    if (!conf.ignore_opposing_basis_detectors)
-        for (det_id_type x : opposite)
-            out.update_affinity(x, affinity(a,x), affinity(b,x), aff_match_map_[x], false);
+    for (det_id_type x : opposite)
+        out.update_affinity(x, affinity(a,x), affinity(b,x), aff_match_map_[x], false);
 
     return out;
 }
@@ -266,5 +269,8 @@ PDZ::affinity(det_id_type a, det_id_type b) const
     };
     return aff_(translate(a), translate(b));
 }
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
 
 } // namespace pp

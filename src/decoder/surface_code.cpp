@@ -106,8 +106,33 @@ PyMatching::PyMatching(const stim::DetectorErrorModel& dem, config_type conf)
     obs_det_id_(dem.count_detectors()),
     mwpm_(pm::detector_error_model_to_mwpm(
                 conf.enable_gap_estimation ? _build_gap_dem(dem) : dem,
-                pm::NUM_DISTINCT_WEIGHTS, conf.correlated, conf.correlated))
+                pm::NUM_DISTINCT_WEIGHTS, conf.correlated, conf.correlated)),
+    cluster_gap_graph_(conf.enable_cluster_gap ? num_detectors : 0)
 {
+    if (conf.enable_cluster_gap)
+    {
+        if (conf.enable_gap_estimation || conf.correlated)
+            throw std::invalid_argument("Cluster gap requires ordinary uncorrelated PyMatching; disable --gap and --correlated");
+        validate_cluster_gap_dem(dem);
+        const auto* begin = mwpm_.flooder.graph.nodes.data();
+        for (size_t u = 0; u < mwpm_.flooder.graph.nodes.size(); u++)
+        {
+            const auto& node = mwpm_.flooder.graph.nodes[u];
+            for (size_t k = 0; k < node.neighbors.size(); k++)
+            {
+                const auto* other = node.neighbors[k];
+                const size_t v = other ? other - begin :
+                    ((node.neighbor_observables[k] & 1) ? cluster_gap_graph_.boundary_one
+                                                      : cluster_gap_graph_.boundary_zero);
+                if (other && u > v)
+                    continue;
+                cluster_gap_graph_.add_edge(u, v, node.neighbor_weights[k]);
+            }
+        }
+        if (mwpm_.flooder.negative_weight_sum != 0)
+            throw std::invalid_argument("Cluster gap does not support negative matching weights");
+        cluster_gap_graph_.finish();
+    }
     if (conf.correlated && (conf.enable_gap_estimation || conf.report_matching_data))
         throw std::invalid_argument("Correlated PyMatching currently supports observable decoding only; disable gap estimation and matched-endpoint reporting");
     if (conf.enable_gap_estimation)
@@ -206,9 +231,34 @@ PyMatching::internal_decode(SyndromeRef syn, bool fire_obs_det, pm::total_weight
     // then translate it into the bit-packed `ObsType` that the rest of the codebase expects.
     Result res;
     res.flipped_obs = ObsType(num_observables);
+    std::function<void(const pm::Mwpm&)> before_extraction;
+    if (conf.enable_cluster_gap)
+        before_extraction = [&](const pm::Mwpm& matching)
+        {
+            std::vector<std::pair<size_t, double>> sources;
+            for (size_t v : det_events)
+            {
+                if (!cluster_gap_graph_.relevant[v])
+                    continue;
+                double radius = 0;
+                auto* region = matching.flooder.graph.nodes[v].region_that_arrived;
+                while (region)
+                {
+                    radius += region->radius.get_distance_at_time(matching.flooder.queue.cur_time);
+                    region = region->blossom_parent;
+                }
+                if (radius < 0)
+                    throw std::logic_error("MWPM cluster radius was negative");
+                sources.push_back({v, radius});
+            }
+            res.cluster_gap_db = cluster_gap_graph_.gap(cluster_gap_graph_.ball_coverage(sources))
+                                 * decibels_per_w_;
+            res.has_cluster_gap = true;
+            s_cluster_gap.add(res.cluster_gap_db);
+        };
     if (report_matching_data)
     {
-        pm::decode_detection_events_to_match_edges(mwpm_, det_events);
+        pm::decode_detection_events_to_match_edges(mwpm_, det_events, before_extraction);
         const auto* node_begin = mwpm_.flooder.graph.nodes.data();
         res.matching_data.frame_flips = ObsType(num_observables);
         for (const auto& edge : mwpm_.flooder.match_edges)
@@ -245,7 +295,7 @@ PyMatching::internal_decode(SyndromeRef syn, bool fire_obs_det, pm::total_weight
     {
         std::vector<uint8_t> obs_bytes(num_observables, 0);
         pm::total_weight_int weight = 0;
-        pm::decode_detection_events(mwpm_, det_events, obs_bytes.data(), weight, conf.correlated);
+        pm::decode_detection_events(mwpm_, det_events, obs_bytes.data(), weight, conf.correlated, before_extraction);
         weight_out = weight;
         for (size_t i = 0; i < num_observables; i++)
             res.flipped_obs[i] = obs_bytes[i] & 1;
@@ -277,6 +327,7 @@ PyMatching::mpi_accumulate()
     MPI_Allreduce(MPI_IN_PLACE, &stats_.decode_min_ns, 1, MPI_UINT64_T, MPI_MIN, MPI_COMM_WORLD);
     MPI_Allreduce(MPI_IN_PLACE, &stats_.decode_max_ns, 1, MPI_UINT64_T, MPI_MAX, MPI_COMM_WORLD);
 #endif
+    s_cluster_gap.mpi_accumulate();
     s_signed_gap.mpi_accumulate();
     s_unsigned_gap.mpi_accumulate();
     s_unsigned_gap_errors.mpi_accumulate();
@@ -294,6 +345,15 @@ PyMatching::print_stats(std::ostream& ostrm) const
           << " max=" << double(stats.decode_max_ns) / 1000.0
           << " includes_empty_syndromes=true scope=full_history"
           << " correlated=" << (conf.correlated ? "true" : "false") << '\n';
+    if (conf.enable_cluster_gap)
+    {
+        ostrm << "Cluster gap (dB): count=" << stats.timed_shots;
+        if (stats.timed_shots)
+            ostrm << " " << s_cluster_gap.to_string_some();
+        ostrm << "\n";
+        if (conf.print_cluster_gap_histogram)
+            ostrm << s_cluster_gap.to_string_full() << "\n";
+    }
     // The gap histogram is only populated when complementary-gap estimation is enabled;
     // otherwise it is empty (and its mean would divide by a zero count).
     if (conf.enable_gap_estimation)
