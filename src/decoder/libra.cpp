@@ -930,6 +930,7 @@ Libra::decode(SyndromeRef syndrome, ObsRef)
     out.matching_data.gap = result.gap_db;
     out.matching_data.probability = std::exp(result.log_masses[result.prediction]);
     const auto elapsed_ns = elapsed_nanoseconds(start);
+    out.decode_latency_ns = elapsed_ns;
     auto& stats = impl_->stats;
     ++stats.timed_shots;
     stats.decode_total_ns += elapsed_ns;

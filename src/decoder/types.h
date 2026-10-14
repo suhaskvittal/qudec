@@ -60,6 +60,9 @@ struct Result
 {
     ObsType flipped_obs{1};
 
+    // Measured decoder latency in nanoseconds; zero when not instrumented.
+    uint64_t decode_latency_ns{0};
+
     // Decoder specific parameters:
     MatchingData matching_data;
 };

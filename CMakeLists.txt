@@ -140,6 +140,11 @@ add_executable(pdz_libra_evaluate main/pdz_libra_evaluate.cpp)
 target_compile_options(pdz_libra_evaluate PRIVATE ${COMPILE_OPTIONS} -fno-fast-math)
 target_link_libraries(pdz_libra_evaluate PRIVATE qudeclib)
 
+# Contributor: OpenAI Codex (uncorrelated PyMatching complementary-gap study).
+add_executable(qudec_eval_gap main/qudec_eval_gap.cpp)
+target_compile_options(qudec_eval_gap PRIVATE ${COMPILE_OPTIONS} -fno-fast-math)
+target_link_libraries(qudec_eval_gap PRIVATE qudeclib)
+
 include(CTest)
 if(BUILD_TESTING)
     # Contributor: OpenAI Codex (weighted union-find regression cases).

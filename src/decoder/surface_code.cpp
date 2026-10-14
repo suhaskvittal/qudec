@@ -134,13 +134,14 @@ PyMatching::decode(SyndromeRef syn, ObsRef obs)
         stats_.decode_total_ns += elapsed_ns;
         stats_.decode_min_ns = std::min(stats_.decode_min_ns, elapsed_ns);
         stats_.decode_max_ns = std::max(stats_.decode_max_ns, elapsed_ns);
+        return elapsed_ns;
     };
     pm::total_weight_int w_primary = 0;
     auto out = internal_decode(syn, /*fire_obs_det=*/false, w_primary,
                                conf.report_matching_data && !conf.enable_gap_estimation);
     if (!conf.enable_gap_estimation)
     {
-        record_latency();
+        out.decode_latency_ns = record_latency();
         return out;
     }
 
@@ -180,7 +181,7 @@ PyMatching::decode(SyndromeRef syn, ObsRef obs)
     out.matching_data.gap = g;
     s_signed_gap.add(g);
 
-    record_latency();
+    out.decode_latency_ns = record_latency();
     return out;
 }
 

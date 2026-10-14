@@ -322,6 +322,7 @@ UnionFind::decode(SyndromeRef syndrome, ObsRef /* actual_observables */)
     stats_.decode_total_ns += elapsed;
     stats_.decode_min_ns = std::min(stats_.decode_min_ns, elapsed);
     stats_.decode_max_ns = std::max(stats_.decode_max_ns, elapsed);
+    result.decode_latency_ns = elapsed;
     return result;
 }
 
