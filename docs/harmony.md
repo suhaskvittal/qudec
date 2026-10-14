@@ -3,9 +3,11 @@
 Contributor: OpenAI Codex.
 
 `qudec harmony` runs independently perturbed two-pass correlated MWPM
-members and pools their logical predictions by voting. The implementation
-follows the vote-pooling variant of arXiv:2401.12434; it does not implement
-the likelihood pooling favored in the paper's surface-code benchmarks.
+members and pools their logical predictions by summing error likelihoods.
+Each member's selected edges are explained with an edge-decomposition
+matching graph and scored under the original, unperturbed channel model.
+Likelihoods are summed in log space within each logical class. Repeated
+member configurations contribute once per member, as in arXiv:2401.12434.
 SI1000 circuits include opposing-basis detectors automatically.
 
 ```sh
@@ -25,6 +27,8 @@ Options:
 - `--harmony-seed`: ensemble perturbation seed, separate from the sampling
   `--seed`. Members are deterministic and identical across MPI ranks;
   sampling streams differ across ranks.
+- `--harmony-pooling sum_likelihood|vote`: pooling method, default
+  `sum_likelihood`. Vote pooling omits error reconstruction.
 
 Output includes logical error rate, expanded shots, total and mean members
 run, and mean/minimum/maximum decoding latency in microseconds. Timings
@@ -45,5 +49,5 @@ done
 The decoder currently supports one logical observable. Perturbed
 probabilities are clamped below one half to fit the matching backend's
 nonnegative conditional-weight representation. Vote ties select frame zero.
-These details and vote pooling should be considered when comparing against
-the paper's reported performance.
+These details should be considered when comparing against the paper's
+reported performance. Sum-likelihood latency includes error reconstruction.

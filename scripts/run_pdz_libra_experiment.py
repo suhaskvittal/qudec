@@ -61,16 +61,22 @@ def find_executable(specified, cores):
 def make_command(args, executable, directory):
     command = [str(executable), "pdz_libra", str(args.distance),
                "-r", str(args.rounds or args.distance), "-p", str(args.p),
-               "-m", "monte_carlo", "--seed", str(args.seed),
-               "--mc-max-samples", str(args.shots),
-               # More than the shot budget prevents the error-count stop.
-               "--mc-stop-at-errors", str(args.shots + 1),
+               "-m", args.method, "--seed", str(args.seed),
                "--pdz-aff-keep-threshold", str(args.pdz_aff_keep_threshold),
                "--pdz-removal-threshold", str(args.pdz_removal_threshold),
                "--libra-ensemble-size", str(args.libra_ensemble_size),
                "--libra-gap-threshold-db", str(args.libra_gap_threshold_db),
                "--libra-seed", str(args.libra_seed), "--record-syndromes",
                "--record-syndromes-dir", str(directory), "--print-progress"]
+    if args.method == "monte_carlo":
+        command.extend(["--mc-max-samples", str(args.shots),
+                        "--mc-stop-at-errors", str(args.shots + 1)])
+    else:
+        command.extend(["--rare-samples-per-level", str(args.rare_samples_per_level or args.shots),
+                        "--rare-max-errors-per-level", str(args.rare_max_errors_per_level),
+                        "--rare-max-level", str(args.rare_max_level),
+                        "--rare-relative-tail-tolerance", str(args.rare_relative_tail_tolerance),
+                        "--rare-tail-tolerance", str(args.rare_tail_tolerance)])
     if args.pdz_consider_compl_match:
         command.append("--pdz-consider-compl-match")
     if args.cores > 1:
@@ -82,7 +88,7 @@ def make_command(args, executable, directory):
 
 
 def run_logged(command, log_path, progress=False):
-    """Use argument lists, preserve full logs, and show Monte Carlo progress."""
+    """Use argument lists, preserve full logs, and show sampling progress."""
     with log_path.open("w") as log:
         with subprocess.Popen(command, cwd=REPOSITORY, stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT, text=True, bufsize=1) as process:
@@ -113,6 +119,8 @@ def format_summary(directory, summary):
              f"Libra bypassed: {bypassed:,} shots.",
              f"PyMatching failures: {summary['pymatching_failures']}; pipeline failures: {summary['pipeline_failures']}",
              "", "PDZ removed     Shots       Ensemble    Errors fixed    Errors introduced"]
+    if summary.get("sampler") == "rare_event":
+        lines.insert(0, "Rare-event tables describe unweighted conditional samples, not physical frequencies.")
     for label, (shots, ensemble, helped, harmed) in zip(("0-20%", ">20-40%", ">40-60%", ">60%"), groups):
         lines.append(f"{label:12} {shots:11,d} {ensemble:12,d} {helped:14,d} {harmed:20,d}")
     lines.extend([f"Empty input syndromes excluded from the table: {empty:,}",
@@ -124,7 +132,16 @@ def format_summary(directory, summary):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--distance", type=positive_integer, required=True)
-    parser.add_argument("--shots", type=positive_integer, required=True)
+    parser.add_argument("--shots", type=positive_integer, required=True,
+                        help="global Monte Carlo shots, or rare-event sample cap per level")
+    parser.add_argument("--method", choices=("auto", "monte_carlo", "rare_event"), default="auto",
+                        help="default: Monte Carlo below d=13, rare event at d>=13")
+    parser.add_argument("--rare-samples-per-level", type=positive_integer,
+                        help="override the rare-event per-level cap (otherwise --shots)")
+    parser.add_argument("--rare-max-errors-per-level", type=positive_integer, default=25)
+    parser.add_argument("--rare-max-level", type=positive_integer, default=128)
+    parser.add_argument("--rare-relative-tail-tolerance", type=float, default=0.1)
+    parser.add_argument("--rare-tail-tolerance", type=float, default=1e-12)
     parser.add_argument("--cores", type=positive_integer, default=64, help="MPI ranks (default: 64; 1 for serial)")
     parser.add_argument("--rounds", type=positive_integer, help="default: distance")
     parser.add_argument("--p", type=float, default=0.001, help="physical error rate (default: 0.001)")
@@ -141,10 +158,19 @@ def main():
     parser.add_argument("--libra-seed", type=int, default=0x4C49425241)
     parser.add_argument("--dry-run", action="store_true", help="print commands without creating files or running sampling")
     args = parser.parse_args()
+    if args.method == "auto":
+        args.method = "rare_event" if args.distance >= 13 else "monte_carlo"
     if args.distance < 2 or args.distance > 2**32 - 1 or (args.rounds or args.distance) > 2**32 - 1:
         parser.error("distance must be at least 2; distance and rounds must fit uint32")
     if args.shots > 2**63 - 2:
         parser.error("shot count must be at most 2**63 - 2")
+    for name in ("rare_samples_per_level", "rare_max_errors_per_level", "rare_max_level"):
+        if getattr(args, name) is not None and getattr(args, name) > 2**63 - 1:
+            parser.error(f"{name} must fit int64")
+    if not math.isfinite(args.rare_relative_tail_tolerance) or args.rare_relative_tail_tolerance < 0:
+        parser.error("rare relative tail tolerance must be finite and nonnegative")
+    if not math.isfinite(args.rare_tail_tolerance) or not 0 <= args.rare_tail_tolerance < 1:
+        parser.error("rare tail tolerance must be finite and in [0, 1)")
     if not math.isfinite(args.p) or not 0 < args.p < .5:
         parser.error("physical error rate must be finite and between 0 and 0.5")
     if min(args.seed, args.libra_seed) < 0 or max(args.seed, args.libra_seed) > 2**63 - 1 - args.cores:
@@ -161,11 +187,14 @@ def main():
         executable = find_executable(args.qudec, args.cores)
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
         directory = args.output_root.expanduser().resolve() / (
-            f"pdz_libra_d{args.distance}_{args.shots}_shots_seed{args.seed}_{timestamp}")
+            f"pdz_libra_d{args.distance}_{args.method}_{args.shots}_shots_seed{args.seed}_{timestamp}")
         command = make_command(args, executable, directory)
     except ValueError as error:
         parser.error(str(error))
     analysis_command = [sys.executable, str(ANALYZER), str(directory)]
+    if args.method == "rare_event":
+        analysis_command.append("--allow-rare-event-samples")
+    print(f"Sampler: {args.method}", flush=True)
     print(f"Run directory: {directory}", flush=True)
     print(shlex.join(command), flush=True)
     if args.dry_run:
@@ -177,7 +206,7 @@ def main():
         "Contributor: OpenAI Codex.\n\n" + shlex.join(command) + "\n\n" + shlex.join(analysis_command) + "\n")
     manifest = {"contributor": "OpenAI Codex", "started_utc": datetime.now(timezone.utc).isoformat(),
                 "decoder_command": command, "analysis_command": analysis_command,
-                "working_directory": str(REPOSITORY), "status": "running"}
+                "working_directory": str(REPOSITORY), "sampler": args.method, "status": "running"}
     manifest_path = directory / "run_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     start = time.monotonic()
@@ -188,9 +217,16 @@ def main():
         print("Validating and analyzing recorded syndromes...", flush=True)
         run_logged(analysis_command, directory / "analysis.log")
         summary = json.loads((directory / "analysis_summary.json").read_text())
-        if summary["shots"] != args.shots or len(summary["rank_shots"]) != args.cores:
+        if ((args.method == "monte_carlo" and summary["shots"] != args.shots)
+                or len(summary["rank_shots"]) != args.cores):
             raise RuntimeError("Recorded shot/rank counts differ from the requested experiment")
+        ler_lines = [line for line in (directory / "run.log").read_text().splitlines()
+                     if line.startswith("Logical error rate:")]
+        if not ler_lines:
+            raise RuntimeError("qudec did not report the logical error rate")
+        manifest["logical_error_rate"] = float(ler_lines[-1].split(":", 1)[1])
         report = format_summary(directory, summary)
+        report = ler_lines[-1] + "\n" + report
         (directory / "experiment_summary.txt").write_text(report)
         manifest["status"] = "complete"
         print(report, end="")

@@ -32,6 +32,8 @@ public:
         // Report matched detector endpoints and each pair's observable parity.
         // Boundary endpoints use -1. Weights are not populated in this mode.
         bool report_matching_data{false};
+        // Use PyMatching's existing two-pass correlated MWPM backend.
+        bool correlated{false};
     };
 
     struct Statistics

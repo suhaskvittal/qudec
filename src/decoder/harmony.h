@@ -15,10 +15,11 @@ namespace dec {
 // Harmonized correlated matching, Shutty, Newman, and Villalonga,
 // arXiv:2401.12434. The DEM should have decomposed CSS error components.
 // Each instance owns mutable matching workspaces; use one instance per worker.
-// Pooling uses the paper's vote method, with optional unanimous-sentinel
-// escalation to the full ensemble.
+// Pooling uses the paper's sum-likelihood method by default, with optional
+// vote pooling and unanimous-sentinel escalation to the full ensemble.
 class Harmony {
 public:
+    enum class Pooling { sum_likelihood, vote };
     struct Config {
         size_t ensemble_size = 100;
         size_t sentinel_size = 4;
@@ -27,6 +28,7 @@ public:
         double alpha_first = 1.0;
         double alpha_second = 0.8;
         double alpha_conditional = 0.5;
+        Pooling pooling = Pooling::sum_likelihood;
     };
     struct Statistics {
         uint64_t shots = 0;

@@ -1,5 +1,6 @@
 /* Contributor: OpenAI Codex. Harmony prototype, arXiv:2401.12434. */
 #include "harmony.h"
+#include "harmony_likelihood.h"
 #include <pymatching/sparse_blossom/driver/mwpm_decoding.h>
 #include <pymatching/sparse_blossom/driver/user_graph.h>
 #include <algorithm>
@@ -15,6 +16,12 @@
 
 namespace dec {
 namespace {
+double log_add(double a, double b) {
+    if (a == -INFINITY) return b;
+    if (b == -INFINITY) return a;
+    if (a < b) std::swap(a, b);
+    return a + std::log1p(std::exp(b - a));
+}
 double sample_probability(double p, double alpha, std::mt19937_64& rng) {
     std::uniform_real_distribution<double> uniform(-alpha, alpha);
     // PyMatching's implied-weight representation assumes nonnegative weights.
@@ -39,6 +46,7 @@ void perturb_graph(pm::UserGraph& graph, double alpha_edge, double alpha_rule,
 }
 
 struct Harmony::Impl {
+    struct Candidate { bool obs; double log_likelihood; };
     struct Member {
         std::unique_ptr<pm::Mwpm> first;
         std::unique_ptr<pm::Mwpm> second;
@@ -47,9 +55,10 @@ struct Harmony::Impl {
     Config config;
     Statistics stats;
     std::vector<Member> members;
+    harmony_detail::ErrorModel original_model;
 
     Impl(const stim::DetectorErrorModel& input, Config cfg)
-        : dem(input), config(cfg), members(cfg.ensemble_size) {
+        : dem(input), config(cfg), members(cfg.ensemble_size), original_model(input) {
         if (!cfg.ensemble_size || !cfg.sentinel_size || cfg.sentinel_size > cfg.ensemble_size)
             throw std::invalid_argument("Harmony needs 1 <= sentinel_size <= ensemble_size");
         for (double a : {cfg.alpha_first, cfg.alpha_second, cfg.alpha_conditional})
@@ -67,7 +76,7 @@ struct Harmony::Impl {
         member.first = std::make_unique<pm::Mwpm>(first.to_mwpm(pm::NUM_DISTINCT_WEIGHTS, true));
         member.second = std::make_unique<pm::Mwpm>(second.to_mwpm(pm::NUM_DISTINCT_WEIGHTS, true));
     }
-    ObsType run(size_t index, const std::vector<uint64_t>& events, size_t nobs) {
+    Candidate run(size_t index, const std::vector<uint64_t>& events) {
         prepare(index);
         auto& member = members[index];
         std::vector<int64_t> initial_edges;
@@ -75,21 +84,41 @@ struct Harmony::Impl {
         auto& final_graph = member.second->flooder.graph;
         auto& final_search_graph = member.second->search_flooder.graph;
         final_graph.reweight_for_edges(initial_edges);
-        final_search_graph.reweight_for_edges(initial_edges);
-        std::vector<uint8_t> bytes(nobs);
-        pm::total_weight_int ignored_weight = 0;
         try {
-            pm::decode_detection_events(*member.second, events, bytes.data(), ignored_weight, false);
+            final_search_graph.reweight_for_edges(initial_edges);
         } catch (...) {
             final_graph.undo_reweights();
-            final_search_graph.undo_reweights();
             throw;
         }
-        final_graph.undo_reweights();
-        final_search_graph.undo_reweights();
-        ObsType obs(nobs);
-        for (size_t k = 0; k < nobs; ++k) obs[k] = bytes[k] & 1;
-        return obs;
+        struct UndoReweight {
+            pm::MatchingGraph& graph;
+            pm::SearchGraph& search_graph;
+            ~UndoReweight() { graph.undo_reweights(); search_graph.undo_reweights(); }
+        } undo{final_graph, final_search_graph};
+        std::vector<int64_t> second_edges;
+        pm::decode_detection_events_to_edges(*member.second, events, second_edges);
+        std::vector<harmony_detail::Edge> selected;
+        selected.reserve(second_edges.size() / 2);
+        bool observed_flip = false;
+        for (size_t i = 0; i < second_edges.size(); i += 2) {
+            const auto a = static_cast<uint32_t>(second_edges[i]);
+            const auto b = second_edges[i + 1] == -1 ? harmony_detail::boundary
+                                                    : static_cast<uint32_t>(second_edges[i + 1]);
+            auto& node = final_search_graph.nodes.at(a);
+            auto* neighbor = b == harmony_detail::boundary ? nullptr
+                                                         : &final_search_graph.nodes.at(b);
+            const size_t slot = node.index_of_neighbor(neighbor);
+            if (slot == SIZE_MAX) throw std::runtime_error("Harmony matched edge lacks graph adjacency");
+            bool flip = false;
+            for (size_t obs : node.neighbor_observable_indices[slot]) flip ^= obs == 0;
+            selected.push_back({a, b, flip});
+            observed_flip ^= flip;
+        }
+        if (config.pooling == Pooling::vote) return {observed_flip, 0};
+        const auto hypothesis = original_model.reconstruct(selected);
+        if (hypothesis.obs != observed_flip)
+            throw std::runtime_error("Harmony likelihood class mismatch");
+        return {hypothesis.obs, -hypothesis.weight};
     }
 };
 
@@ -112,28 +141,33 @@ Result Harmony::decode(SyndromeRef syndrome, ObsRef) {
     std::vector<uint64_t> events;
     for (size_t d = 0; d < num_detectors; ++d)
         if (syndrome[d]) events.push_back(d);
-    const auto count = [&](size_t end, size_t& ones) {
-        for (size_t i = 0; i < end; ++i)
-            ones += impl_->run(i, events, num_observables)[0] ? 1 : 0;
-        impl_->stats.members_run += end;
-    };
     size_t ones = 0;
+    double log_mass[2]{-INFINITY, -INFINITY};
+    const auto collect = [&](size_t begin, size_t end) {
+        for (size_t i = begin; i < end; ++i) {
+            const auto candidate = impl_->run(i, events);
+            ones += candidate.obs;
+            log_mass[candidate.obs] = log_add(log_mass[candidate.obs], candidate.log_likelihood);
+        }
+        impl_->stats.members_run += end - begin;
+    };
     const size_t sentinels = impl_->config.layered
         ? impl_->config.sentinel_size : impl_->config.ensemble_size;
-    count(sentinels, ones);
+    collect(0, sentinels);
     size_t used = sentinels;
     if (impl_->config.layered && ones != 0 && ones != sentinels) {
-        for (size_t i = sentinels; i < impl_->config.ensemble_size; ++i)
-            ones += impl_->run(i, events, num_observables)[0] ? 1 : 0;
-        impl_->stats.members_run += impl_->config.ensemble_size - sentinels;
+        collect(sentinels, impl_->config.ensemble_size);
         ++impl_->stats.expanded_shots;
         used = impl_->config.ensemble_size;
     }
     Result result;
     result.flipped_obs = ObsType(num_observables);
-    result.flipped_obs[0] = 2 * ones > used;
+    const bool prediction = impl_->config.pooling == Pooling::vote
+        ? 2 * ones > used : log_mass[1] > log_mass[0];
+    result.flipped_obs[0] = prediction;
     result.matching_data.frame_flips = result.flipped_obs;
-    result.matching_data.probability = double(std::max(ones, used - ones)) / used;
+    const double normalizer = log_add(log_mass[0], log_mass[1]);
+    result.matching_data.probability = std::exp(log_mass[prediction] - normalizer);
     const auto ns = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::steady_clock::now() - start).count());
     result.decode_latency_ns = ns;

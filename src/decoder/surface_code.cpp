@@ -106,8 +106,10 @@ PyMatching::PyMatching(const stim::DetectorErrorModel& dem, config_type conf)
     obs_det_id_(dem.count_detectors()),
     mwpm_(pm::detector_error_model_to_mwpm(
                 conf.enable_gap_estimation ? _build_gap_dem(dem) : dem,
-                pm::NUM_DISTINCT_WEIGHTS))
+                pm::NUM_DISTINCT_WEIGHTS, conf.correlated, conf.correlated))
 {
+    if (conf.correlated && (conf.enable_gap_estimation || conf.report_matching_data))
+        throw std::invalid_argument("Correlated PyMatching currently supports observable decoding only; disable gap estimation and matched-endpoint reporting");
     if (conf.enable_gap_estimation)
         assert(num_observables == 1 && "complementary gap estimation supports exactly one observable");
     if (conf.report_matching_data && num_observables > sizeof(pm::obs_int) * 8)
@@ -243,7 +245,7 @@ PyMatching::internal_decode(SyndromeRef syn, bool fire_obs_det, pm::total_weight
     {
         std::vector<uint8_t> obs_bytes(num_observables, 0);
         pm::total_weight_int weight = 0;
-        pm::decode_detection_events(mwpm_, det_events, obs_bytes.data(), weight, false);
+        pm::decode_detection_events(mwpm_, det_events, obs_bytes.data(), weight, conf.correlated);
         weight_out = weight;
         for (size_t i = 0; i < num_observables; i++)
             res.flipped_obs[i] = obs_bytes[i] & 1;
@@ -290,7 +292,8 @@ PyMatching::print_stats(std::ostream& ostrm) const
           << " average=" << average_us
           << " min=" << double(stats.decode_min_ns) / 1000.0
           << " max=" << double(stats.decode_max_ns) / 1000.0
-          << " includes_empty_syndromes=true scope=full_history\n";
+          << " includes_empty_syndromes=true scope=full_history"
+          << " correlated=" << (conf.correlated ? "true" : "false") << '\n';
     // The gap histogram is only populated when complementary-gap estimation is enabled;
     // otherwise it is empty (and its mean would divide by a zero count).
     if (conf.enable_gap_estimation)

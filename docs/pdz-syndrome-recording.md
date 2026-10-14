@@ -31,7 +31,8 @@ python3 scripts/run_pdz_libra_experiment.py --distance 9 --shots 1000000
 ```
 
 The runner discovers an existing MPI build, uses 64 ranks by default, records
-exactly the requested shot count, then runs the analysis. It creates a unique
+the requested shot count for distances below 13, then runs the analysis. At
+distance 13 and above it automatically uses rare-event sampling. It creates a unique
 subfolder of `out/` containing rank files, configuration, commands, logs, CSV
 tables, and reports. It prints a summary with ensemble calls, errors fixed,
 and errors introduced by PDZ removal fraction. It does not compile the decoder.
@@ -41,7 +42,18 @@ or `--cores 1` for serial execution. `--p` defaults to 0.001 and `--rounds`
 defaults to the distance. PDZ and ensemble settings are also exposed; see
 `--help`. `--dry-run` checks the configuration and prints commands without
 creating a run directory or sampling. The shot budget is global across ranks;
-the error-count stop is disabled for this experiment.
+the Monte Carlo error-count stop is disabled for this experiment.
+
+Use `--method monte_carlo` or `--method rare_event` to override automatic
+selection. In rare-event mode, `--shots` is the global sample cap **per error
+level**, rather than a total shot count; `--rare-samples-per-level` can override
+that cap. Each level stops after 25 logical errors by default, and the sampler
+can stop visiting levels once its remaining probability bound is small enough.
+The `--rare-*` options control these limits and tolerances. Rare-event analysis
+tables and associations describe **unweighted conditional samples**; the
+physical logical error rate is the weighted estimate printed by `qudec` and
+preserved in the experiment summary and manifest. Recording currently lacks
+per-shot level labels, so these tables cannot be physically reweighted.
 
 Analyze and combine ranks with:
 

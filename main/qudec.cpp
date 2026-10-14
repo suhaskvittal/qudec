@@ -51,6 +51,7 @@ run_cli(int argc, char* argv[], int world_rank)
      * PyMatching parameters:
      * */
     bool enable_gap{false};
+    bool correlated_pymatching{false};
     bool record_syndromes{false};
     std::string recording_directory;
     // OpenAI GPT-6-Sol: Let CLI experiments opt into interior opposite-basis checks.
@@ -66,6 +67,7 @@ run_cli(int argc, char* argv[], int world_rank)
     int64_t harmony_sentinel_size = 0;
     int64_t harmony_seed = static_cast<int64_t>(harmony_config.seed);
     bool harmony_full_ensemble = false;
+    std::string harmony_pooling = "sum_likelihood";
 
     ARGPARSE()
         .required("decoder-name", "Decoder: pymatching, blossom5, tesseract, libra, pdz_libra, uf, harmony", decoder_name)
@@ -77,6 +79,7 @@ run_cli(int argc, char* argv[], int world_rank)
         .optional("-m", "--method", "Sampler method: monte_carlo or rare_event", conf.method, "monte_carlo")
         .optional("-pp", "--print-progress", "Print simulation progress", conf.print_progress, false)
         .optional("-g", "--gap", "Enable complementary gap estimation (pymatching only)", enable_gap, false)
+        .optional("", "--correlated", "PyMatching: use two-pass correlated MWPM", correlated_pymatching, false)
         .optional("", "--record-syndromes", "PDZ + Libra: record every decoded syndrome to per-rank gzip files", record_syndromes, false)
         .optional("", "--record-syndromes-dir", "PDZ + Libra: run directory (default: unique subfolder of out/)", recording_directory, "")
         .optional("", "--include-opposite-basis-detectors", "Include interior opposite-basis check detectors", include_opposite_basis_detectors, false)
@@ -96,6 +99,7 @@ run_cli(int argc, char* argv[], int world_rank)
         .optional("", "--harmony-sentinel-size", "Harmony: initial members (0 = min(4, ensemble size))", harmony_sentinel_size, 0)
         .optional("", "--harmony-full-ensemble", "Harmony: run every member on every shot", harmony_full_ensemble, false)
         .optional("", "--harmony-seed", "Harmony: shared ensemble-prior seed", harmony_seed, harmony_seed)
+        .optional("", "--harmony-pooling", "Harmony: sum_likelihood or vote", harmony_pooling, "sum_likelihood")
 
         .optional("", "--mc-max-samples", "Monte-carlo: max shots to sample", conf.monte_carlo.max_samples, 1000000)
         .optional("", "--mc-stop-at-errors", "Monte-carlo: stop after this many logical errors", conf.monte_carlo.stop_at_error_count, 25)
@@ -120,6 +124,10 @@ run_cli(int argc, char* argv[], int world_rank)
 
     if (conf.method != "monte_carlo" && conf.method != "rare_event")
         throw std::invalid_argument("Unknown sampler method: " + conf.method);
+    if (correlated_pymatching && decoder_name != "pymatching")
+        throw std::invalid_argument("--correlated is only available for pymatching");
+    if (correlated_pymatching && enable_gap)
+        throw std::invalid_argument("--correlated cannot currently be combined with --gap");
     if ((record_syndromes || !recording_directory.empty()) && decoder_name != "pdz_libra")
         throw std::invalid_argument("Syndrome recording is only available for pdz_libra");
     if (!record_syndromes && !recording_directory.empty())
@@ -139,8 +147,14 @@ run_cli(int argc, char* argv[], int world_rank)
             ? harmony_sentinel_size : std::min<int64_t>(4, harmony_ensemble_size));
         harmony_config.layered = !harmony_full_ensemble;
         harmony_config.seed = static_cast<uint64_t>(harmony_seed);
+        if (harmony_pooling == "sum_likelihood")
+            harmony_config.pooling = dec::Harmony::Pooling::sum_likelihood;
+        else if (harmony_pooling == "vote")
+            harmony_config.pooling = dec::Harmony::Pooling::vote;
+        else
+            throw std::invalid_argument("Harmony pooling must be sum_likelihood or vote");
     }
-    if (decoder_name == "libra" || decoder_name == "pdz_libra" || decoder_name == "harmony")
+    if (decoder_name == "libra" || decoder_name == "pdz_libra" || decoder_name == "harmony" || correlated_pymatching)
         include_opposite_basis_detectors = true;
 
     auto circuit = sc_si1000(d, r, p, false, include_opposite_basis_detectors);
@@ -162,13 +176,15 @@ run_cli(int argc, char* argv[], int world_rank)
 
     if (decoder_name == "pymatching")
     {
-        run(dec::PyMatching(dem, {.enable_gap_estimation=enable_gap}), [] (auto, auto, auto) {});
+        run(dec::PyMatching(dem, {.enable_gap_estimation=enable_gap, .correlated=correlated_pymatching}),
+            [] (auto, auto, auto) {});
     }
     else if (decoder_name == "harmony")
     {
         if (world_rank == 0)
             std::cout << "Harmony SI1000: distance=" << d << " rounds=" << r << " p=" << p
-                      << " opposite_basis_detectors=true pooling=vote ensemble_size=" << harmony_config.ensemble_size
+                      << " opposite_basis_detectors=true pooling=" << harmony_pooling
+                      << " ensemble_size=" << harmony_config.ensemble_size
                       << " sentinel_size=" << harmony_config.sentinel_size
                       << " layered=" << (harmony_config.layered ? "true" : "false")
                       << " sampling_seed=" << conf.seed << " ensemble_seed=" << harmony_config.seed << '\n';

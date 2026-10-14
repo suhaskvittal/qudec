@@ -177,6 +177,8 @@ def controlled_logistic(data):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run_directory", type=Path)
+    parser.add_argument("--allow-rare-event-samples", action="store_true",
+                        help="analyze raw conditional counts; these are not physical-frequency weighted")
     args = parser.parse_args()
     directory = args.run_directory
     data, ranks, geometry = load_records(directory)
@@ -195,7 +197,8 @@ def main():
                 data["input_hw"].astype(np.int64) - data["post_hw"] >= threshold * data["input_hw"]))
             if np.any(expected_bypass != data["bypassed"].astype(bool)):
                 raise ValueError("Bypass flags disagree with configured PDZ removal threshold")
-    if metadata.get("sampler", "monte_carlo") != "monte_carlo":
+    sampler = metadata.get("sampler", "monte_carlo")
+    if sampler != "monte_carlo" and not args.allow_rare_event_samples:
         raise ValueError("Physical-frequency analysis requires Monte Carlo records, not rare-event samples")
 
     removed = data["input_hw"].astype(np.int64) - data["post_hw"]
@@ -228,6 +231,8 @@ def main():
     fraction_mean = np.bincount(initial_hw, weights=fit_fraction) / np.maximum(n_by_hw, 1)
     ensemble_mean = np.bincount(initial_hw, weights=active["ensemble"]) / np.maximum(n_by_hw, 1)
     summary = {
+        "sampler": sampler,
+        "frequency_weighting": "physical_samples" if sampler == "monte_carlo" else "unweighted_conditional_samples",
         "shots": len(data), "rank_shots": ranks, "detectors": geometry[0],
         "bypassed_shots": int(data["bypassed"].sum()),
         "ensemble_shots": int(data["ensemble"].sum()),
@@ -253,6 +258,8 @@ def main():
              f"Ensemble changes helped/harmed relative to PyMatching: {summary['ensemble_changes_helped']}/{summary['ensemble_changes_harmed']}",
              "", "Removal fraction (empty input separately; fractions of removed syndrome bits)",
              "Range          Shots     Ensemble    P(ensemble)    Changed    Helped/Harmed"]
+    if sampler != "monte_carlo":
+        lines.insert(1, "All tables, means, and associations describe unweighted conditional samples, not physical frequencies.")
     for row in tables["by_removal_fraction"]:
         bucket = row["fraction_bucket"]
         label = "empty input" if bucket == -1 else "0%" if bucket == 0 else f"({10*(bucket-1)},{10*bucket}]%"
