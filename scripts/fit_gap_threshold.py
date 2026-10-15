@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fit log10 P(logical error | cluster gap >= threshold) from a cluster-gap run."""
+"""Fit log10 P(logical error | gap >= threshold) from a gap-study run."""
 
 import argparse
 import csv
@@ -16,15 +16,17 @@ def positive(value):
     return number
 
 
-def read_bins(path):
-    histograms = {"CLUSTER_GAP_DB": {}, "CLUSTER_GAP_DB_ERRORS": {}}
+def read_bins(path, shots_name, errors_name):
+    histograms = {shots_name: {}, errors_name: {}}
     with path.open(newline="") as source:
         reader = csv.DictReader(source)
         required = {"histogram", "bin_low_db", "bin_high_db", "extreme", "edge_db", "count"}
         if not reader.fieldnames or not required.issubset(reader.fieldnames):
-            raise ValueError("cluster_gap_bins.csv has no error histogram; rerun with updated qudec and run_cluster_gap_study.py")
+            raise ValueError(f"{path.name} has no per-gap error histogram; rerun with an updated collector")
         for row in reader:
             name = row["histogram"]
+            if name == "SIGNED_GAP" and shots_name == "UNSIGNED_GAP":
+                continue
             if name not in histograms:
                 raise ValueError(f"Unknown histogram {name!r}")
             count = int(row["count"])
@@ -32,25 +34,37 @@ def read_bins(path):
                 raise ValueError("Histogram counts must be nonnegative")
             if row["extreme"]:
                 if row["extreme"] != ">=":
-                    raise ValueError("Cluster gap underflow cannot be used for threshold fitting")
+                    raise ValueError("Gap underflow cannot be used for threshold fitting")
                 key = float(row["edge_db"])
             else:
                 key = float(row["bin_low_db"])
                 high = float(row["bin_high_db"])
                 if not math.isfinite(high) or high <= key:
-                    raise ValueError("Invalid cluster gap bin edges")
+                    raise ValueError("Invalid gap bin edges")
             if not math.isfinite(key) or key < 0 or key in histograms[name]:
-                raise ValueError("Invalid or duplicate cluster gap threshold")
+                raise ValueError("Invalid or duplicate gap threshold")
             histograms[name][key] = count
-    shots = histograms["CLUSTER_GAP_DB"]
-    errors = histograms["CLUSTER_GAP_DB_ERRORS"]
+    shots = histograms[shots_name]
+    errors = histograms[errors_name]
     if not shots:
-        raise ValueError("No cluster gap bins found")
+        raise ValueError(f"No {shots_name} bins found")
     if set(errors) - set(shots):
         raise ValueError("Error histogram contains a bin absent from the shot histogram")
     if any(errors.get(edge, 0) > count for edge, count in shots.items()):
         raise ValueError("Error count exceeds shot count in a gap bin")
     return shots, errors
+
+
+def gap_format(folder):
+    cluster = folder / "cluster_gap_bins.csv"
+    complementary = folder / "gap_bins.csv"
+    if cluster.is_file() and complementary.is_file():
+        raise ValueError("Both gap CSV formats are present; input folder is ambiguous")
+    if cluster.is_file():
+        return "cluster", cluster, "CLUSTER_GAP_DB", "CLUSTER_GAP_DB_ERRORS"
+    if complementary.is_file():
+        return "complementary", complementary, "UNSIGNED_GAP", "UNSIGNED_GAP_ERRORS"
+    raise ValueError("No cluster_gap_bins.csv or gap_bins.csv found in input folder")
 
 
 def threshold_rows(shots, errors, min_shots, min_errors):
@@ -91,7 +105,7 @@ def fit_line(rows):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("input_folder", type=Path, help="out/cluster_gap_<decoder>_... folder")
+    parser.add_argument("input_folder", type=Path, help="cluster or complementary gap-study folder")
     parser.add_argument("--min-errors", type=positive, default=5,
                         help="minimum errors above a threshold for fitting (default: 5)")
     parser.add_argument("--min-shots", type=positive, default=100,
@@ -101,23 +115,25 @@ def main():
     try:
         with (folder / "summary.json").open() as source:
             summary = json.load(source)
-        shots, errors = read_bins(folder / "cluster_gap_bins.csv")
+        gap_type, bins_path, shots_name, errors_name = gap_format(folder)
+        shots, errors = read_bins(bins_path, shots_name, errors_name)
         if sum(shots.values()) != summary.get("shots_observed") or sum(errors.values()) != summary.get("logical_errors_observed"):
             raise ValueError("Histogram totals disagree with summary.json")
         rows = threshold_rows(shots, errors, args.min_shots, args.min_errors)
         fit = fit_line(rows)
-        result = {"input_folder": str(folder), "quantity": "P(logical error | cluster gap >= G)",
+        result = {"input_folder": str(folder), "gap_type": gap_type,
+                  "quantity": f"P(logical error | {gap_type} gap >= G)",
                   "gap_units": "dB", "model": "log10(probability) = intercept + slope_per_db * G",
                   "min_errors": args.min_errors, "min_shots": args.min_shots,
                   "shots_observed": sum(shots.values()), "logical_errors_observed": sum(errors.values()), **fit}
-        with (folder / "cluster_gap_thresholds.csv").open("w", newline="") as output:
+        with (folder / "gap_thresholds.csv").open("w", newline="") as output:
             writer = csv.DictWriter(output, fieldnames=rows[0].keys())
             writer.writeheader()
             writer.writerows(rows)
-        (folder / "cluster_gap_threshold_fit.json").write_text(json.dumps(result, indent=2) + "\n")
+        (folder / "gap_threshold_fit.json").write_text(json.dumps(result, indent=2) + "\n")
         print(json.dumps(result, indent=2))
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as error:
-        parser.exit(1, f"fit_cluster_gap_threshold: {error}\n")
+        parser.exit(1, f"fit_gap_threshold: {error}\n")
 
 
 if __name__ == "__main__":

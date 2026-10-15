@@ -4,12 +4,12 @@ Contributor: OpenAI Codex.
 
 ## Complementary gap statistics
 
-`scripts/run_gap_study.py` collects complementary-gap statistics from standalone
+`scripts/run_compl_gap_study.py` collects complementary-gap statistics from standalone
 uncorrelated PyMatching. It does not run the two-level evaluator or fit a routing
 threshold.
 
 ```sh
-python3 scripts/run_gap_study.py --distance 9 --shots 1000000 --cores 64
+python3 scripts/run_compl_gap_study.py --distance 9 --shots 1000000 --cores 64
 ```
 
 Specify `--qudec PATH` or a configured `--build-dir DIR` when needed. Options
@@ -25,6 +25,17 @@ The log includes `SIGNED_GAP`, `UNSIGNED_GAP`, and `UNSIGNED_GAP_ERRORS`; the
 latter reports error counts in each gap bin and supports conditional-error
 analyses. The physical logical error rate is the observed error count divided
 by observed shots. This script always uses Monte Carlo sampling.
+
+Fit `log10 P(logical error | unsigned complementary gap >= G)` versus threshold
+`G` with the same script used for cluster-gap runs:
+
+```sh
+python3 scripts/fit_gap_threshold.py out/complementary_gap_d9_...
+```
+
+The fit script writes `gap_thresholds.csv` and `gap_threshold_fit.json` in the
+run folder. It uses the `UNSIGNED_GAP` and `UNSIGNED_GAP_ERRORS` histograms;
+the signed gap is excluded because its sign encodes whether decoding failed.
 
 ## Two-level Libra evaluator
 

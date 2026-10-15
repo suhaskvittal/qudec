@@ -67,7 +67,8 @@ def parse_histograms(path):
 def mpi_capable(binary):
     cache = binary.parent / "CMakeCache.txt"
     if cache.is_file():
-        return "ENABLE_MPI:BOOL=ON" in cache.read_text()
+        return any(line.upper() == "ENABLE_MPI:BOOL=ON"
+                   for line in cache.read_text().splitlines())
     try:
         deps = subprocess.run(["ldd", str(binary)], text=True, capture_output=True, check=False).stdout
         return "libmpi" in deps.lower()

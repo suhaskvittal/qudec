@@ -96,10 +96,10 @@ errors in each of the same 1 dB gap bins.
 Fit the conditional logical error probability above a gap threshold with:
 
 ```sh
-python3 scripts/fit_cluster_gap_threshold.py out/cluster_gap_pymatching_d9_...
+python3 scripts/fit_gap_threshold.py out/cluster_gap_pymatching_d9_...
 ```
 
-This writes `cluster_gap_thresholds.csv` and `cluster_gap_threshold_fit.json`
+This writes `gap_thresholds.csv` and `gap_threshold_fit.json`
 into the run folder. For each bin lower edge `G`, it computes
 `P(logical error | cluster gap >= G)` from the cumulative error and shot counts.
 It fits `log10(P) = intercept + slope_per_db * G` by ordinary least squares
