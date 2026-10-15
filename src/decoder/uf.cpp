@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <iterator>
 #include <limits>
 #include <map>
 #include <numeric>
@@ -309,7 +310,7 @@ UnionFind::peel_forest(std::vector<uint8_t>& syndrome, ObsRef correction,
 }
 
 Result
-UnionFind::decode(SyndromeRef syndrome, ObsRef /* actual_observables */)
+UnionFind::decode(SyndromeRef syndrome, ObsRef actual_observables)
 {
     const auto start = std::chrono::steady_clock::now();
     if (syndrome.num_bits_padded() < num_detectors)
@@ -345,6 +346,8 @@ UnionFind::decode(SyndromeRef syndrome, ObsRef /* actual_observables */)
     peel_forest(remaining, result.flipped_obs, conf.report_matching_data ? &selected_edges : nullptr);
     if (conf.report_matching_data)
         report_matching(syndrome, selected_edges, result);
+    if (conf.enable_cluster_gap && actual_observables[0] != result.flipped_obs[0])
+        s_cluster_gap_errors.add(result.cluster_gap_db);
     result.matching_data.frame_flips = result.flipped_obs;
     result.matching_data.gap = 0;
 
@@ -367,7 +370,13 @@ UnionFind::report_matching(SyndromeRef syndrome, const std::vector<size_t>& sele
     // Different valid path decompositions can exist at branching vertices;
     // this deterministic decomposition preserves the chosen UF correction.
     using neighbor_type = std::pair<size_t, size_t>;
-    struct path_type { int64_t detector; ObsType frame; };
+    using correction_edge_type = MatchingData::assignment_type::correction_edge_type;
+    struct path_type
+    {
+        int64_t detector;
+        ObsType frame;
+        std::vector<correction_edge_type> correction_edges;
+    };
     std::vector<std::vector<neighbor_type>> neighbors(num_vertices_);
     for (size_t id : selected)
     {
@@ -386,12 +395,18 @@ UnionFind::report_matching(SyndromeRef syndrome, const std::vector<size_t>& sele
     {
         if (v >= num_detectors)
             result.matching_data.add({.d1=path.detector, .d2=-1, .pr=1, .w_qu=0,
-                                      .frame_flips=std::move(path.frame)});
+                                      .frame_flips=std::move(path.frame),
+                                      .correction_edges=std::move(path.correction_edges)});
         else if (pending[v])
         {
             path.frame ^= pending[v]->frame;
+            auto& other_edges = pending[v]->correction_edges;
+            path.correction_edges.insert(path.correction_edges.end(),
+                std::make_move_iterator(other_edges.begin()),
+                std::make_move_iterator(other_edges.end()));
             result.matching_data.add({.d1=pending[v]->detector, .d2=path.detector,
-                                      .pr=1, .w_qu=0, .frame_flips=std::move(path.frame)});
+                                      .pr=1, .w_qu=0, .frame_flips=std::move(path.frame),
+                                      .correction_edges=std::move(path.correction_edges)});
             pending[v].reset();
         }
         else
@@ -421,8 +436,16 @@ UnionFind::report_matching(SyndromeRef syndrome, const std::vector<size_t>& sele
                 throw std::logic_error("UnionFind path decomposition left an unmatched detector");
             auto path = std::move(*pending[v]);
             pending[v].reset();
-            for (size_t obs : edges_[parent_edge[v]].observables)
+            const auto& edge = edges_[parent_edge[v]];
+            uint64_t observable_mask = 0;
+            for (size_t obs : edge.observables)
+            {
                 path.frame[obs] ^= true;
+                observable_mask ^= uint64_t(1) << obs;
+            }
+            path.correction_edges.push_back({static_cast<int64_t>(edge.u),
+                edge.v < num_detectors ? static_cast<int64_t>(edge.v) : -1,
+                observable_mask});
             consume(parent[v], std::move(path));
         }
     }
@@ -455,7 +478,8 @@ UnionFind::print_stats(std::ostream& ostrm) const
             ostrm << " " << s_cluster_gap.to_string_some();
         ostrm << "\n";
         if (conf.print_cluster_gap_histogram)
-            ostrm << s_cluster_gap.to_string_full() << "\n";
+            ostrm << s_cluster_gap.to_string_full() << "\n"
+                  << s_cluster_gap_errors.to_string_full() << "\n";
     }
 }
 
@@ -463,6 +487,7 @@ void
 UnionFind::mpi_accumulate()
 {
     s_cluster_gap.mpi_accumulate();
+    s_cluster_gap_errors.mpi_accumulate();
 #if defined(ENABLE_MPI)
     uint64_t sums[]{stats_.timed_shots, stats_.decode_total_ns};
     MPI_Allreduce(MPI_IN_PLACE, sums, 2, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);

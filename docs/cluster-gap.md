@@ -90,7 +90,25 @@ Use `--cores 1` for serial operation; `--dry-run` prints the command. Each run
 gets a unique `out/cluster_gap_<decoder>_.../` folder containing the sampling
 log, command, `summary.json`, and `cluster_gap_bins.csv`. The summary includes
 observed shot count, mean, standard deviation, minimum and maximum when
-available.
+available. New runs also record a `CLUSTER_GAP_DB_ERRORS` histogram: logical
+errors in each of the same 1 dB gap bins.
+
+Fit the conditional logical error probability above a gap threshold with:
+
+```sh
+python3 scripts/fit_cluster_gap_threshold.py out/cluster_gap_pymatching_d9_...
+```
+
+This writes `cluster_gap_thresholds.csv` and `cluster_gap_threshold_fit.json`
+into the run folder. For each bin lower edge `G`, it computes
+`P(logical error | cluster gap >= G)` from the cumulative error and shot counts.
+It fits `log10(P) = intercept + slope_per_db * G` by ordinary least squares
+across thresholds with at least five errors and 100 shots; change these limits
+with `--min-errors` and `--min-shots`. Zero-error thresholds remain in the CSV
+but cannot enter a logarithmic fit. Cumulative threshold estimates share shots,
+so the reported `r_squared` describes fit shape, not independent observations.
+Existing run folders without per-gap logical error counts cannot support this
+fit and must be collected again with the updated binary and runner.
 
 These are empirical Monte Carlo probabilities under the selected SI1000 error
 rate. The runner deliberately has no rare-event option: per-level conditional

@@ -40,7 +40,7 @@ public:
     struct config_type
     {
         uint64_t weight_scale{1024};
-        // Decompose the chosen correction into detector pairs for PDZ.
+        // Decompose the chosen correction into detector pairs and physical paths.
         bool report_matching_data{false};
         bool enable_cluster_gap{false};
         bool print_cluster_gap_histogram{false};
@@ -48,6 +48,7 @@ public:
 
     // Full-value cluster output; histogram bins are printed only on request.
     StatsHistogram<double> s_cluster_gap{"CLUSTER_GAP_DB", 0, 256, 256};
+    StatsHistogram<double> s_cluster_gap_errors{"CLUSTER_GAP_DB_ERRORS", 0, 256, 256};
 
     struct Statistics
     {

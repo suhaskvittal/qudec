@@ -17,6 +17,7 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 NUMBER = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
 BIN = re.compile(rf"^({NUMBER})\s*<=\s*X\s*<\s*({NUMBER}):\s*(\d+)\s*$")
 EXTREME = re.compile(rf"^(<|>=)({NUMBER}):\s*(\d+)\s*$")
+HEADER = re.compile(r"^(CLUSTER_GAP_DB|CLUSTER_GAP_DB_ERRORS)\s*=+")
 
 
 def positive(value):
@@ -26,35 +27,41 @@ def positive(value):
     return value
 
 
-def parse_histogram(path):
-    text = path.read_text()
-    header = re.search(r"^CLUSTER_GAP_DB\s*=+", text, re.M)
-    if not header:
-        raise ValueError(f"Missing CLUSTER_GAP_DB histogram in {path}")
-    section = text[header.end():].split("\n", 1)[1]
-    bins, extremes, declared_count, mean, std, minimum, maximum = {}, [], None, None, None, None, None
-    for line in section.splitlines():
+def parse_histograms(path):
+    histograms, current = {}, None
+    for line in path.read_text().splitlines():
+        header = HEADER.match(line)
+        if header:
+            current = {"bins": {}, "extremes": [], "count": None, "mean_db": None,
+                       "std_db": None, "min_db": None, "max_db": None}
+            histograms[header[1]] = current
+            continue
+        if current is None:
+            continue
         match = BIN.match(line)
         if match:
-            bins[(float(match[1]), float(match[2]))] = int(match[3])
+            current["bins"][(float(match[1]), float(match[2]))] = int(match[3])
             continue
         match = EXTREME.match(line)
         if match:
-            extremes.append((match[1], float(match[2]), int(match[3])))
+            current["extremes"].append((match[1], float(match[2]), int(match[3])))
             continue
         match = re.search(r"mean\s*=\s*([^,]+).*std\s*=\s*([^,]+).*min\s*=\s*([^,]+).*max\s*=\s*([^,]+).*count\s*=\s*(\d+)", line)
         if match:
-            mean, std, minimum, maximum, declared_count = (float(match[1]), float(match[2]),
-                float(match[3]), float(match[4]), int(match[5]))
-    if declared_count is None:
-        match = re.search(r"count\s*=\s*(\d+)", section)
+            current.update(mean_db=float(match[1]), std_db=float(match[2]),
+                           min_db=float(match[3]), max_db=float(match[4]), count=int(match[5]))
+            continue
+        match = re.fullmatch(r"count\s*=\s*0", line.strip())
         if match:
-            declared_count = int(match[1])
-    count = sum(bins.values()) + sum(x[2] for x in extremes)
-    if declared_count is None or declared_count != count:
-        raise ValueError(f"Cluster histogram count mismatch: header {declared_count}, bins {count}")
-    return {"count": count, "mean_db": mean, "std_db": std, "min_db": minimum,
-            "max_db": maximum, "bins": bins, "extremes": extremes}
+            current["count"] = 0
+    for name in ("CLUSTER_GAP_DB", "CLUSTER_GAP_DB_ERRORS"):
+        if name not in histograms:
+            raise ValueError(f"Missing {name} histogram in {path}; rerun with a qudec build that records cluster-gap errors")
+        hist = histograms[name]
+        observed = sum(hist["bins"].values()) + sum(x[2] for x in hist["extremes"])
+        if hist["count"] != observed:
+            raise ValueError(f"Cluster histogram count mismatch for {name}: header {hist['count']}, bins {observed}")
+    return histograms
 
 
 def mpi_capable(binary):
@@ -139,22 +146,24 @@ def main():
     try:
         with log.open("w") as output:
             subprocess.run(command, cwd=REPOSITORY, stdout=output, stderr=subprocess.STDOUT, check=True)
-        hist = parse_histogram(log)
-        match = re.search(r"^Logical error rate:\s*([^\s]+)", log.read_text(), re.M)
-        logical_error_rate = float(match[1]) if match else None
+        histograms = parse_histograms(log)
+        hist, errors = histograms["CLUSTER_GAP_DB"], histograms["CLUSTER_GAP_DB_ERRORS"]
+        logical_error_rate = errors["count"] / hist["count"] if hist["count"] else None
         summary = {"contributor": "OpenAI Codex", "decoder": args.decoder, "sampler": "monte_carlo",
                    "distance": args.distance, "rounds": args.rounds or args.distance, "p": args.p,
                    "seed": args.seed, "shots_requested": args.shots, "max_errors": args.max_errors,
+                   "shots_observed": hist["count"], "logical_errors_observed": errors["count"],
                    "logical_error_rate": logical_error_rate,
                    "cluster_gap_db": {k: v for k, v in hist.items() if k not in ("bins", "extremes")}}
         (directory / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
         with (directory / "cluster_gap_bins.csv").open("w", newline="") as output:
             writer = csv.writer(output)
-            writer.writerow(["bin_low_db", "bin_high_db", "extreme", "edge_db", "count"])
-            for (lo, hi), count in sorted(hist["bins"].items()):
-                writer.writerow([lo, hi, "", "", count])
-            for direction, edge, count in hist["extremes"]:
-                writer.writerow(["", "", direction, edge, count])
+            writer.writerow(["histogram", "bin_low_db", "bin_high_db", "extreme", "edge_db", "count"])
+            for name, value in histograms.items():
+                for (lo, hi), count in sorted(value["bins"].items()):
+                    writer.writerow([name, lo, hi, "", "", count])
+                for direction, edge, count in value["extremes"]:
+                    writer.writerow([name, "", "", direction, edge, count])
         print(json.dumps(summary, indent=2))
         print(f"Completed cluster-gap collection: {directory}")
     except (OSError, ValueError, subprocess.CalledProcessError) as error:

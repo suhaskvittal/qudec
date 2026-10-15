@@ -798,7 +798,7 @@ struct Libra::Impl
     }
 
     DetailedResult
-    decode(SyndromeRef syndrome)
+    decode(SyndromeRef syndrome, bool force_ensemble = false)
     {
         ++stats.shots;
         std::vector<uint64_t> events;
@@ -833,7 +833,7 @@ struct Libra::Impl
         // Section V: high-gap syndromes use the original unconstrained
         // correlated matcher. Constrained correlated matching is approximate;
         // its cheaper representative can predict a different logical class.
-        if (result.gap_db >= config.gap_threshold_db)
+        if (!force_ensemble && result.gap_db >= config.gap_threshold_db)
         {
             start = Clock::now();
             auto fallback = decode_candidate(*fallback_matcher, events, false);
@@ -846,7 +846,7 @@ struct Libra::Impl
         }
 
         std::vector<Cycle> positive_cycles[2];
-        if (result.gap_db < config.gap_threshold_db && config.ensemble_size)
+        if ((force_ensemble || result.gap_db < config.gap_threshold_db) && config.ensemble_size)
         {
             result.ensemble_used = true;
             ++stats.ensemble_shots;
@@ -936,6 +936,28 @@ Libra::decode(SyndromeRef syndrome, ObsRef)
     stats.decode_total_ns += elapsed_ns;
     stats.decode_min_ns = std::min(stats.decode_min_ns, elapsed_ns);
     stats.decode_max_ns = std::max(stats.decode_max_ns, elapsed_ns);
+    return out;
+}
+
+Result
+Libra::decode_with_ensemble(SyndromeRef syndrome, ObsRef)
+{
+    // Contributor: OpenAI Codex. Preserve the same timing and result contract
+    // as decode(), while making the seed gap the sole ensemble trigger.
+    const auto start = Clock::now();
+    auto result = impl_->decode(syndrome, true);
+    Result out;
+    out.flipped_obs = ObsType(1);
+    out.flipped_obs[0] = result.prediction;
+    out.matching_data.frame_flips = out.flipped_obs;
+    out.matching_data.gap = result.gap_db;
+    out.matching_data.probability = std::exp(result.log_masses[result.prediction]);
+    out.decode_latency_ns = elapsed_nanoseconds(start);
+    auto& stats = impl_->stats;
+    ++stats.timed_shots;
+    stats.decode_total_ns += out.decode_latency_ns;
+    stats.decode_min_ns = std::min(stats.decode_min_ns, out.decode_latency_ns);
+    stats.decode_max_ns = std::max(stats.decode_max_ns, out.decode_latency_ns);
     return out;
 }
 

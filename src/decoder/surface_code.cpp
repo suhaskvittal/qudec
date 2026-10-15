@@ -106,7 +106,8 @@ PyMatching::PyMatching(const stim::DetectorErrorModel& dem, config_type conf)
     obs_det_id_(dem.count_detectors()),
     mwpm_(pm::detector_error_model_to_mwpm(
                 conf.enable_gap_estimation ? _build_gap_dem(dem) : dem,
-                pm::NUM_DISTINCT_WEIGHTS, conf.correlated, conf.correlated)),
+                pm::NUM_DISTINCT_WEIGHTS,
+                conf.correlated || conf.report_matching_data, conf.correlated)),
     cluster_gap_graph_(conf.enable_cluster_gap ? num_detectors : 0)
 {
     if (conf.enable_cluster_gap)
@@ -168,6 +169,8 @@ PyMatching::decode(SyndromeRef syn, ObsRef obs)
                                conf.report_matching_data && !conf.enable_gap_estimation);
     if (!conf.enable_gap_estimation)
     {
+        if (conf.enable_cluster_gap && obs[0] != out.flipped_obs[0])
+            s_cluster_gap_errors.add(out.cluster_gap_db);
         out.decode_latency_ns = record_latency();
         return out;
     }
@@ -287,6 +290,25 @@ PyMatching::internal_decode(SyndromeRef syn, bool fire_obs_det, pm::total_weight
                 .frame_flips = ObsType(num_observables)};
             for (size_t k = 0; k < num_observables; k++)
                 assignment.frame_flips[k] = (edge_obs_mask >> k) & 1;
+            if (!conf.enable_gap_estimation)
+            {
+                const auto& search_nodes = mwpm_.search_flooder.graph.nodes;
+                const size_t from = static_cast<size_t>(edge.loc_from - node_begin);
+                const size_t to = edge.loc_to ? static_cast<size_t>(edge.loc_to - node_begin) : SIZE_MAX;
+                mwpm_.search_flooder.iter_edges_on_shortest_path_from_middle(
+                    from, to, [&](const pm::SearchGraphEdge& path_edge)
+                    {
+                        const auto* source = path_edge.detector_node;
+                        const auto* neighbor = source->neighbors[path_edge.neighbor_index];
+                        uint64_t observable_mask = 0;
+                        for (size_t observable : source->neighbor_observable_indices[path_edge.neighbor_index])
+                            observable_mask ^= uint64_t(1) << observable;
+                        assignment.correction_edges.push_back({
+                            static_cast<int64_t>(source - search_nodes.data()),
+                            neighbor ? static_cast<int64_t>(neighbor - search_nodes.data()) : -1,
+                            observable_mask});
+                    });
+            }
             res.matching_data.add(assignment);
         }
         weight_out = 0;
@@ -328,6 +350,7 @@ PyMatching::mpi_accumulate()
     MPI_Allreduce(MPI_IN_PLACE, &stats_.decode_max_ns, 1, MPI_UINT64_T, MPI_MAX, MPI_COMM_WORLD);
 #endif
     s_cluster_gap.mpi_accumulate();
+    s_cluster_gap_errors.mpi_accumulate();
     s_signed_gap.mpi_accumulate();
     s_unsigned_gap.mpi_accumulate();
     s_unsigned_gap_errors.mpi_accumulate();
@@ -352,7 +375,8 @@ PyMatching::print_stats(std::ostream& ostrm) const
             ostrm << " " << s_cluster_gap.to_string_some();
         ostrm << "\n";
         if (conf.print_cluster_gap_histogram)
-            ostrm << s_cluster_gap.to_string_full() << "\n";
+            ostrm << s_cluster_gap.to_string_full() << "\n"
+                  << s_cluster_gap_errors.to_string_full() << "\n";
     }
     // The gap histogram is only populated when complementary-gap estimation is enabled;
     // otherwise it is empty (and its mean would divide by a zero count).

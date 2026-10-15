@@ -41,6 +41,7 @@ public:
 
     // Full-value cluster output; histogram bins are printed only on request.
     StatsHistogram<double> s_cluster_gap{"CLUSTER_GAP_DB", 0, 256, 256};
+    StatsHistogram<double> s_cluster_gap_errors{"CLUSTER_GAP_DB_ERRORS", 0, 256, 256};
 
     struct Statistics
     {

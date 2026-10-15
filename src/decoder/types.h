@@ -31,11 +31,20 @@ struct MatchingData
     using weight_type = uint64_t;
     struct assignment_type
     {
+        // Physical correction edges selected along this matched path. A boundary
+        // endpoint is -1. This is populated when matched paths are requested.
+        struct correction_edge_type
+        {
+            det_id_type d1;
+            det_id_type d2;
+            uint64_t observable_mask;
+        };
         det_id_type d1;
         det_id_type d2;
         double      pr;
         weight_type w_qu;
         ObsType     frame_flips;
+        std::vector<correction_edge_type> correction_edges;
 
         int matching_step{0};
         int cluster_id{0};

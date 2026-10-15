@@ -94,6 +94,9 @@ public:
      * matching_data.probability is an unnormalized class score, not confidence.
      * */
     Result decode(SyndromeRef, ObsRef);
+    // Contributor: OpenAI Codex. The seed decoder has already selected this
+    // syndrome for ensembling, independently of Libra's internal gap.
+    Result decode_with_ensemble(SyndromeRef, ObsRef);
     DetailedResult decode_detailed(SyndromeRef);
 
     // Prepare immutable perturbed priors before timing decoding.
