@@ -1,0 +1,57 @@
+Phantom cluster identification: software and FPGA notes
+=====================================================
+
+Current software implementation
+-------------------------------
+For a syndrome with H fired detectors, make an undirected graph with one vertex
+per fired detector. Vertices i and j are adjacent when their pairwise affinity
+is at most the current threshold. The software implementation uses root-based
+union-find to obtain connected components. It decodes components of size at
+most ASTREA_MAX_HW (currently 10) and skips larger components. The affinity
+threshold selection and per-cluster PyMatching calls are separate from the
+component-finding method.
+
+Why the original label update was insufficient
+----------------------------------------------
+Writing parent[max(i,j)] = min(i,j) can overwrite a previous connection. For
+H=3 and affinities A(0,2)=A(1,2)=1, A(0,1)=2, threshold 1, the pair (1,2)
+sets parent[2]=1 and the later pair (2,0) overwrites it with parent[2]=0.
+The resulting labels split one connected component. The original cyclic pair
+loop also visits no pairs when H=2 and misses opposite pairs for even H.
+Union of the current roots addresses both problems when all unordered pairs
+are visited.
+
+Hardware ideas discussed; no FPGA implementation selected
+---------------------------------------------------------
+H denotes the syndrome's fired-detector count, expected to reach roughly
+150-200. ASTREA_MAX_HW=10 is the maximum component size to correct, not the
+maximum syndrome weight. A hardware bitmask for detector membership therefore
+needs capacity for the supported maximum H.
+
+One approach grows a membership bitmask from every fired detector. In a
+synchronous round, a candidate ORs in neighbors of all detectors currently in
+its mask, using only masks from the previous round. For a connected component
+of size at most 10, the candidate converges within 9 expansion rounds. For a
+larger component, every candidate sees at least 11 vertices within 10 rounds
+and can be rejected. Identical completed masks are duplicates; only their
+lowest-index member need emit a cluster. At H=200, one bank of 200 masks of
+200 bits is about 5 KB. The OR routing and adjacency bandwidth, rather than
+the mask storage, are the principal concern if every candidate grows at once.
+A fixed number of concurrent candidates could trade latency for less hardware.
+
+Another approach stores a membership mask for each current cluster and ORs
+two masks on a merge. A CAM can find rows with either old mask and broadcast
+the merged mask to all members. This works if every member of a component
+always has the same mask and updates are coordinated. A narrower variant
+stores a cluster ID per detector (8 bits suffice for 200 initial IDs), then
+uses a CAM to rewrite all members of one old ID to the merged ID. Both avoid
+parent-pointer chasing, but simultaneous merges that involve the same current
+cluster require arbitration or a combined update.
+
+Odd/even scheduling by detector index can make detector pairs disjoint, with
+special handling for an odd H. It does not guarantee that current clusters
+are disjoint: after (0,1), (2,3), ... have merged, the next-stage edges
+(1,2), (3,4), ... may each touch the same current cluster through different
+member detectors. Thus a fixed two- or three-stage edge schedule alone does
+not settle overlapping CAM writes. The schedule would need to account for
+current cluster IDs, or updates would need to propagate until they converge.
