@@ -1,20 +1,22 @@
+# Implementation authored by OpenAI Codex.
 from sys import argv
 import os
 
 decoder = argv[1]
 p = float(argv[2])
-cores = argv[3]
-output_folder = argv[4]
+p_std = float(argv[3])
+cores = argv[4]
+output_folder = argv[5]
 if len(argv) > 5:
-    cli_args = ' '.join(argv[5:])
+    cli_args = ' '.join(argv[6:])
 else:
     cli_args = ''
 
 seed = 0
 if output_folder == 'auto':
-    output_folder = f'out/{decoder}_sc_error_rates_p{p:.2e}'
+    output_folder = f'out/{decoder}_sc_error_rates_p{p:.2e}_std{p_std:.2e}_nu'
 else:
-    output_folder = f'out/{output_folder}_sc_error_rates_p{p:.2e}'
+    output_folder = f'out/{output_folder}_sc_error_rates_p{p:.2e}_std{p_std:.2e}_nu'
 
 # (d, shots)
 comb = [
@@ -33,12 +35,14 @@ for (d, shots) in comb:
     # write cli and other info to setup.log
     with open(f'{output_folder}/d{d}/setup.log', 'w') as wr:
         wr.write(f'''p = {p}
+std = {p_std}
 d = {d}
 shots = {shots}
 seed = {seed}
 cores = {cores}
 cli_args = {cli_args}
 ''')
-    cmd = f'mpirun -np {cores} ./build/qudec {decoder} {d} -p {p} --seed {seed} --mc-max-samples {shots} {cli_args} > {output_folder}/d{d}/output.log'
-    print(cmd)
-    os.system(cmd)
+    for r in range(10):
+        cmd = f'mpirun -np {cores} ./build/qudec {decoder} {d} -p {p} --seed {seed} --mc-max-samples {shots} --noise-log-stddev {p_std} --noise-seed {r} {cli_args} > {output_folder}/d{d}/output.{r}.log'
+        print(cmd)
+        os.system(cmd)

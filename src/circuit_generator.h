@@ -7,6 +7,7 @@
 #define CIRCUIT_GENERATOR_h
 
 #include <stim.h>
+#include "component_error_distribution.h"
 
 #include <cstdint>
 
@@ -39,7 +40,8 @@
  * */
 // OpenAI GPT-6-Sol: Expose optional interior opposite-basis detectors while preserving existing calls.
 stim::Circuit sc_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
-                        bool include_opposite_basis_detectors = false);
+                        bool include_opposite_basis_detectors = false,
+                        const ComponentErrorDistribution& noise_distribution = {});
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
@@ -72,9 +74,22 @@ stim::Circuit sc_si1000(uint32_t distance, uint32_t rounds, double p, bool is_me
  * */
 // OpenAI GPT-6-Sol: Keep toric SI1000's detector option consistent with the rotated code.
 stim::Circuit toric_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
-                           bool include_opposite_basis_detectors = false);
+                           bool include_opposite_basis_detectors = false,
+                           const ComponentErrorDistribution& noise_distribution = {});
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
+
+// Triangular, one-logical-qubit color-code memories. Odd distance >= 3,
+// rounds >= 1, finite 0 <= p <= 0.2. Both check bases are compared between
+// rounds; only the memory basis is deterministic at initialization/readout.
+// Every flag is a SINGLE-round detector, in both bases, including round one.
+// DETECTOR coordinates: (x, y, round, color, basis, is_flag), where
+// color = 0/1/2 for red/green/blue; basis = 0/1 for X/Z.
+// Bulk faces: cc666 has hexagons; cc488 has red squares and green/blue octagons.
+stim::Circuit cc666_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
+                            const ComponentErrorDistribution& noise_distribution = {});
+stim::Circuit cc488_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
+                            const ComponentErrorDistribution& noise_distribution = {});
 
 #endif // CIRCUIT_GENERATOR_h

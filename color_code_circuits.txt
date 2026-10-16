@@ -1,0 +1,178 @@
+Color-code Stim circuits
+========================
+
+Public API (src/circuit_generator.h):
+
+    stim::Circuit cc666_si1000(uint32_t distance, uint32_t rounds,
+                              double p, bool is_memory_x);
+    stim::Circuit cc488_si1000(uint32_t distance, uint32_t rounds,
+                              double p, bool is_memory_x);
+
+Implemented in src/color_code_circuits.cpp and linked into qudeclib.
+Example: auto circuit = cc488_si1000(5, 5, 0.001, false);
+Write circuit.str() to a .stim file to use it with other Stim tools.
+No color-code decoder or changes to the existing surface-code CLI are included.
+
+All SI1000 generators also accept an optional final
+ComponentErrorDistribution argument for fixed, seeded non-uniform rates:
+
+    ComponentErrorDistribution spread{.log_stddev=0.5, .seed=123};
+    auto circuit = cc488_si1000(5, 5, 0.001, false, spread);
+
+The default has zero spread and reproduces uniform rates exactly. See
+docs/nonuniform_noise.md for the component identity and lognormal convention.
+
+Patches and memory experiments
+------------------------------
+
+Both families are triangular planar CSS codes encoding one logical qubit.
+Distance must be odd and at least 3; rounds must be at least 1. The data
+qubits are prepared and destructively measured in X when is_memory_x=true,
+and in Z otherwise. Observable 0 is the parity of all final data outcomes,
+a representative of the corresponding logical operator.
+
+cc666 uses the triangular honeycomb patch: bulk checks have six vertices,
+and boundary checks have four. The number of data qubits is (3*d*d+1)/4.
+cc488 uses the standard triangular square/octagon patch: red checks have
+four vertices, bulk green and blue checks have eight, and shortened green
+and blue boundary checks have four. Its data count is (d*d+2*d-1)/2.
+At distance 3, both are seven-qubit codes with three weight-four faces.
+
+Each face supports an X stabilizer and a Z stabilizer over the same data
+vertices. It has two dedicated ancillas, reused for the two bases and all
+rounds. With n data qubits, there are (n-1)/2 faces, n-1 ancillas, and 2*n-1
+total qubits. Data indices are 0 through n-1. Face k has ancillas n+2*k
+(named a) and n+2*k+1 (named b).
+
+Bell-flagged extraction
+----------------------
+
+The local construction is the "Bell Flagging (standard color code circuit)"
+in Figure 2 of Gidney and Jones, arXiv:2312.08813 (the layouts are Figure 1):
+https://arxiv.org/pdf/2312.08813
+
+Each extraction prepares a in |+> and b in |0>, and applies CX(a,b), making
+a Bell pair. The face vertices are ordered around the perimeter and split
+into two equal contiguous halves. Each half interacts with its own ancilla.
+For an X check, the ancillas control CX gates targeting data; for a Z
+check, data control CX gates targeting the ancillas. Matching steps on the
+two halves run in parallel. After another CX(a,b), measure a in X and b in Z.
+
+For X extraction, a gives the check and b gives the flag. For Z extraction,
+b gives the check and a gives the flag. The ideal flag is always zero,
+independently of the data state and of all previous flags. No feedback is
+needed. The same gadget applies to four-, six-, and eight-vertex faces.
+
+A round consists of X extraction for red, green, and blue faces, followed
+by Z extraction for red, green, and blue faces. Faces of the same color
+have disjoint data supports, so they run in parallel without gate collisions.
+A boundary face with a shorter support finishes its interactions earlier
+and idles through the remaining interaction steps for that color.
+
+This deliberately uses six color/basis subrounds. It implements the local
+bell-flagged gadget, rather than reproducing the paper's optimized global
+schedule. In particular, its depth and idle-noise exposure differ from the
+paper's benchmark circuits. Full noisy circuit distance/fault tolerance,
+especially for the eight-body extension, is not asserted by the validation
+below; flags and noiseless parity checks alone do not establish it.
+
+Detector metadata
+-----------------
+
+Every DETECTOR has six coordinates:
+
+    (x, y, time, color, basis, is_flag)
+
+x,y:     geometric face center.
+time:    extraction round, starting at 0; final data checks use time=rounds.
+color:   0=red, 1=green, 2=blue.
+basis:   0=X check/extraction, 1=Z check/extraction.
+is_flag: 0=stabilizer detector, 1=flag detector.
+
+Time advances using SHIFT_COORDS(0,0,1), leaving metadata coordinates fixed.
+The two detector kinds at a face share a position and are distinguished by
+is_flag; the X and Z detectors are distinguished by basis. In Python:
+
+    coordinates = circuit.get_detector_coordinates()
+    flag_ids = [i for i, c in coordinates.items() if c[5] == 1]
+    red_check_ids = [i for i, c in coordinates.items()
+                     if c[3] == 0 and c[5] == 0]
+
+These six-coordinate labels are project metadata, not Chromobius's packed
+fourth-coordinate convention; adapt them if connecting that decoder later.
+Data QUBIT_COORDS contain x,y. Ancilla QUBIT_COORDS contain
+(x,y,color,role), with role=1 for a and role=2 for b. An individual data
+qubit can border several colors, so it is not assigned a single face color.
+
+First round: checks in the memory basis are compared against their known
+initial +1 values. Opposite-basis checks are initially random, so no such
+first-round detectors are emitted. BOTH bases' flags are emitted immediately.
+
+Later rounds: each check outcome is XORed with the previous round's outcome
+of the same face and basis. Each flag detector contains ONLY its own current
+measurement record. It is never XORed with a previous round's flag.
+
+Final readout: each memory-basis face parity on the final data measurements
+is XORed with its last ancilla check outcome. There are no final opposite-
+basis checks or additional flags after destructive data measurement.
+
+For F faces and R rounds there are 4*F*R detectors: 2*F*R flags and
+2*F*R stabilizer detectors (including initialization and final boundaries).
+There are 4*F*R+n measurements. The repeated interior round is a Stim REPEAT
+block, so text size does not grow linearly with the requested round count.
+
+SI1000 noise
+------------
+
+The implementation uses Z-basis hardware operations: R, H, CX, M.
+Preparing |+> is R then H; X readout is H then M. Every H and CX layer
+is explicitly separated by TICKs. Rates follow the superconducting-inspired
+SI1000 convention, e.g. NoiseModel.si1000 in:
+https://github.com/quantumlib/chromobius/blob/main/src/gen/_core/_noise.py
+
+  H:                DEPOLARIZE1(p/10) afterwards.
+  CX:               DEPOLARIZE2(p) afterwards, on the same pair.
+  R:                X_ERROR(2p) afterwards.
+  M:                X_ERROR(5p) immediately before measurement, and
+                    DEPOLARIZE1(p) afterwards.
+  Idle:             DEPOLARIZE1(p/10) per layer.
+  Waiting for R/M:  an additional, separate DEPOLARIZE1(2p) channel on
+                    idle qubits in that reset/measurement layer.
+
+The pre-M flip is equivalent to a readout-bit flip for these measurements:
+ancillas are reset before reuse, and data measurement is destructive.
+The waiting channel is applied to all idle qubits, including other colors'
+ancillas, not just data. Separate reset and measurement layers each incur
+waiting noise. All rate arguments must be finite and 0 <= p <= 0.2, since
+the largest probability is 5p. At p=0 no noise instructions are emitted.
+The existing surface/toric generators have their own older noise helpers;
+these color-code functions use the rates explicitly listed here.
+
+Validation and provenance
+-------------------------
+
+The CTest target color_code_circuits_test covers both families, both memory
+bases, d=3,5,7,9, and R=1,2,5. For all 48 configurations it samples 1024
+zero-noise shots and requires no detection events or logical flips. It also
+checks absolute measurement reference parities so that subtracting Stim's
+reference sample cannot hide a constant nonzero parity. Detector-error-model
+construction checks determinism without allowing gauge detectors, at both
+p=0 and p=0.001. No graphlike error decomposition is requested, because
+color-code errors naturally produce hyperedges.
+
+Further checks cover qubit/measurement/detector counts, color and flag
+metadata, commuting even-weight faces, disjoint same-color faces, CSS rank
+(one encoded qubit), exact data-code distance for d=3,5, independent flag
+readout faults, valid Stim serialization, and invalid inputs.
+
+Run with:
+    cmake -S . -B .agentic_artifacts/color_codes/build -DBUILD_TESTING=ON
+    cmake --build .agentic_artifacts/color_codes/build --target color_code_circuits_test -j 6
+    ctest --test-dir .agentic_artifacts/color_codes/build -R '^color_code_circuits$' --output-on-failure
+
+The square/octagon patch coordinates are adapted and simplified from the
+Apache-2.0 quantumlib/chromobius layout implementation, Copyright 2023
+Google LLC. Source:
+https://github.com/quantumlib/chromobius/blob/main/src/clorco/color_code/_color_code_layouts.py
+The license is retained in docs/color_code_layout_LICENSE. The extraction
+schedule, Stim metadata, noise placement, and tests are implemented here.

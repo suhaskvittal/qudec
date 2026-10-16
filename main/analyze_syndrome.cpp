@@ -7,7 +7,7 @@
 */
 
 #include "circuit_generator.h"
-#include "decoder/surface_code.h"
+#include "decoder/pymatching.h"
 #include "hypergraph.h"
 #include "preprocessor/affinity.h"
 

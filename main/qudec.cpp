@@ -5,7 +5,8 @@
  * */
 
 #include <circuit_generator.h>
-#include <decoder/surface_code.h>
+#include <decoder/pymatching.h>
+#include <decoder/blossom5.h>
 #include <decoder/libra.h>
 #include <decoder/harmony.h>
 #include <decoder/seeded.h>
@@ -44,6 +45,8 @@ run_cli(int argc, char* argv[], int world_rank)
             r;
     double p;
     ExperimentConfig conf;
+    ComponentErrorDistribution noise_distribution;
+    int64_t noise_seed = 0;
 
     /*
      * PyMatching parameters:
@@ -76,6 +79,8 @@ run_cli(int argc, char* argv[], int world_rank)
         .optional("-r", "--rounds", "Number of rounds (-1 = same as code distance)", r, -1)
         .optional("-v", "--verbose", "Verbosity level", conf.verbosity, 0)
         .optional("", "--seed", "Sampling seed (MPI ranks use distinct streams)", conf.seed, 0)
+        .optional("", "--noise-log-stddev", "Component error-rate spread: standard deviation in log space (0 = uniform)", noise_distribution.log_stddev, 0.0)
+        .optional("", "--noise-seed", "Fixed hardware error-model seed (shared across MPI ranks)", noise_seed, 0)
         .optional("-m", "--method", "Sampler method: monte_carlo or rare_event", conf.method, "monte_carlo")
         .optional("-pp", "--print-progress", "Print simulation progress", conf.print_progress, false)
         .optional("-g", "--gap", "Enable complementary gap estimation (pymatching only)", enable_gap, false)
@@ -116,6 +121,10 @@ run_cli(int argc, char* argv[], int world_rank)
 
     if (r < 0)
         r = d;
+    if (noise_seed < 0)
+        throw std::invalid_argument("--noise-seed must be nonnegative");
+    noise_distribution.seed = static_cast<uint64_t>(noise_seed);
+    noise_distribution.validate();
 
     if (decoder_name != "pymatching" && decoder_name != "blossom5" &&
         decoder_name != "tesseract" && decoder_name != "libra" && decoder_name != "seeded" &&
@@ -175,7 +184,11 @@ run_cli(int argc, char* argv[], int world_rank)
         decoder_name == "harmony" || correlated_pymatching)
         include_opposite_basis_detectors = true;
 
-    auto circuit = sc_si1000(d, r, p, false, include_opposite_basis_detectors);
+    auto circuit = sc_si1000(d, r, p, false, include_opposite_basis_detectors, noise_distribution);
+    if (world_rank == 0 && noise_distribution.log_stddev > 0)
+        std::cout << "Component noise: log_stddev=" << noise_distribution.log_stddev
+                  << " model_seed=" << noise_distribution.seed
+                  << " nominal_p=" << p << '\n';
 
     // Convert to DEM with error decomposition required by PyMatching
     auto dem = stim::circuit_to_dem(circuit, {.decompose_errors = true});

@@ -3,7 +3,7 @@
 #define QUDEC_DECODER_SEEDED_H
 
 #include "decoder/libra.h"
-#include "decoder/surface_code.h"
+#include "decoder/pymatching.h"
 #include "decoder/uf.h"
 
 #include <pymatching/sparse_blossom/driver/mwpm_decoding.h>

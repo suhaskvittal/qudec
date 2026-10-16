@@ -39,7 +39,7 @@ averages are not physical-frequency weighted latency estimates.
 
 ```cpp
 #include "decoder/pdz.h"
-#include "decoder/surface_code.h"
+#include "decoder/pymatching.h"
 #include "decoder/uf.h"
 
 dec::UnionFind initial(dem, {.report_matching_data=true});

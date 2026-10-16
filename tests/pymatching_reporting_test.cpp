@@ -2,7 +2,7 @@
  *  contributor: OpenAI Codex
  * */
 
-#include "decoder/surface_code.h"
+#include "decoder/pymatching.h"
 
 #include <iostream>
 #include <stdexcept>

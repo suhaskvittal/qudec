@@ -11,7 +11,7 @@
  */
 #include "circuit_generator.h"
 #include "decoder/libra.h"
-#include "decoder/surface_code.h"
+#include "decoder/pymatching.h"
 #include "libra_splitting.h"
 #if defined(LIBRA_SPLITTING_LOCAL)
 #include "libra_local_splitting.h"

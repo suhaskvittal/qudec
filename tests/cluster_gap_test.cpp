@@ -1,7 +1,7 @@
 /* Contributor: OpenAI Codex. */
 
 #include "circuit_generator.h"
-#include "decoder/surface_code.h"
+#include "decoder/pymatching.h"
 #include "decoder/uf.h"
 
 #include <stim/simulators/dem_sampler.h>

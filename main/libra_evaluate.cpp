@@ -12,7 +12,7 @@
  */
 #include "circuit_generator.h"
 #include "decoder/libra.h"
-#include "decoder/surface_code.h"
+#include "decoder/pymatching.h"
 #include "libra_rare_event.h"
 #include "sampler.h"
 

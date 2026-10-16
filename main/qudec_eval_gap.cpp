@@ -5,7 +5,7 @@
 
 #include "circuit_generator.h"
 #include "decoder/libra.h"
-#include "decoder/surface_code.h"
+#include "decoder/pymatching.h"
 #include "decoder/uf.h"
 #include "sampler.h"
 #include "stats.h"

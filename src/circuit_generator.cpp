@@ -163,7 +163,8 @@ struct toric_coord
 
 stim::Circuit
 sc_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
-          bool include_opposite_basis_detectors)
+          bool include_opposite_basis_detectors,
+          const ComponentErrorDistribution& noise_distribution)
 {
     using namespace stim;
 
@@ -376,7 +377,7 @@ sc_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
     std::sort(obs_inc.begin(), obs_inc.end());
     tail.safe_append_ua("OBSERVABLE_INCLUDE", obs_inc, 0);
 
-    return head + body * (rounds - 1) + tail;
+    return apply_component_error_distribution(head + body * (rounds - 1) + tail, noise_distribution);
 }
 
 ////////////////////////////////////////////////////////////////
@@ -384,7 +385,8 @@ sc_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
 
 stim::Circuit
 toric_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
-             bool include_opposite_basis_detectors)
+             bool include_opposite_basis_detectors,
+          const ComponentErrorDistribution& noise_distribution)
 {
     using namespace stim;
 
@@ -589,7 +591,7 @@ toric_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
         tail.safe_append_ua("OBSERVABLE_INCLUDE", obs_inc, (double)obs_id);
     }
 
-    return head + body * (rounds - 1) + tail;
+    return apply_component_error_distribution(head + body * (rounds - 1) + tail, noise_distribution);
 }
 
 ////////////////////////////////////////////////////////////////

@@ -7,7 +7,7 @@
 */
 
 #include "circuit_generator.h"
-#include "decoder/surface_code.h"
+#include "decoder/pymatching.h"
 #include "decoder/tesseract.h"
 #include "sampler.h"
 
