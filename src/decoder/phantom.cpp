@@ -97,38 +97,40 @@ Phantom::decode(SyndromeRef s, ObsRef obs)
     }
 
     const size_t max_aff_start = std::max(size_t{1}, (d-1)/2);
-    for (size_t a = max_aff_start; a > 0 && remaining() > ASTREA_MAX_HW; a--)
+    for (size_t a = max_aff_start; a > max_aff_start && remaining() > ASTREA_MAX_HW; a--)
     {
         auto clusters = build_clusters(a);
-        if (clusters.size() > 0)
+        // run pymatching on each cluster and accumulate results.
+        std::sort(clusters.begin(), clusters.end(),
+                [] (const auto& x, const auto& y) { return x.size() > y.size(); });
+        for (const auto& cluster : clusters)
         {
-            // run pymatching on each cluster and accumulate results.
-            for (const auto& cluster : clusters)
-            {
-                SyndromeType cs(num_detectors);
-                for (auto i : cluster) 
-                    cs[i] = 1;
-                auto sub_result = internal_matcher_->decode(cs, obs);
-                out.flipped_obs ^= sub_result.flipped_obs;
+            SyndromeType cs(num_detectors);
+            for (auto i : cluster) 
+                cs[i] = 1;
+            auto sub_result = internal_matcher_->decode(cs, obs);
+            out.flipped_obs ^= sub_result.flipped_obs;
 
-                for (auto i : cluster)
-                    is_matched_[i] = true;
+            for (auto i : cluster)
+                is_matched_[i] = true;
 
-#if defined(PHANTOM_DEUBG)
-                std::cout << "(a = " << a < << ") cluster: ";
-                for (size_t i : cluster)
+#if defined(PHANTOM_DEBUG)
+            std::cout << "(a = " << a << ") cluster: ";
+            for (size_t i : cluster)
+                std::cout << " " << i;
+            std::cout << ", obs = ";
+            for (size_t i = 0; i < num_observables; i++)
+                if (sub_result.flipped_obs[i])
                     std::cout << " " << i;
-                std::cout << ", obs = ";
-                for (size_t i = 0; i < num_observables; i++)
-                    if (sub_result.flipped_obs[i])
-                        std::cout << " " << i;
-                std::cout << ", remaining = ";
-                for (size_t d : detectors_)
-                    if (!is_matched_[d])
-                        std::cout << " " << d;
-                std::cout << "\n";
+            std::cout << ", remaining = ";
+            for (size_t d : detectors_)
+                if (!is_matched_[d])
+                    std::cout << " " << d;
+            std::cout << "\n";
 #endif
-            }
+
+            if (remaining() <= ASTREA_MAX_HW)
+                break;
         }
     }
 
@@ -141,6 +143,17 @@ Phantom::decode(SyndromeRef s, ObsRef obs)
                 rem_s[d] ^= 1;
         auto rem_out = internal_matcher_->decode(rem_s, obs);
         out.flipped_obs ^= rem_out.flipped_obs;
+#if defined(PHANTOM_DEBUG)
+        std::cout << "remaining = ";
+        for (auto d : detectors_)
+            if (!is_matched_[d])
+                std::cout << " " << d;
+        std::cout << ", hw = " << rem_s.popcnt() << ", obs =";
+        for (size_t i = 0; i < num_observables; i++)
+            if (obs[i])
+                std::cout << " " << i;
+        std::cout << "\n";
+#endif
     }
 
 #if defined(PHANTOM_DEBUG)
@@ -219,7 +232,7 @@ Phantom::filter(size_t w)
     ObsType dummy(num_observables);
     auto out = internal_matcher_->decode(s, dummy);
 #if defined(PHANTOM_DEBUG)
-    std::cout << "filter flipped obs: ";
+    std::cout << "filter(" << w << ") flipped obs: ";
     for (size_t i = 0; i < num_observables; i++)
         if (out.flipped_obs[i])
             std::cout << i;
