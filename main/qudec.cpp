@@ -6,6 +6,7 @@
 
 #include <circuit_generator.h>
 #include <decoder/pymatching.h>
+#include <decoder/concat_mwpm.h>
 #include <decoder/blossom5.h>
 #include <decoder/libra.h>
 #include <decoder/harmony.h>
@@ -41,6 +42,7 @@ run_cli(int argc, char* argv[], int world_rank)
      * Simulation configuration:
      * */
     std::string decoder_name;
+    std::string code_name;
     int64_t d,
             r;
     double p;
@@ -73,8 +75,9 @@ run_cli(int argc, char* argv[], int world_rank)
     std::string harmony_pooling = "sum_likelihood";
 
     ARGPARSE()
-        .required("decoder-name", "Decoder: pymatching, blossom5, tesseract, libra, seeded, uf, harmony", decoder_name)
-        .required("code-distance", "Code distance of surface code", d)
+        .required("decoder-name", "Decoder: pymatching, blossom5, tesseract, libra, seeded, uf, harmony, concat_mwpm", decoder_name)
+        .required("code-distance", "Code distance", d)
+        .optional("", "--code", "Code family: sc or cc666 (default: cc666 for concat_mwpm, sc otherwise)", code_name, "")
         .optional("-p", "--physical-error-rate", "Physical error rate", p, 1e-3)
         .optional("-r", "--rounds", "Number of rounds (-1 = same as code distance)", r, -1)
         .optional("-v", "--verbose", "Verbosity level", conf.verbosity, 0)
@@ -128,10 +131,17 @@ run_cli(int argc, char* argv[], int world_rank)
 
     if (decoder_name != "pymatching" && decoder_name != "blossom5" &&
         decoder_name != "tesseract" && decoder_name != "libra" && decoder_name != "seeded" &&
-        decoder_name != "uf" && decoder_name != "harmony")
+        decoder_name != "uf" && decoder_name != "harmony" && decoder_name != "concat_mwpm")
     {
         throw std::invalid_argument("Unknown decoder name: " + decoder_name);
     }
+    if (code_name.empty()) code_name = decoder_name == "concat_mwpm" ? "cc666" : "sc";
+    if (code_name != "sc" && code_name != "cc666")
+        throw std::invalid_argument("Unknown code family: " + code_name);
+    if (decoder_name == "concat_mwpm" && code_name != "cc666")
+        throw std::invalid_argument("concat_mwpm requires --code cc666");
+    if (decoder_name == "concat_mwpm" && enable_gap)
+        throw std::invalid_argument("--gap is not available for concat_mwpm");
 
     if (conf.method != "monte_carlo" && conf.method != "rare_event")
         throw std::invalid_argument("Unknown sampler method: " + conf.method);
@@ -184,14 +194,17 @@ run_cli(int argc, char* argv[], int world_rank)
         decoder_name == "harmony" || correlated_pymatching)
         include_opposite_basis_detectors = true;
 
-    auto circuit = sc_si1000(d, r, p, false, include_opposite_basis_detectors, noise_distribution);
+    // Contributor: OpenAI Codex. Color-code flags and both check bases are
+    // emitted by the cc666 generator; their original DEM events stay intact.
+    auto circuit = code_name == "cc666" ? cc666_si1000(d,r,p,false,noise_distribution)
+        : sc_si1000(d,r,p,false,include_opposite_basis_detectors,noise_distribution);
     if (world_rank == 0 && noise_distribution.log_stddev > 0)
         std::cout << "Component noise: log_stddev=" << noise_distribution.log_stddev
                   << " model_seed=" << noise_distribution.seed
                   << " nominal_p=" << p << '\n';
 
-    // Convert to DEM with error decomposition required by PyMatching
-    auto dem = stim::circuit_to_dem(circuit, {.decompose_errors = true});
+    // Concatenated MWPM needs the original correlated DEM events.
+    auto dem = stim::circuit_to_dem(circuit, {.decompose_errors = decoder_name != "concat_mwpm"});
 
     // Build decoder, run estimation, and report results.
     auto run = [&] (auto&& dec, const auto& error_callback)
@@ -205,7 +218,14 @@ run_cli(int argc, char* argv[], int world_rank)
         }
     };
 
-    if (decoder_name == "pymatching")
+    if (decoder_name == "concat_mwpm")
+    {
+        if (world_rank == 0)
+            std::cout << "ConcatMWPM cc666 SI1000: distance=" << d << " rounds=" << r
+                      << " p=" << p << " sampling_seed=" << conf.seed << '\n';
+        run(dec::ConcatMWPM(dem), [] (auto, auto, auto) {});
+    }
+    else if (decoder_name == "pymatching")
     {
         run(dec::PyMatching(dem, {.enable_gap_estimation=enable_gap, .correlated=correlated_pymatching,
                                       .enable_cluster_gap=enable_cluster_gap,
