@@ -131,6 +131,11 @@ add_executable(analyze_syndrome main/analyze_syndrome.cpp)
 target_compile_options(analyze_syndrome PRIVATE ${COMPILE_OPTIONS})
 target_link_libraries(analyze_syndrome PRIVATE qudeclib LibLZMA::LibLZMA)
 
+# Export fixed-size shared-shot training data for detector affinity models.
+add_executable(export_affinity_dataset main/export_affinity_dataset.cpp)
+target_compile_options(export_affinity_dataset PRIVATE ${COMPILE_OPTIONS} -fno-fast-math)
+target_link_libraries(export_affinity_dataset PRIVATE qudeclib)
+
 # Stable Libra evaluators, including the corrected sampler used in the paper study.
 add_executable(libra_evaluate main/libra_evaluate.cpp)
 target_compile_options(libra_evaluate PRIVATE ${COMPILE_OPTIONS} -fno-fast-math)

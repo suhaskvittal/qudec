@@ -1,6 +1,19 @@
 import os
-cores = 64
-for p in [7e-4, 8.5e-4, 1e-3, 1.5e-3, 2e-3]:
+cores = 32
+
+PLIST = [
+    8e-4,
+    9e-4,
+    1e-3,
+    1.25e-3,
+    1.5e-3,
+    1.75e-3,
+    2e-3,
+    2.5e-3,
+    3e-3
+]
+
+for p in PLIST:
     # pymatching:
     os.system(f'python3 scripts/eval_decoder_uniform.py pymatching {p} {cores} auto')
     # correlated pm:
