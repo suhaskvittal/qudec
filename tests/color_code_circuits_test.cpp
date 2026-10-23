@@ -6,6 +6,7 @@
 #include <stim/util_top/circuit_to_dem.h>
 
 #include <cmath>
+#include <functional>
 #include <bit>
 #include <iostream>
 #include <limits>
@@ -17,7 +18,7 @@ namespace {
 void require(bool ok, const char* message) {
     if (!ok) throw std::runtime_error(message);
 }
-using Generator = stim::Circuit (*)(uint32_t, uint32_t, double, bool, const ComponentErrorDistribution&);
+using Generator = std::function<stim::Circuit(uint32_t, uint32_t, double, bool, const ComponentErrorDistribution&)>;
 
 auto detector_coordinates(const stim::Circuit& c) {
     std::set<uint64_t> indices;
@@ -171,7 +172,10 @@ void check_flag_independence(Generator generate, int basis) {
 int main() {
     std::mt19937_64 rng(42);
     for (bool oct : {false, true}) {
-        Generator generate = oct ? cc488_si1000 : cc666_si1000;
+        Generator generate = [oct](uint32_t d, uint32_t r, double p, bool x,
+                                   const ComponentErrorDistribution& noise) {
+            return oct ? cc488_si1000(d,r,p,x,true,noise) : cc666_si1000(d,r,p,x,false,noise);
+        };
         check_flag_independence(generate, 0);
         check_flag_independence(generate, 1);
         for (uint32_t d : {3, 5, 7, 9}) for (bool x : {false, true})
@@ -179,7 +183,7 @@ int main() {
                 const uint32_t n = oct ? (d * d + 2 * d - 1) / 2 : (3 * d * d + 1) / 4;
                 auto c = generate(d, rounds, 0, x, {});
                 require(c.count_qubits() == 2 * n - 1, "Wrong qubit count");
-                require(c.count_detectors() == 2 * (n - 1) * rounds, "Wrong detector count");
+                require(c.count_detectors() == (n - 1) * (oct ? 4 * rounds : 3 * rounds + 1), "Wrong detector count");
                 require(c.count_measurements() == 2 * (n - 1) * rounds + n, "Wrong measurement count");
                 check_absolute_parities(c);
                 auto [dets, obs] = stim::sample_batch_detection_events<64>(c, 1024, rng);

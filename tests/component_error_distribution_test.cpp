@@ -82,9 +82,14 @@ int main() {
         const auto toric = toric_si1000(3, 3, 0.001, memory_x, true);
         require(toric_si1000(3, 3, 0.001, memory_x, true, distribution) ==
                 apply_component_error_distribution(toric, distribution), "Toric generator ignores distribution");
-        for (auto color : {cc666_si1000, cc488_si1000}) {
-            const auto c = color(3, 3, 0.001, memory_x, distribution);
-            require(c == apply_component_error_distribution(color(3, 3, 0.001, memory_x, {}), distribution),
+        for (bool octagons : {false, true}) {
+            auto generate = [octagons, memory_x](const ComponentErrorDistribution& noise) {
+                return octagons
+                    ? cc488_si1000(3, 3, 0.001, memory_x, true, noise)
+                    : cc666_si1000(3, 3, 0.001, memory_x, false, noise);
+            };
+            const auto c = generate(distribution);
+            require(c == apply_component_error_distribution(generate({}), distribution),
                     "Color generator ignores distribution");
             require(stim::circuit_to_dem(c, {}).count_errors() > 0, "Nonuniform color DEM failed");
         }

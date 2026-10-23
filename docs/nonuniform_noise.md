@@ -56,14 +56,16 @@ blocks. At nonzero spread, unsupported noise channels raise an error.
 
 ## API and CLI
 
-The optional final argument on `sc_si1000`, `toric_si1000`, `cc666_si1000`, and
-`cc488_si1000` is a `ComponentErrorDistribution`. Existing direct calls remain
-valid through the default zero-spread argument.
+The optional final argument on these generators is a
+`ComponentErrorDistribution`. For the color-code generators, the
+`include_opposite_basis_detectors` boolean precedes it; the old five-argument
+calls that pass a distribution remain supported. The option defaults to false.
 
 ```cpp
 ComponentErrorDistribution device{.log_stddev = 0.7, .seed = 123};
 auto surface = sc_si1000(5, 5, 0.001, false, true, device);
-auto color = cc666_si1000(5, 5, 0.001, false, device);
+auto color = cc666_si1000(5, 5, 0.001, false, false, device);
+auto octagonal_color = cc488_si1000(5, 5, 0.001, false, false, device);
 // Or transform an already-generated circuit:
 auto nonuniform = apply_component_error_distribution(uniform_circuit, device);
 ```

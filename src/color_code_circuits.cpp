@@ -90,7 +90,7 @@ std::pair<double, double> position(Point q, bool octagons) {
 }
 
 stim::Circuit make_color_memory(uint32_t distance, uint32_t rounds, double p,
-                                bool memory_x, bool octagons) {
+                                bool memory_x, bool octagons, bool include_opposite_basis_detectors) {
     if (distance < 3 || distance % 2 == 0 || rounds == 0)
         throw std::invalid_argument("color code: need odd distance >= 3 and rounds >= 1");
     if (!std::isfinite(p) || p < 0 || p > 0.2)
@@ -225,7 +225,8 @@ stim::Circuit make_color_memory(uint32_t distance, uint32_t rounds, double p,
             for (uint32_t k = 0; k < nf; ++k) {
                 auto [x, y] = centers[k];
                 auto back = m - check_order[basis * nf + k];
-                if (!first || (basis == 0) == memory_x) {
+                if ((!first || (basis == 0) == memory_x) &&
+                    ((basis == 0) == memory_x || include_opposite_basis_detectors)) {
                     std::vector<uint32_t> records{rec(back)};
                     if (!first) records.push_back(rec(back + m));
                     c.safe_append_u("DETECTOR", records, {x, y, 0, (double)faces[k].color, (double)basis, 0});
@@ -261,12 +262,14 @@ stim::Circuit make_color_memory(uint32_t distance, uint32_t rounds, double p,
 } // namespace
 
 stim::Circuit cc666_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
+                         bool include_opposite_basis_detectors,
                          const ComponentErrorDistribution& noise_distribution) {
     return apply_component_error_distribution(
-        make_color_memory(distance, rounds, p, is_memory_x, false), noise_distribution);
+        make_color_memory(distance, rounds, p, is_memory_x, false, include_opposite_basis_detectors), noise_distribution);
 }
 stim::Circuit cc488_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
+                         bool include_opposite_basis_detectors,
                          const ComponentErrorDistribution& noise_distribution) {
     return apply_component_error_distribution(
-        make_color_memory(distance, rounds, p, is_memory_x, true), noise_distribution);
+        make_color_memory(distance, rounds, p, is_memory_x, true, include_opposite_basis_detectors), noise_distribution);
 }

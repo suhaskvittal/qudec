@@ -10,6 +10,8 @@
 #include "component_error_distribution.h"
 
 #include <cstdint>
+#include <type_traits>
+#include <utility>
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
@@ -81,15 +83,35 @@ stim::Circuit toric_si1000(uint32_t distance, uint32_t rounds, double p, bool is
 ////////////////////////////////////////////////////////////////
 
 // Triangular, one-logical-qubit color-code memories. Odd distance >= 3,
-// rounds >= 1, finite 0 <= p <= 0.2. Both check bases are compared between
-// rounds; only the memory basis is deterministic at initialization/readout.
+// rounds >= 1, finite 0 <= p <= 0.2. The memory basis is deterministic at
+// initialization/readout. Opposite-basis interior detectors are optional.
 // Every flag is a SINGLE-round detector, in both bases, including round one.
 // DETECTOR coordinates: (x, y, round, color, basis, is_flag), where
 // color = 0/1/2 for red/green/blue; basis = 0/1 for X/Z.
 // Bulk faces: cc666 has hexagons; cc488 has red squares and green/blue octagons.
+// By default emits only memory-basis check detectors (plus flags in both
+// bases). When enabled, also compares opposite-basis checks between rounds.
 stim::Circuit cc666_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
+                            bool include_opposite_basis_detectors = false,
                             const ComponentErrorDistribution& noise_distribution = {});
+// Preserve the earlier five-argument call where the fifth argument is noise.
+template <typename T>
+    requires std::is_same_v<std::remove_cvref_t<T>, ComponentErrorDistribution>
+inline stim::Circuit cc666_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
+                                  T&& noise_distribution) {
+    return cc666_si1000(distance,rounds,p,is_memory_x,false,
+                        std::forward<T>(noise_distribution));
+}
 stim::Circuit cc488_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
+                            bool include_opposite_basis_detectors = false,
                             const ComponentErrorDistribution& noise_distribution = {});
+// Preserve the earlier five-argument call where the fifth argument is noise.
+template <typename T>
+    requires std::is_same_v<std::remove_cvref_t<T>, ComponentErrorDistribution>
+inline stim::Circuit cc488_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
+                                  T&& noise_distribution) {
+    return cc488_si1000(distance,rounds,p,is_memory_x,false,
+                        std::forward<T>(noise_distribution));
+}
 
 #endif // CIRCUIT_GENERATOR_h

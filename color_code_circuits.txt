@@ -4,22 +4,24 @@ Color-code Stim circuits
 Public API (src/circuit_generator.h):
 
     stim::Circuit cc666_si1000(uint32_t distance, uint32_t rounds,
-                              double p, bool is_memory_x);
+                              double p, bool is_memory_x, bool include_opposite_basis_detectors = false);
     stim::Circuit cc488_si1000(uint32_t distance, uint32_t rounds,
-                              double p, bool is_memory_x);
+                              double p, bool is_memory_x, bool include_opposite_basis_detectors = false);
 
 Implemented in src/color_code_circuits.cpp and linked into qudeclib.
 Example: auto circuit = cc488_si1000(5, 5, 0.001, false);
 Write circuit.str() to a .stim file to use it with other Stim tools.
-No color-code decoder or changes to the existing surface-code CLI are included.
+The `qudec` CLI exposes this detector option with `--include-opposite-basis-detectors`.
 
 All SI1000 generators also accept an optional final
 ComponentErrorDistribution argument for fixed, seeded non-uniform rates:
 
     ComponentErrorDistribution spread{.log_stddev=0.5, .seed=123};
-    auto circuit = cc488_si1000(5, 5, 0.001, false, spread);
+    auto circuit = cc488_si1000(5, 5, 0.001, false, false, spread);
+    auto color666 = cc666_si1000(5, 5, 0.001, false, true, spread);
 
-The default has zero spread and reproduces uniform rates exactly. See
+The previous five-argument cc666 and cc488 calls with a ComponentErrorDistribution remain supported.
+The default spread is zero and reproduces uniform rates exactly. See
 docs/nonuniform_noise.md for the component identity and lognormal convention.
 
 Patches and memory experiments
@@ -31,7 +33,11 @@ qubits are prepared and destructively measured in X when is_memory_x=true,
 and in Z otherwise. Observable 0 is the parity of all final data outcomes,
 a representative of the corresponding logical operator.
 
-cc666 uses the triangular honeycomb patch: bulk checks have six vertices,
+Both color-code generators emit memory-basis checks by default. Set
+`include_opposite_basis_detectors` to also emit interior checks from the other
+basis in rounds 2 through r; flags from both bases remain independent
+single-round detectors. cc666 uses the
+triangular honeycomb patch: bulk checks have six vertices,
 and boundary checks have four. The number of data qubits is (3*d*d+1)/4.
 cc488 uses the standard triangular square/octagon patch: red checks have
 four vertices, bulk green and blue checks have eight, and shortened green

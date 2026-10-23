@@ -94,6 +94,10 @@ set(QUDEC_FILES
     src/decoder/concat_mwpm.cpp
     src/decoder/concat_mwpm/matching.cpp
     src/decoder/concat_mwpm/circuit.cpp
+    # Contributor: OpenAI Codex (fractional-weight correlated restriction).
+    src/decoder/correlated_restriction.cpp
+    src/decoder/correlated_restriction/matching.cpp
+    src/decoder/correlated_restriction/circuit.cpp
     src/decoder/types.cpp
     src/preprocessor/affinity.cpp
     src/globals.cpp
@@ -118,6 +122,9 @@ set_source_files_properties(src/decoder/restriction.cpp src/decoder/restriction/
 set_source_files_properties(src/color_code_circuits.cpp src/component_error_distribution.cpp PROPERTIES COMPILE_OPTIONS "-fno-fast-math")
 set_source_files_properties(src/decoder/concat_mwpm.cpp src/decoder/concat_mwpm/matching.cpp
     src/decoder/concat_mwpm/circuit.cpp PROPERTIES COMPILE_OPTIONS "-fno-fast-math")
+set_source_files_properties(src/decoder/correlated_restriction.cpp
+    src/decoder/correlated_restriction/matching.cpp src/decoder/correlated_restriction/circuit.cpp
+    PROPERTIES COMPILE_OPTIONS "-fno-fast-math")
 add_library(libra_decoder ALIAS qudeclib)
 if(ENABLE_MPI)
     target_compile_definitions(qudeclib PUBLIC ENABLE_MPI)
@@ -166,13 +173,22 @@ target_link_libraries(qudec_eval_gap PRIVATE qudeclib)
 include(CTest)
 if(BUILD_TESTING)
     # Contributor: OpenAI Codex (weighted union-find regression cases).
-    foreach(test IN ITEMS component_error_distribution color_code_circuits restriction concat_mwpm cluster_gap uf seeded_matching libra libra_assignment libra_rare_event pymatching_reporting
+    foreach(test IN ITEMS component_error_distribution color_code_circuits restriction concat_mwpm correlated_restriction cluster_gap uf seeded_matching libra libra_assignment libra_rare_event pymatching_reporting
                           libra_splitting libra_local_splitting rare_event_sampler libra_integration)
         add_executable(${test}_test tests/${test}_test.cpp)
         target_compile_options(${test}_test PRIVATE ${COMPILE_OPTIONS} -fno-fast-math)
         target_link_libraries(${test}_test PRIVATE qudeclib)
         add_test(NAME ${test} COMMAND ${test}_test)
     endforeach()
+    # Contributor: OpenAI Codex (correlated restriction CLI smoke checks).
+    add_test(NAME correlated_restriction_cli COMMAND qudec correlated_restriction 5 -p 0.0005
+        --mc-max-samples 8 --mc-stop-at-errors 100 --seed 42)
+    set_tests_properties(correlated_restriction_cli PROPERTIES
+        PASS_REGULAR_EXPRESSION "CorrelatedRestrictionDecoder shots=8")
+    add_test(NAME correlated_restriction_cli_noiseless COMMAND qudec correlated_restriction 5 -p 0
+        --mc-max-samples 8 --mc-stop-at-errors 100 --seed 42)
+    set_tests_properties(correlated_restriction_cli_noiseless PROPERTIES
+        PASS_REGULAR_EXPRESSION "Logical error rate: 0")
     add_test(NAME concat_mwpm_cli COMMAND qudec concat_mwpm 7 -p 0.0005
         --mc-max-samples 8 --mc-stop-at-errors 100 --seed 42)
     set_tests_properties(concat_mwpm_cli PROPERTIES PASS_REGULAR_EXPRESSION "ConcatMWPM shots=8")
