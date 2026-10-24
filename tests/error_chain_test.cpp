@@ -74,6 +74,22 @@ void tests()
             return result;
         },out);
     require(singles.tested == 2 && !singles.failures,"Flattened events lost");
+    // Author: OpenAI Codex. Shared flags persist while check/observable parity cancels.
+    const stim::DetectorErrorModel flagged(R"(
+        error(0.1) D0 D1 L0
+        error(0.1) D0 D1 D2 L0
+        detector(0,0,0,0,1,0) D0
+        detector(0,0,0,-1,0,1) D1
+        detector(1,0,0,1,1,0) D2
+    )");
+    auto verify_flags = [](auto syndrome,auto truth)
+    {
+        require(!syndrome[0] && syndrome[1] && syndrome[2] && !truth[0],
+                "Chain flags must use OR, with XOR for checks and observables");
+        return dec::Result{.flipped_obs=dec::ObsType(1)};
+    };
+    evaluate_error_chains(flagged,{.length=2,.exhaustive=true},verify_flags,out);
+    evaluate_error_chains(flagged,{.length=2,.samples=10},verify_flags,out);
 }
 void display_tests()
 {

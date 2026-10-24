@@ -49,6 +49,7 @@ compress(Model model, bool preserve_order)
     if (model.colors.empty()) throw std::invalid_argument("Concatenated MWPM needs check detectors");
     std::map<std::pair<std::vector<size_t>, uint64_t>, double> merged;
     std::map<std::pair<std::vector<size_t>, uint64_t>, BoundaryHint> boundary_kind;
+    std::map<std::pair<std::vector<size_t>, uint64_t>, bool> supported;
     std::vector<std::pair<std::vector<size_t>, uint64_t>> insertion_order;
     for (auto& e : model.events)
     {
@@ -64,17 +65,22 @@ compress(Model model, bool preserve_order)
         else if (boundary_kind[key] != e.boundary_hint)
             boundary_kind[key] = BoundaryHint::Unknown;
         auto& p = merged[key];
-        p = xor_probability(p, e.probability);
+        // Author: OpenAI Codex. C_f probabilities contain supported single
+        // faults, rather than also adding suppressed unsupported channels.
+        if (model.flag_renormalization && e.flag_supported && !supported[key]) p = 0;
+        supported[key] = supported[key] || e.flag_supported;
+        if (!model.flag_renormalization || e.flag_supported || !supported[key])
+            p = xor_probability(p, e.probability);
     }
     model.events.clear();
     // Contributor: OpenAI Codex. In the opt-in boundary ensemble retain input
     // event order, including PyMatching tie choices, as in the validated model.
     if (preserve_order)
         for (const auto& key : insertion_order)
-            model.events.push_back({merged.at(key),key.first,key.second,boundary_kind.at(key)});
+            model.events.push_back({merged.at(key),key.first,key.second,boundary_kind.at(key),supported.at(key)});
     else
         for (const auto& [key,p] : merged)
-            model.events.push_back({p,key.first,key.second,boundary_kind.at(key)});
+            model.events.push_back({p,key.first,key.second,boundary_kind.at(key),supported.at(key)});
     for (int c : model.colors)
         if (c < 0 || c > 2) throw std::invalid_argument("Invalid detector color");
     return model;
@@ -296,6 +302,7 @@ Decoder::Decoder(Model input, bool uniform, bool boundary_gap, EnsembleConfig co
         // Compress first-stage projections, including physical positive-weight
         // boundary--boundary edges from spatial corner data faults.
         std::map<std::vector<size_t>,double> projected;
+        std::map<std::vector<size_t>,double> flagged_projected;
         for (const auto& e : model.events)
         {
             const auto other = projection(e);
@@ -303,6 +310,11 @@ Decoder::Decoder(Model input, bool uniform, bool boundary_gap, EnsembleConfig co
             {
                 auto& p = projected[other];
                 p = xor_probability(p,e.probability);
+                if (model.flag_renormalization && e.flag_supported)
+                {
+                    auto& flagged = flagged_projected[other];
+                    flagged = xor_probability(flagged,e.probability);
+                }
             }
         }
         std::map<std::vector<size_t>,size_t> virtual_id;
@@ -310,7 +322,7 @@ Decoder::Decoder(Model input, bool uniform, bool boundary_gap, EnsembleConfig co
         for (const auto& [support,p] : projected)
         {
             virtual_id[support] = n+first_events.size();
-            first_events.push_back({p,support,0});
+            first_events.push_back({flagged_projected.contains(support) ? flagged_projected.at(support) : p,support,0});
         }
         sub->first_events = first_events;
         if (boundary_gap_)

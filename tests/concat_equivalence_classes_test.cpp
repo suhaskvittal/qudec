@@ -115,7 +115,9 @@ void flagged_only_and_ties()
 
 void extraction_basis_flags()
 {
-    for (bool memory_x : {false,true})
+    // Author: OpenAI Codex. Same-extraction-basis flags remain irrelevant
+    // under both conditional weights and the paper's p^m renormalization.
+    for (bool paper : {false,true}) for (bool memory_x : {false,true})
     {
         const int basis=memory_x ? 0 : 1;
         std::ostringstream text;
@@ -125,7 +127,7 @@ void extraction_basis_flags()
              << "detector(0,0,0,0," << basis << ",0) D0\n"
              << "detector(0,0,0,99," << 1-basis << ",1) D1\n"
              << "detector(0,0,0,-1," << basis << ",1) D2\n";
-        dec::concat::CircuitDecoder core(stim::DetectorErrorModel(text.str()),memory_x);
+        dec::concat::CircuitDecoder core(stim::DetectorErrorModel(text.str()),memory_x,true,16,false,{}, {paper,.001});
         require(core.flag_globals==std::vector<size_t>{1},"Wrong check-extraction flag basis kept");
         require(core.equivalence_classes()[0].flags==std::vector<size_t>{1},"Ignored flag remained on a class member");
         require(core.flag_measurement_probabilities()[2]==0,"Ignored flag prior was retained");
@@ -136,7 +138,8 @@ void extraction_basis_flags()
         require(std::abs(absent.weights[0].effective_probability-unflagged)<1e-15,"Ignored flag channels not marginalized");
         require(ignored.weights[0].effective_probability==absent.weights[0].effective_probability &&
                 ignored.weights[0].selected_flags.empty(),"Same-basis flag altered the empty-F model");
-        require(std::abs(relevant.weights[0].effective_probability-flagged/core.flag_flip_probabilities()[1])<1e-14 &&
+        const double expected = paper ? flagged : flagged/core.flag_flip_probabilities()[1];
+        require(std::abs(relevant.weights[0].effective_probability-expected)<1e-14 &&
                 relevant.weights[0].selected_flags==std::vector<size_t>{1},"Opposite extraction-block flag not used");
         require(both.weights[0].effective_probability==relevant.weights[0].effective_probability &&
                 both.weights[0].flag_distance==relevant.weights[0].flag_distance,"Ignored flag altered representative distance");

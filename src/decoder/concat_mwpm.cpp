@@ -26,7 +26,8 @@ ConcatMWPM::ConcatMWPM(const stim::DetectorErrorModel& dem, config_type conf)
     :num_detectors(dem.count_detectors()), num_observables(dem.count_observables()),
      decoder_(std::make_unique<concat::CircuitDecoder>(dem,conf.memory_x,
                                                        conf.use_flags,conf.flag_cache_capacity,
-                                                       conf.boundary_gap,concat::EnsembleConfig{conf.ensemble_size,conf.ensemble_seed})), debug_(conf.debug)
+                                                       conf.boundary_gap,concat::EnsembleConfig{conf.ensemble_size,conf.ensemble_seed},
+                                                       concat::FlagRenormalization{conf.flag_renormalization,conf.physical_error_rate})), debug_(conf.debug)
 {
 }
 

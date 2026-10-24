@@ -34,12 +34,15 @@ struct Event
     std::vector<size_t> detectors;
     uint64_t observable;
     BoundaryHint boundary_hint{BoundaryHint::Unknown};
+    // Author: OpenAI Codex. Raw single-fault contribution to the paper's C_f.
+    bool flag_supported{false};
 };
 
 struct Model
 {
     std::vector<int> colors;
     std::vector<Event> events;
+    bool flag_renormalization{false}; // Prefer supported contributions after projection.
 };
 
 struct Result

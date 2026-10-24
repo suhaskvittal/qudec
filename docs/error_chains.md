@@ -60,8 +60,9 @@ from the original, flattened, undecomposed DEM**. Two events are adjacent if the
 flip a common detector, including a flag detector. Separators within one error
 instruction do not create independent events. Repeated targets cancel by XOR.
 Detectorless events can appear as length-one chains, but cannot join longer
-chains. Shared logical observables alone do not connect events. Syndrome and
-logical truth are the XOR of all events selected in a chain. Some decoder graphs
+chains. Shared logical observables alone do not connect events. Check detections and
+logical truth are the XOR of all events selected in a chain. Flag detections
+are ORed across events, so repeated triggers stay set. Some decoder graphs
 require decomposition; they receive their usual decomposed model while chain
 selection still uses the original events.
 
@@ -111,7 +112,7 @@ for spatial check IDs.
 
 The ASCII drawing uses the circuit generator's actual data positions and check
 supports for either color code. Dots mark data vertices; edges outline the
-check polygons. `[R13]` highlights check 13 when its **combined XOR syndrome**
+check polygons. `[R13]` highlights check 13 when its **combined syndrome (checks XOR, flags OR)**
 fires in any round or either basis. This is a union across rounds, so two fired
 detectors on the same check in different rounds do not cancel in the drawing.
 `R13!` marks a fired colorless flag located at that check; `[R13]!` means both

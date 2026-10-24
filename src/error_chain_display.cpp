@@ -172,7 +172,7 @@ void ErrorChainDisplay::draw(dec::SyndromeRef syndrome,std::ostream& out) const
         if (!collision) break;
         if (scale == 24) throw std::runtime_error("Could not fit ASCII check labels");
     }
-    out << "Color-code lattice (" << code_ << "), combined XOR syndrome across all rounds:\n"
+    out << "Color-code lattice (" << code_ << "), combined syndrome across all rounds (checks XOR, flags OR):\n"
         << "  . = data qubit; [R/G/B id] = check fired in at least one round; ! = colocated colorless flag fired\n"
         << "  Unbracketed checks are quiet. Data-fault locations are not inferred from DEM events.\n";
     // Trim the extra canvas margin, preserving the relative position of every edge.

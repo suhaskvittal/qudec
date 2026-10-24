@@ -65,6 +65,7 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
     bool correlated_pymatching{false};
     // Contributor: OpenAI Codex. Opt-in first-stage boundary-parity ensemble.
     bool concat_boundary_gap{false};
+    bool concat_flag_renormalization{false}; // Author: OpenAI Codex, paper Sec. III D.
     bool decoder_debug{false};
     // Contributor: OpenAI Codex. Optional fixed first-stage probability ensemble.
     int64_t concat_ensemble_size{1};
@@ -122,6 +123,7 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
         .optional("", "--include-opposite-basis-detectors", "Include interior opposite-basis check detectors", include_opposite_basis_detectors, false)
         .optional("", "--debug", "Color-code decoders: populate and print decoder-specific debug information", decoder_debug, false)
         .optional("", "--concat-boundary-gap", "ConcatMWPM: ensemble even/odd spatial-boundary sectors in stage one", concat_boundary_gap, false)
+        .optional("", "--concat-flag-renormalization", "ConcatMWPM: use raw flag-fault probabilities and p^m ordinary-edge suppression", concat_flag_renormalization, false)
         .optional("", "--concat-ensemble", "ConcatMWPM: number of first-stage graphs per color (1 = unperturbed)", concat_ensemble_size, 1)
         .optional("", "--concat-seed", "ConcatMWPM: fixed first-stage ensemble seed", concat_ensemble_seed, concat_ensemble_seed)
         .optional("", "--uf-weight-scale", "Union-find: quantization units per natural-log weight", uf_weight_scale, 1024)
@@ -233,6 +235,8 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
         throw std::invalid_argument("--concat-ensemble and --concat-seed require concat_mwpm");
     if (concat_boundary_gap && decoder_name != "concat_mwpm")
         throw std::invalid_argument("--concat-boundary-gap requires concat_mwpm");
+    if (concat_flag_renormalization && decoder_name != "concat_mwpm")
+        throw std::invalid_argument("--concat-flag-renormalization requires concat_mwpm");
     if (correlated_pymatching && decoder_name != "pymatching")
         throw std::invalid_argument("--correlated is only available for pymatching");
     if (enable_cluster_gap && (decoder_name != "pymatching" && decoder_name != "uf"))
@@ -354,10 +358,12 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
             std::cout << "ConcatMWPM " << code_name << ' ' << noise_model << ": distance=" << d << " rounds=" << r
                       << " p=" << p << " sampling_seed=" << conf.seed
                       << " boundary_gap=" << concat_boundary_gap
-                      << " ensemble_size=" << concat_ensemble_size << " ensemble_seed=" << concat_ensemble_seed << '\n';
+                      << " ensemble_size=" << concat_ensemble_size << " ensemble_seed=" << concat_ensemble_seed
+                      << " flag_renormalization=" << concat_flag_renormalization << '\n';
         run(dec::ConcatMWPM(dem,{.boundary_gap=concat_boundary_gap,
             .ensemble_size=static_cast<size_t>(concat_ensemble_size),
-            .ensemble_seed=static_cast<uint64_t>(concat_ensemble_seed),.debug=decoder_debug}), [] (auto, auto, auto) {});
+            .ensemble_seed=static_cast<uint64_t>(concat_ensemble_seed),.debug=decoder_debug,
+            .flag_renormalization=concat_flag_renormalization,.physical_error_rate=p}), [] (auto, auto, auto) {});
     }
     else if (decoder_name == "pymatching")
     {

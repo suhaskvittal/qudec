@@ -14,6 +14,13 @@
 namespace dec::concat
 {
 
+// Author: OpenAI Codex. Chamberland et al., NJP 22, 023019, Sec. III D.
+struct FlagRenormalization
+{
+    bool enabled{false};
+    double physical_error_rate{0};
+};
+
 struct CircuitFault
 {
     double probability;
@@ -33,7 +40,7 @@ struct FlagWeight
     size_t fired_flags;
     // Contributor: OpenAI Codex. Incidence is diagnostic only; unflagged-event penalties are disabled.
     std::vector<size_t> incident_observed_flags;
-    double outside_flag_penalty{1}; // Retained diagnostic; always one.
+    double outside_flag_penalty{1}; // Paper mode: p^m for unsupported ordinary events.
     size_t selected_variant{SIZE_MAX}; // Index in the equivalence class; SIZE_MAX = disabled.
     size_t flag_distance{SIZE_MAX}; // |selected flags XOR full observed flags|.
     std::vector<size_t> selected_flags;
@@ -59,7 +66,8 @@ public:
     // Uses the full original DEM and infers each flag's isolated-flip prior.
     CircuitDecoder(const stim::DetectorErrorModel&, bool memory_x,
                    bool use_flags = true, size_t cache_capacity = 16,
-                   bool boundary_gap = false, EnsembleConfig ensemble = {});
+                   bool boundary_gap = false, EnsembleConfig ensemble = {},
+                   FlagRenormalization renormalization = {});
     uint64_t decode(const std::vector<uint8_t>& full_syndrome, std::string* debug_info = nullptr);
     CircuitResult inspect(const std::vector<uint8_t>& full_syndrome, DebugTrace* debug = nullptr);
     std::vector<uint8_t> fault_syndrome(const std::vector<size_t>& ids) const;
@@ -106,6 +114,7 @@ private:
     const bool boundary_gap_;
     // Contributor: OpenAI Codex. Reused for each independently flag-conditioned context.
     const EnsembleConfig ensemble_;
+    const FlagRenormalization renormalization_;
     std::vector<int> colors_;
     std::vector<Class> classes_;
     std::map<std::string, Context> contexts_;

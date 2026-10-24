@@ -12,6 +12,7 @@
 #include <memory>
 #include <ostream>
 #include <random>
+#include <set>
 #include <stdexcept>
 #include <vector>
 
@@ -142,13 +143,22 @@ ErrorChainSummary evaluate_error_chains(const stim::DetectorErrorModel& dem,
     };
     ErrorChainSummary summary;
     std::unique_ptr<ErrorChainDisplay> display;
+    // Author: OpenAI Codex. Preserve the requested OR convention for flags
+    // in chain stress tests, with XOR for checks and logical effects.
+    std::set<uint64_t> detector_ids;
+    for (size_t d = 0; d < dem.count_detectors(); d++) detector_ids.insert(d);
+    std::vector<bool> is_flag(dem.count_detectors(),false);
+    for (const auto& [id,c] : dem.get_detector_coordinates(detector_ids))
+        is_flag[id] = c.size() == 6 && c[5] == 1;
     dec::SyndromeType syndrome(dem.count_detectors()), truth(dem.count_observables());
     auto test = [&](const std::vector<size_t>& pattern)
     {
         syndrome.clear(); truth.clear();
         for (auto id : pattern)
         {
-            for (auto d : events[id].detectors) syndrome[d] ^= 1;
+            for (auto d : events[id].detectors)
+                if (is_flag[d]) syndrome[d] = 1;
+                else syndrome[d] ^= 1;
             for (auto obs : events[id].observables) truth[obs] ^= 1;
         }
         const auto result = decode(syndrome,truth);

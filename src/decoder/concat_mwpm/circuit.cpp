@@ -51,12 +51,16 @@ read_coordinates(const stim::DetectorErrorModel& dem)
 } // namespace
 
 CircuitDecoder::CircuitDecoder(const stim::DetectorErrorModel& dem, bool memory_x,
-                               bool use_flags, size_t cache_capacity, bool boundary_gap, EnsembleConfig ensemble)
+                               bool use_flags, size_t cache_capacity, bool boundary_gap, EnsembleConfig ensemble,
+                               FlagRenormalization renormalization)
     :num_detectors(dem.count_detectors()), faults(read_faults(dem)),
      coordinates(read_coordinates(dem)),
      flag_p_(num_detectors,0), measurement_p_(num_detectors, 0), use_flags_(use_flags),
-     cache_capacity_(cache_capacity), boundary_gap_(boundary_gap), ensemble_(ensemble)
+     cache_capacity_(cache_capacity), boundary_gap_(boundary_gap), ensemble_(ensemble), renormalization_(renormalization)
 {
+    if (renormalization.enabled && (!std::isfinite(renormalization.physical_error_rate) ||
+        renormalization.physical_error_rate < 0 || renormalization.physical_error_rate >= 1))
+        throw std::invalid_argument("Flag renormalization needs 0 <= physical error rate < 1");
     if (ensemble.size == 0 || !(ensemble.spread_scale >= 0) || !std::isfinite(ensemble.spread_scale))
         throw std::invalid_argument("Invalid concatenated matching ensemble configuration");
     if (dem.count_observables() != 1 || cache_capacity == 0)
@@ -244,11 +248,23 @@ CircuitDecoder::flag_neighborhoods(const std::vector<uint8_t>& syndrome) const
 CircuitDecoder::Context
 CircuitDecoder::make_context(const std::vector<uint8_t>& syndrome) const
 {
-    Model model{colors_, {}};
+    Model model{colors_, {}, renormalization_.enabled};
     Context out;
     const auto neighborhoods = flag_neighborhoods(syndrome);
     std::vector<size_t> observed_flags;
     if (use_flags_) for (auto f : flag_globals) if (syndrome[f]) observed_flags.push_back(f);
+    // Author: OpenAI Codex. Count flagged measurement circuits, not flag bits.
+    // Metadata groups multiple flag qubits of one extraction by face/time/basis.
+    std::set<std::tuple<double,double,double,double>> flagged_circuits;
+    for (auto f : observed_flags)
+    {
+        const auto& c = coordinates.at(f);
+        flagged_circuits.emplace(c[0],c[1],c[2],c[4]);
+    }
+    const double ordinary_scale = renormalization_.enabled ?
+        std::pow(renormalization_.physical_error_rate,flagged_circuits.size()) : 1;
+    if (renormalization_.enabled && !flagged_circuits.empty() && !(ordinary_scale > 0))
+        throw std::invalid_argument("Flag renormalization p^m is zero or underflowed");
     for (const auto& group : classes_)
     {
         // Contributor: OpenAI Codex. Select one actual member of the detector
@@ -265,6 +281,11 @@ CircuitDecoder::make_context(const std::vector<uint8_t>& syndrome) const
             // class's flags and the syndrome, only an unflagged representative
             // is eligible; unrelated observed flags cannot enable the class.
             if (active == 0 && !variant.flags.empty()) continue;
+            // The paper enables a flag event only for its associated outcome;
+            // a quiet required flag cannot be supplied by partial overlap.
+            if (renormalization_.enabled &&
+                !std::includes(observed_flags.begin(),observed_flags.end(),variant.flags.begin(),variant.flags.end()))
+                continue;
             size_t overlap = 0;
             if (use_flags_) for (auto f : variant.flags) overlap += syndrome[f] != 0;
             const size_t distance = observed_flags.size()+variant.flags.size()-2*overlap;
@@ -284,7 +305,9 @@ CircuitDecoder::make_context(const std::vector<uint8_t>& syndrome) const
         const uint64_t observable = selected ? selected->observable : 0;
         double probability = selected ? selected->probability : 0;
         double denominator = 1;
-        if (selected && use_flags_)
+        const bool flag_supported = selected && !selected->flags.empty();
+        const double penalty = renormalization_.enabled && !flag_supported ? ordinary_scale : 1;
+        if (selected && use_flags_ && !renormalization_.enabled)
             for (auto f : selected->flags) if (syndrome[f]) denominator *= flag_p_[f];
         if (selected)
         {
@@ -294,11 +317,14 @@ CircuitDecoder::make_context(const std::vector<uint8_t>& syndrome) const
                 throw std::invalid_argument("Conditional probability exceeds one: the product-of-flag-marginals approximation is invalid for this representative");
             // Round tiny floating-point overshoots at the probability endpoint.
             probability = std::min(probability,1.0);
+            probability *= penalty;
+            if (!(probability > 0)) throw std::invalid_argument("Renormalized event probability underflowed");
         }
         out.weights.push_back({group.checks, observable, unflagged, probability,
-            group.flags.size(),active,std::move(incident_flags),1.0,selected_id,best_distance,
+            group.flags.size(),active,std::move(incident_flags),penalty,selected_id,best_distance,
             selected ? selected->flags : std::vector<size_t>{},selected ? selected->probability : 0,denominator});
-        if (selected) model.events.push_back({probability,group.checks,observable,group.boundary_hint});
+        if (selected) model.events.push_back({probability,group.checks,observable,group.boundary_hint,
+            renormalization_.enabled && flag_supported});
     }
     out.decoder = std::make_unique<Decoder>(std::move(model),false,boundary_gap_,ensemble_);
     return out;

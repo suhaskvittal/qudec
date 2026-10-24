@@ -33,6 +33,9 @@ public:
         size_t ensemble_size{1};
         uint64_t ensemble_seed{20261024};
         bool debug{false}; // Populate Result::debug_info on each decode.
+        // Author: OpenAI Codex. Opt-in Sec. III D probability renormalization.
+        bool flag_renormalization{false};
+        double physical_error_rate{0};
     };
     struct Statistics
     {
