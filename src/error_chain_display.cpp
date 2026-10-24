@@ -25,17 +25,35 @@ std::map<uint64_t,std::vector<double>> detector_coordinates(const stim::Detector
 }
 
 ErrorChainDisplay::ErrorChainDisplay(const stim::DetectorErrorModel& dem,
-    const std::string& code,uint32_t distance)
+    const std::string& code,uint32_t distance,bool superdense)
     :code_(code), coordinates_(detector_coordinates(dem))
 {
     if (code.empty()) return; // Generic toy DEMs need no lattice metadata.
     if (code != "cc666" && code != "cc488") throw std::invalid_argument("ASCII display requires a color code");
     const CodeCapacityNoisePolicy noise(0);
-    const auto reference = code == "cc666" ? cc666_circuit(distance,1,noise,false)
-                                           : cc488_circuit(distance,1,noise,false);
+    const auto reference = superdense
+        ? (code=="cc666" ? cc666_superdense(distance,1,SI1000NoisePolicy(0),false)
+                          : cc488_superdense(distance,1,SI1000NoisePolicy(0),false))
+        : (code == "cc666" ? cc666_circuit(distance,1,noise,false)
+                           : cc488_circuit(distance,1,noise,false));
     qubits_ = reference.get_final_qubit_coords();
+    // Author: OpenAI Codex. Superdense layouts have different embeddings.
+    // Recover their exact data supports from final closure annotations.
+    if (superdense)
+    {
+        for (auto it=qubits_.begin();it!=qubits_.end();)
+            if (it->second.size()>=4 && it->second[3]!=0) it=qubits_.erase(it); else ++it;
+        const size_t n=qubits_.size();
+        for (const auto& op:reference.operations)
+            if (op.gate_type==stim::GateType::DETECTOR && op.args[2]==1 && op.args[5]==0)
+            {
+                Check check{.x=op.args[0],.y=op.args[1],.color=int(op.args[3])};
+                for (auto t:op.targets) if (t.rec_offset()>=-int64_t(n)) check.qubits.push_back(n+t.rec_offset());
+                checks_.push_back(std::move(check));
+            }
+    }
     // One Z-product measurement per spatial check, in generator check-ID order.
-    for (const auto& op : reference.operations) if (op.gate_type == stim::GateType::MPP)
+    for (const auto& op : reference.operations) if (!superdense && op.gate_type == stim::GateType::MPP)
     {
         // Stim may fuse adjacent MPP instructions into a single operation.
         // Split its products at adjacent Pauli targets without a combiner.
@@ -67,7 +85,7 @@ ErrorChainDisplay::ErrorChainDisplay(const stim::DetectorErrorModel& dem,
     }
     if (checks_.empty()) throw std::runtime_error("No color-code check supports for ASCII display");
     const auto reference_coordinates = detector_coordinates(stim::circuit_to_dem(reference,{}));
-    for (size_t id = 0; id < checks_.size(); id++)
+    for (size_t id = 0; !superdense && id < checks_.size(); id++)
     {
         const auto& c = reference_coordinates.at(id);
         checks_[id].color = static_cast<int>(c[3]);
@@ -77,6 +95,8 @@ ErrorChainDisplay::ErrorChainDisplay(const stim::DetectorErrorModel& dem,
     for (const auto& [detector,c] : coordinates_)
     {
         if (c.size() != 6) throw std::invalid_argument("Missing color-code detector coordinates");
+        // Routing flags live between faces; retain their independent identity.
+        if (superdense && c[5]==1) continue;
         auto match = checks_.size();
         for (size_t id = 0; id < checks_.size(); id++)
             if (std::abs(checks_[id].x-c[0])<1e-8 && std::abs(checks_[id].y-c[1])<1e-8)
@@ -94,7 +114,13 @@ std::string ErrorChainDisplay::detector_label(size_t id) const
     std::ostringstream out;
     out << 'D' << id;
     const auto found = detector_checks_.find(id);
-    if (found == detector_checks_.end()) return out.str();
+    if (found == detector_checks_.end())
+    {
+        const auto p=coordinates_.find(id);
+        if (p!=coordinates_.end() && p->second.size()==6 && p->second[5]==1)
+            out<<"=F("<<p->second[0]<<','<<p->second[1]<<", "<<p->second[2]<<"):"<<(p->second[4]==0 ? 'X':'Z');
+        return out.str();
+    }
     const auto check = found->second;
     const auto& c = coordinates_.at(id);
     out << '=' << (c[5] == 1 ? 'F' : "RGB"[checks_[check].color])
@@ -122,12 +148,14 @@ void ErrorChainDisplay::draw(dec::SyndromeRef syndrome,std::ostream& out) const
     }
     // Scale until labels fit without overwriting lattice edges or data vertices.
     std::vector<std::string> canvas;
+    double min_x=0,min_y=0;
+    for (const auto& [q,c]:qubits_) {min_x=std::min(min_x,c[0]);min_y=std::min(min_y,c[1]);}
     for (int scale = 3; scale <= 24; scale++)
     {
         const double sx = 2*scale, sy = code_ == "cc666" ? 2*scale/std::sqrt(3.0) : scale;
         const int margin = 12;
         auto point = [&](double x,double y)
-        {return std::pair<int,int>{margin+static_cast<int>(std::lround(sx*x)),margin+static_cast<int>(std::lround(sy*y))};};
+        {return std::pair<int,int>{margin+static_cast<int>(std::lround(sx*(x-min_x))),margin+static_cast<int>(std::lround(sy*(y-min_y)))};};
         int width = 0,height = 0;
         for (const auto& [q,c] : qubits_)
         {
@@ -194,5 +222,11 @@ void ErrorChainDisplay::draw(dec::SyndromeRef syndrome,std::ostream& out) const
         any = true;
         out << "  " << detector_label(detector) << (coordinates_.at(detector)[5] == 1 ? " (colorless flag)" : " (check)") << '\n';
     }
+    for (const auto& [detector,c]:coordinates_)
+        if (c[5]==1 && !detector_checks_.contains(detector) && syndrome[detector])
+        {
+            any=true;
+            out<<"  "<<detector_label(detector)<<" (colorless routing flag; spatial x,y and round)\n";
+        }
     if (!any) out << "  none\n";
 }

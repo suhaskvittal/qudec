@@ -15,6 +15,7 @@
 #include <stdexcept>
 #include <tuple>
 #include <ostream>
+#include <numeric>
 
 namespace dec::concat
 {
@@ -95,8 +96,15 @@ struct Decoder::Graph
     std::vector<Edge> endpoints;
     std::vector<size_t> component;
     std::vector<bool> component_boundary;
+    // Author: OpenAI Codex. Stable backend nodes and reusable active-edge views.
+    std::vector<std::vector<size_t>> adjacent_events;
+    std::vector<double> encoded_weights;
+    std::vector<pm::weight_int> integer_weights;
+    std::vector<size_t> degrees, positions;
+    std::vector<bool> has_boundary;
+    bool uniform_;
 
-    Graph(size_t num_detectors, const std::vector<Event>& events, bool uniform)
+    Graph(size_t num_detectors, const std::vector<Event>& events, bool uniform) :uniform_(uniform)
     {
         stim::DetectorErrorModel dem;
         for (size_t i = 0; i < events.size(); i++)
@@ -116,6 +124,21 @@ struct Decoder::Graph
         }
         dem += stim::DetectorErrorModel("detector D" + std::to_string(num_detectors-1));
         matcher = pm::detector_error_model_to_mwpm(dem, 1 << 24, true, false);
+        adjacent_events.resize(num_detectors);
+        for (size_t v = 0; v < num_detectors; v++)
+            for (auto* neighbor : matcher.flooder.graph.nodes[v].neighbors)
+                adjacent_events[v].push_back(records.at(std::minmax(static_cast<int64_t>(v),
+                    neighbor ? static_cast<int64_t>(neighbor-matcher.flooder.graph.nodes.data()) : int64_t{-1})));
+        encoded_weights.resize(events.size());
+        for (size_t id = 0; id < probabilities.size(); id++) if (probabilities[id] > 0)
+        {
+            const double q = probabilities[id]/(1+probabilities[id]);
+            encoded_weights[id] = std::log((1-q)/q);
+        }
+        integer_weights.resize(events.size());
+        degrees.resize(num_detectors);
+        positions.resize(num_detectors);
+        has_boundary.resize(num_detectors);
         // Contributor: OpenAI Codex. Detect infeasible boundary-parity sectors without
         // invoking/resetting PyMatching on an unmatched odd component.
         component.resize(num_detectors);
@@ -137,6 +160,118 @@ struct Decoder::Graph
             if (edge.first < 0) component_boundary[component[edge.second]] = true;
     }
 
+    // Author: OpenAI Codex. No DEM conversion, matcher construction, or sentinel
+    // edges. Rebuild only active adjacency views when the enabled support changes.
+    void update(const std::vector<Event>& events)
+    {
+        if (events.size() != probabilities.size()) throw std::invalid_argument("In-place graph event count changed");
+        bool topology_changed = false, integral = true;
+        double maximum = 0;
+        for (size_t id = 0; id < events.size(); id++)
+        {
+            const double p = events[id].probability == 0 ? 0 : (uniform_ ? .1 : events[id].probability);
+            if ((probabilities[id] > 0) != (p > 0)) topology_changed = true;
+            if (p > 0)
+            {
+                error_weight(p);
+                const auto edge = edge_key(events[id].detectors);
+                topology_changed |= endpoints[id] != edge;
+                endpoints[id] = edge;
+                // Match the existing DEM->log-odds conversion and quantization.
+                if (p != probabilities[id])
+                {
+                    const double q = p/(1+p);
+                    encoded_weights[id] = std::log((1-q)/q);
+                }
+                const double w = encoded_weights[id];
+                maximum = std::max(maximum,w);
+                integral &= std::round(w) == w;
+            }
+            probabilities[id] = p;
+        }
+        const double half_scale = integral ? 1 : double((1 << 24)-1)/maximum;
+        auto& matching = matcher.flooder.graph;
+        auto& search = matcher.search_flooder.graph;
+        matching.normalising_constant = 2*half_scale;
+        for (size_t id = 0; id < events.size(); id++) if (probabilities[id] > 0)
+            integer_weights[id] = static_cast<pm::weight_int>(2*std::round(encoded_weights[id]*half_scale));
+
+        // Successful solves already release their regions. Reset ephemeral node
+        // and queue state before changing adjacency or its integer weight scale.
+        matcher.search_flooder.reset();
+        matcher.flooder.queue.reset();
+        matcher.flooder.match_edges.clear();
+        for (auto& node : matching.nodes) node.reset();
+        if (topology_changed)
+        {
+            std::fill(degrees.begin(),degrees.end(),0);
+            std::fill(has_boundary.begin(),has_boundary.end(),false);
+            for (size_t id = 0; id < events.size(); id++) if (probabilities[id] > 0)
+            {
+                const auto [a,b] = endpoints[id];
+                degrees[b]++;
+                if (a >= 0) degrees[a]++;
+                else has_boundary[b] = true;
+            }
+            for (size_t v = 0; v < matching.nodes.size(); v++)
+            {
+                auto& a = matching.nodes[v];
+                auto& b = search.nodes[v];
+                a.neighbors.resize(degrees[v]); a.neighbor_weights.resize(degrees[v]);
+                a.neighbor_observables.resize(degrees[v],0); a.neighbor_implied_weights.resize(degrees[v]);
+                b.neighbors.resize(degrees[v]); b.neighbor_weights.resize(degrees[v]);
+                b.neighbor_observable_indices.resize(degrees[v]); b.neighbor_markers.resize(degrees[v],0);
+                b.neighbor_implied_weights.resize(degrees[v]); adjacent_events[v].resize(degrees[v]);
+                positions[v] = has_boundary[v] ? 1 : 0;
+            }
+            auto append = [&](size_t v,int64_t neighbor,size_t id)
+            {
+                const size_t slot = neighbor < 0 ? 0 : positions[v]++;
+                matching.nodes[v].neighbors[slot] = neighbor < 0 ? nullptr : &matching.nodes[neighbor];
+                matching.nodes[v].neighbor_observables[slot] = 0;
+                search.nodes[v].neighbors[slot] = neighbor < 0 ? nullptr : &search.nodes[neighbor];
+                search.nodes[v].neighbor_markers[slot] = 0;
+                adjacent_events[v][slot] = id;
+            };
+            // Preserve the original converter's edge insertion order and its
+            // convention that a boundary edge occupies adjacency slot zero.
+            for (size_t id = 0; id < events.size(); id++) if (probabilities[id] > 0)
+            {
+                const auto [a,b] = endpoints[id];
+                if (a >= 0) append(a,b,id);
+                append(b,a,id);
+            }
+            std::iota(component.begin(),component.end(),0);
+            auto root = [&](size_t v)
+            {
+                while (component[v] != v) v = component[v];
+                return v;
+            };
+            for (size_t id = 0; id < events.size(); id++) if (probabilities[id] > 0 && endpoints[id].first >= 0)
+                component[root(endpoints[id].second)] = root(endpoints[id].first);
+            for (size_t v = 0; v < component.size(); v++) component[v] = root(v);
+            std::fill(component_boundary.begin(),component_boundary.end(),false);
+            for (size_t id = 0; id < events.size(); id++) if (probabilities[id] > 0 && endpoints[id].first < 0)
+                component_boundary[component[endpoints[id].second]] = true;
+        }
+        for (size_t v = 0; v < adjacent_events.size(); v++)
+            for (size_t slot = 0; slot < adjacent_events[v].size(); slot++)
+            {
+                const auto w = integer_weights[adjacent_events[v][slot]];
+                matching.nodes[v].neighbor_weights[slot] = w;
+                search.nodes[v].neighbor_weights[slot] = w;
+            }
+    }
+
+    size_t event_id(int64_t from,int64_t to) const
+    {
+        if (from < 0) std::swap(from,to);
+        const auto& graph = matcher.search_flooder.graph;
+        const auto& node = graph.nodes[from];
+        const auto slot = node.index_of_neighbor(to < 0 ? nullptr : const_cast<pm::SearchDetectorNode*>(&graph.nodes[to]));
+        return adjacent_events[from][slot];
+    }
+
     bool can_solve(const std::vector<uint64_t>& fired) const
     {
         std::vector<bool> parity(component.size(), false);
@@ -151,8 +286,11 @@ struct Decoder::Graph
         const auto& graph = matcher.flooder.graph;
         const auto& search = matcher.search_flooder.graph;
         const double scale = graph.normalising_constant;
-        for (const auto& [edge, id] : records)
+        size_t count = 0;
+        for (size_t id = 0; id < probabilities.size(); id++) if (probabilities[id] > 0)
         {
+            count++;
+            const auto& edge = endpoints[id];
             const int64_t x = edge.first < 0 ? edge.second : edge.first;
             const int64_t y = edge.first < 0 ? -1 : edge.second;
             const auto& node = graph.nodes[x];
@@ -169,7 +307,7 @@ struct Decoder::Graph
             if (std::abs(actual-expected) > 2/scale || std::abs(actual_search-expected) > 2/scale)
                 throw std::runtime_error("Actual matching/search weights disagree with negative-log probabilities");
         }
-        return records.size();
+        return count;
     }
 
     std::vector<size_t> solve(const std::vector<uint64_t>& fired,
@@ -193,8 +331,7 @@ struct Decoder::Graph
                     {
                         auto* u = e.detector_node;
                         auto* v = u->neighbors[e.neighbor_index];
-                        const auto id = records.at(std::minmax(int64_t(u-search_nodes),
-                            v ? int64_t(v-search_nodes) : int64_t{-1}));
+                        const auto id = adjacent_events[u-search_nodes][e.neighbor_index];
                         unordered.push_back(id);
                         traced_parity[id] = !traced_parity[id];
                     });
@@ -220,7 +357,7 @@ struct Decoder::Graph
         }
         std::vector<size_t> ids;
         for (size_t i = 0; i < edges.size(); i += 2)
-            ids.push_back(records.at(std::minmax(edges[i], edges[i+1])));
+            ids.push_back(event_id(edges[i], edges[i+1]));
         if (paths || node_paths)
         {
             for (auto id : ids) traced_parity[id] = !traced_parity[id];
@@ -240,6 +377,13 @@ struct Decoder::SubDecoder
     std::vector<Event> first_events;
     std::vector<std::shared_ptr<Graph>> ensemble;
     std::vector<size_t> original_events;
+    // Author: OpenAI Codex. Static projection provenance and compact active
+    // virtual IDs preserve the original matching tie/order conventions.
+    std::vector<std::vector<size_t>> first_sources;
+    std::vector<size_t> second_projection, virtual_ids;
+    std::vector<Event> perturbed_events;
+    size_t perturbed_active_count{SIZE_MAX};
+    std::vector<double> ensemble_multipliers;
 };
 
 size_t
@@ -270,11 +414,14 @@ Decoder::audit_weights() const
 }
 
 Decoder::Decoder(Model input, bool uniform, bool boundary_gap, EnsembleConfig config)
-    :model(compress(std::move(input),boundary_gap)), boundary_gap_(boundary_gap), config_(config)
+    :model(compress(std::move(input),boundary_gap)), boundary_gap_(boundary_gap), config_(config), uniform_(uniform)
 {
     if (config.size == 0 || !(config.spread_scale >= 0) || !std::isfinite(config.spread_scale))
         throw std::invalid_argument("Invalid ensemble configuration");
     const size_t n = model.colors.size();
+    for (size_t id = 0; id < model.events.size(); id++) event_slots_.emplace(model.events[id].detectors,id);
+    active_events_.resize(model.events.size());
+    std::iota(active_events_.begin(),active_events_.end(),0);
     for (int c = 0; c < 3; c++)
     {
         auto sub = std::make_shared<SubDecoder>();
@@ -325,6 +472,16 @@ Decoder::Decoder(Model input, bool uniform, bool boundary_gap, EnsembleConfig co
             first_events.push_back({flagged_projected.contains(support) ? flagged_projected.at(support) : p,support,0});
         }
         sub->first_events = first_events;
+        sub->perturbed_events = first_events;
+        sub->first_sources.resize(first_events.size());
+        sub->virtual_ids.resize(first_events.size());
+        std::iota(sub->virtual_ids.begin(),sub->virtual_ids.end(),n);
+        for (size_t id = 0; id < model.events.size(); id++)
+        {
+            const auto projected_support = projection(model.events[id]);
+            if (!projected_support.empty())
+                sub->first_sources[virtual_id.at(projected_support)-n].push_back(id);
+        }
         if (boundary_gap_)
             sub->boundary_graph = std::make_shared<Graph>(n+3,first_events,uniform);
         else
@@ -355,12 +512,94 @@ Decoder::Decoder(Model input, bool uniform, bool boundary_gap, EnsembleConfig co
             // support creates a virtual check. Boundary-only projections are
             // unobserved, even though their parity was fixed in stage one.
             if (!other.empty()) own.push_back(virtual_id.at(projection(e)));
+            sub->second_projection.push_back(other.empty() ? SIZE_MAX : virtual_id.at(projection(e))-n);
             if (own.size() > 2) throw std::invalid_argument("Non-graphlike monochromatic projection");
             sub->second_events.push_back({e.probability, own, e.observable});
             sub->original_events.push_back(id);
         }
         sub->monochromatic = std::make_unique<Graph>(n+first_events.size(), sub->second_events, false);
         subdecoders_[c] = std::move(sub);
+    }
+}
+
+void
+Decoder::update(Model input)
+{
+    if (input.colors != model.colors || event_slots_.size() != active_events_.size())
+        throw std::invalid_argument("In-place update needs the constructor's colors and unique event supports");
+    std::fill(active_events_.begin(),active_events_.end(),SIZE_MAX);
+    for (size_t id = 0; id < input.events.size(); id++)
+    {
+        const auto& e = input.events[id];
+        const auto found = event_slots_.find(e.detectors);
+        if (found == event_slots_.end()) throw std::invalid_argument("Event outside in-place union topology");
+        if (e.probability == 0) continue;
+        error_weight(e.probability);
+        if (active_events_[found->second] != SIZE_MAX) throw std::invalid_argument("Duplicate in-place event support");
+        active_events_[found->second] = id;
+    }
+    model = std::move(input);
+    const size_t n = model.colors.size();
+    for (int c = 0; c < 3; c++)
+    {
+        auto& sub = *subdecoders_[c];
+        size_t active_count = 0;
+        for (size_t id = 0; id < sub.first_sources.size(); id++)
+        {
+            double ordinary = 0, flagged = 0;
+            bool supported = false, present = false;
+            for (auto slot : sub.first_sources[id]) if (active_events_[slot] != SIZE_MAX)
+            {
+                present = true;
+                const auto& e = model.events[active_events_[slot]];
+                ordinary = xor_probability(ordinary,e.probability);
+                if (model.flag_renormalization && e.flag_supported)
+                {
+                    supported = true;
+                    flagged = xor_probability(flagged,e.probability);
+                }
+            }
+            const double p = supported ? flagged : ordinary;
+            sub.first_events[id].probability = p;
+            sub.virtual_ids[id] = present ? n+active_count++ : SIZE_MAX;
+        }
+        sub.ensemble[0]->update(sub.first_events);
+        if (sub.perturbed_active_count != active_count && config_.size > 1)
+        {
+            sub.ensemble_multipliers.clear();
+            sub.ensemble_multipliers.reserve((config_.size-1)*active_count);
+            std::mt19937_64 rng(config_.seed+0x9e3779b97f4a7c15ULL*(c+1));
+            for (size_t member = 1; member < config_.size; member++)
+            {
+                const double sigma = std::log(member%2 ? 2.0 : 4.0)*config_.spread_scale;
+                std::normal_distribution<double> normal(0,1);
+                for (size_t id = 0; id < active_count; id++)
+                    sub.ensemble_multipliers.push_back(std::exp(sigma*normal(rng)));
+            }
+            sub.perturbed_active_count = active_count;
+        }
+        size_t multiplier = 0;
+        for (size_t member = 1; member < config_.size; member++)
+        {
+            for (size_t id = 0; id < sub.first_events.size(); id++)
+            {
+                const double p = sub.first_events[id].probability;
+                sub.perturbed_events[id].probability = sub.virtual_ids[id] != SIZE_MAX ?
+                    std::clamp((uniform_ ? .1 : p)*sub.ensemble_multipliers[multiplier++],1e-12,.499999999) : 0;
+            }
+            sub.ensemble[member]->update(sub.perturbed_events);
+        }
+        for (size_t slot = 0; slot < active_events_.size(); slot++)
+        {
+            auto& e = sub.second_events[slot];
+            const auto active = active_events_[slot];
+            sub.original_events[slot] = active;
+            e.probability = active == SIZE_MAX ? 0 : model.events[active].probability;
+            e.observable = active == SIZE_MAX ? 0 : model.events[active].observable;
+            if (active != SIZE_MAX && sub.second_projection[slot] != SIZE_MAX)
+                e.detectors.back() = sub.virtual_ids[sub.second_projection[slot]];
+        }
+        sub.monochromatic->update(sub.second_events);
     }
 }
 
@@ -446,7 +685,7 @@ Decoder::decode_color(const std::vector<uint8_t>& syndrome, int c, int mask, siz
                 const auto id = edge_paths[j][k];
                 const double p = matched_graph.probabilities[id];
                 debug->out << " --{" << (first_stage ? "P" : "E")
-                    << (first_stage ? id : sub.original_events[id]) << ", p=" << p << ", W=" << error_weight(p);
+                    << (first_stage ? sub.virtual_ids[id]-model.colors.size() : sub.original_events[id]) << ", p=" << p << ", W=" << error_weight(p);
                 if (first_stage) debug->out << ", base_p=" << sub.first_events[id].probability;
                 debug->out << "}--> " << node_name(nodes[k+1],first_stage);
             }
@@ -476,7 +715,7 @@ Decoder::decode_color(const std::vector<uint8_t>& syndrome, int c, int mask, siz
     {
         const auto& support = sub.first_events[id].detectors;
         if (std::any_of(support.begin(),support.end(),[&](auto v) { return v < model.colors.size(); }))
-            second_fired.push_back(model.colors.size()+id);
+            second_fired.push_back(sub.virtual_ids[id]);
         if (trace) candidate.restricted_edges.push_back(support);
     }
     auto canonical = second_fired;
@@ -493,7 +732,7 @@ Decoder::decode_color(const std::vector<uint8_t>& syndrome, int c, int mask, siz
         debug->out << "  Virtual detector definitions (selected first-stage edges):\n";
         for (auto id : first_selected)
         {
-            debug->out << "    V" << id << " = {";
+            debug->out << "    V" << sub.virtual_ids[id]-model.colors.size() << " = {";
             for (auto v : sub.first_events[id].detectors) debug->out << node_name(v,true) << ' ';
             debug->out << "}\n";
         }

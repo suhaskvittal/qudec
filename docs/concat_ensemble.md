@@ -42,13 +42,14 @@ retains its detector insertion order, so coalescing does not introduce new
 PyMatching tie choices. All unperturbed candidates precede perturbed ones.
 
 Second-stage graphs and final correction scores use the original model
-probabilities. The minimum original log-odds correction wins; equal scores keep
+probabilities. The minimum original negative-log correction weight wins; equal scores keep
 the first candidate. Every correction must reproduce the complete spacetime
 syndrome. Ensembling does not flatten measurement detectors or change flag
-weighting. Circuit-level flag observations first select the existing conditioned
-model; that context owns its matching ensemble. Eviction and rebuilding use the
-same seed and probabilities. Memory use therefore scales with K and the number
-of retained flag contexts.
+weighting. Circuit-level flag observations select representatives and update
+one persistent matching ensemble in place. Graph objects are retained across
+flag patterns; memory scales with K and the union of possible graph edges.
+The existing seeded perturbation sequence is preserved as active projections
+change. See [in-place updates](concat_inplace.md).
 
 ## C++ API
 

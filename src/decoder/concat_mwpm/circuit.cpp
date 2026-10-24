@@ -56,7 +56,7 @@ CircuitDecoder::CircuitDecoder(const stim::DetectorErrorModel& dem, bool memory_
     :num_detectors(dem.count_detectors()), faults(read_faults(dem)),
      coordinates(read_coordinates(dem)),
      flag_p_(num_detectors,0), measurement_p_(num_detectors, 0), use_flags_(use_flags),
-     cache_capacity_(cache_capacity), boundary_gap_(boundary_gap), ensemble_(ensemble), renormalization_(renormalization)
+     boundary_gap_(boundary_gap), ensemble_(ensemble), renormalization_(renormalization)
 {
     if (renormalization.enabled && (!std::isfinite(renormalization.physical_error_rate) ||
         renormalization.physical_error_rate < 0 || renormalization.physical_error_rate >= 1))
@@ -250,7 +250,6 @@ CircuitDecoder::make_context(const std::vector<uint8_t>& syndrome) const
 {
     Model model{colors_, {}, renormalization_.enabled};
     Context out;
-    const auto neighborhoods = flag_neighborhoods(syndrome);
     std::vector<size_t> observed_flags;
     if (use_flags_) for (auto f : flag_globals) if (syndrome[f]) observed_flags.push_back(f);
     // Author: OpenAI Codex. Count flagged measurement circuits, not flag bits.
@@ -297,11 +296,6 @@ CircuitDecoder::make_context(const std::vector<uint8_t>& syndrome) const
                 best_distance = distance;
             }
         }
-        std::vector<size_t> incident_flags;
-        for (const auto& [f,detectors] : neighborhoods)
-            if (std::any_of(group.checks.begin(),group.checks.end(),[&](auto v)
-                {return std::binary_search(detectors.begin(),detectors.end(),v);}))
-                incident_flags.push_back(f);
         const uint64_t observable = selected ? selected->observable : 0;
         double probability = selected ? selected->probability : 0;
         double denominator = 1;
@@ -321,12 +315,12 @@ CircuitDecoder::make_context(const std::vector<uint8_t>& syndrome) const
             if (!(probability > 0)) throw std::invalid_argument("Renormalized event probability underflowed");
         }
         out.weights.push_back({group.checks, observable, unflagged, probability,
-            group.flags.size(),active,std::move(incident_flags),penalty,selected_id,best_distance,
+            group.flags.size(),active,{},penalty,selected_id,best_distance,
             selected ? selected->flags : std::vector<size_t>{},selected ? selected->probability : 0,denominator});
         if (selected) model.events.push_back({probability,group.checks,observable,group.boundary_hint,
             renormalization_.enabled && flag_supported});
     }
-    out.decoder = std::make_unique<Decoder>(std::move(model),false,boundary_gap_,ensemble_);
+    out.input_model = std::move(model);
     return out;
 }
 
@@ -336,13 +330,25 @@ CircuitDecoder::context(const std::vector<uint8_t>& syndrome)
     if (syndrome.size() != num_detectors) throw std::invalid_argument("Wrong full syndrome length");
     std::string key;
     for (auto f : flag_globals) key.push_back(use_flags_ && syndrome[f]);
-    auto it = contexts_.find(key);
-    if (it == contexts_.end())
+    if (!context_.decoder)
     {
-        if (contexts_.size() >= cache_capacity_) contexts_.clear();
-        it = contexts_.emplace(std::move(key), make_context(syndrome)).first;
+        // Author: OpenAI Codex. Compile every possible event/projection once.
+        // Disabled classes are represented by absent backend adjacency entries.
+        Model topology{colors_,{},renormalization_.enabled};
+        topology.events.reserve(classes_.size());
+        for (const auto& group : classes_)
+            topology.events.push_back({.1,group.checks,0,group.boundary_hint});
+        context_.decoder = std::make_unique<Decoder>(std::move(topology),false,boundary_gap_,ensemble_);
     }
-    return it->second;
+    if (!context_ready_ || key != current_flags_)
+    {
+        auto selected = make_context(syndrome);
+        context_.decoder->update(std::move(selected.input_model));
+        context_.weights = std::move(selected.weights);
+        current_flags_ = std::move(key);
+        context_ready_ = true;
+    }
+    return context_;
 }
 
 std::vector<uint8_t>
@@ -392,7 +398,16 @@ CircuitDecoder::inspect(const std::vector<uint8_t>& full, DebugTrace* debug)
         if (candidate.weight < colors[candidate.color].weight-1e-9) colors[candidate.color] = candidate;
         if (candidate.weight < best.weight-1e-9) best = candidate;
     }
-    return {std::move(best), std::move(colors), ctx.weights, ctx.decoder->model,
+    // Author: OpenAI Codex. Incidence neighborhoods are diagnostic only; avoid
+    // their construction in ordinary decoding's flag-update path.
+    auto weights = ctx.weights;
+    const auto neighborhoods = flag_neighborhoods(full);
+    for (auto& w : weights)
+        for (const auto& [flag,detectors] : neighborhoods)
+            if (std::any_of(w.checks.begin(),w.checks.end(),[&](auto v)
+                {return std::binary_search(detectors.begin(),detectors.end(),v);}))
+                w.incident_observed_flags.push_back(flag);
+    return {std::move(best), std::move(colors), std::move(weights), ctx.decoder->model,
             ctx.decoder->audit_weights(), std::move(candidates),ctx.decoder->ambiguous_boundary_events()};
 }
 

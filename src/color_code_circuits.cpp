@@ -18,6 +18,8 @@ using Point = std::pair<int, int>;
 struct Face {
     int color;
     std::vector<Point> vertices;
+    // Author: OpenAI Codex. Complete polygon retains missing boundary slots.
+    std::vector<Point> cycle;
 };
 
 // Honeycomb vertices and face centers on a triangular integer grid. Physical
@@ -35,6 +37,8 @@ std::vector<Face> layout666(uint32_t distance) {
     std::vector<Face> faces;
     for (auto [x, y] : centers) {
         Face f{(x + y) % 3, {}};
+        for (auto [dx,dy] : std::vector<Point>{{2,0},{1,-1},{-1,-1},{-2,0},{-1,1},{1,1}})
+            f.cycle.emplace_back(x+dx,y+dy);
         for (auto [dx, dy] : std::vector<Point>{{2, 0}, {1, 1}, {-1, 1}, {-2, 0}, {-1, -1}, {1, -1}})
             if (data.contains({x + dx, y + dy}))
                 f.vertices.emplace_back(x + dx, y + dy);
@@ -51,18 +55,26 @@ std::vector<Face> layout666(uint32_t distance) {
 std::vector<Face> layout488(uint32_t distance) {
     const int w = distance, half = w / 2;
     std::vector<Face> faces;
-    auto add = [&](int color, int x, int y, std::vector<Point> offsets) {
+    auto add = [&](int color, int x, int y, std::vector<Point> offsets,
+                   std::vector<Point> complete = {}) {
         Face f{color, {}};
         for (auto [dx, dy] : offsets)
             f.vertices.emplace_back(x + dx, y + dy);
+        for (auto [dx,dy] : (complete.empty() ? offsets:complete))
+            f.cycle.emplace_back(x+dx,y+dy);
         faces.push_back(std::move(f));
     };
+    auto rectangle = [](int first_y) {
+        std::vector<Point> result;
+        for (int x=0;x<2;x++) for (int y=first_y;y<first_y+4;y++) result.emplace_back(x,y);
+        return result;
+    };
     for (int x = 1; x < w; x += 2)
-        add(2, x, 0, {{0, 1}, {0, 0}, {1, 0}, {1, 1}});
+        add(2, x, 0, {{0, 1}, {0, 0}, {1, 0}, {1, 1}},rectangle(-2));
     for (int x = 0; x < half; x += 2)
-        add(1, x, 2 * x, {{0, 0}, {1, 0}, {1, 1}, {1, 2}});
+        add(1, x, 2 * x, {{0, 0}, {1, 0}, {1, 1}, {1, 2}},rectangle(-1));
     for (int x = 0; x < half - 1; x += 2)
-        add(2, w - x - 2, 2 * x + 2, {{0, 0}, {0, 1}, {0, 2}, {1, 0}});
+        add(2, w - x - 2, 2 * x + 2, {{0, 0}, {0, 1}, {0, 2}, {1, 0}},rectangle(-1));
     for (int offset = 0; offset < w; offset += 2) {
         for (int x = 0; x < half - offset / 2; ++x)
             add(0, x + 1 + offset, 2 * x + 1, {{0, 0}, {0, 1}, {1, 1}, {1, 0}});
@@ -82,7 +94,10 @@ std::pair<double, double> position(Point q, bool octagons) {
         return {x * 0.5, y * std::sqrt(3.0) * 0.5};
     // Expand alternate pairs of rows into the square/octagon embedding.
     int r = 2 * x;
-    if (((y + 1) / 2) % 2 == 0)
+    // Floor division also handles extrapolated polygon vertices below y=0.
+    int row=(y+1)/2;
+    if (y+1<0 && (y+1)%2) --row;
+    if (row % 2 == 0)
         r += (x + 1) % 2;
     else
         r += x % 2;
@@ -159,15 +174,15 @@ stim::Circuit make_color_memory(uint32_t distance, uint32_t rounds, const Circui
         idle(c, active, CircuitOperationKind::GateIdle);
         idle(c, active, CircuitOperationKind::MeasurementIdle);
     };
-    policy.append(head, {CircuitOperationKind::Reset, data});
+    // Initialize all Bell ancillas once. Subsequent basis transitions use MR.
+    policy.append(head, {CircuitOperationKind::Reset, bell_flagged ? all:data});
     if (bell_flagged) {
-        slow_idle(head, data);
         head.safe_append_u("TICK", {});
     }
     if (memory_x) h(head, data);
 
     stim::Circuit cycle;
-    // Fixed measurement order: basis X/Z, color R/G/B, all a then all b.
+    // Fixed measurement order: basis X/Z, all a then all b (all colors).
     std::vector<uint32_t> check_order(2 * nf), flag_order(2 * nf);
     uint32_t order = 0;
     policy.append(cycle, {CircuitOperationKind::RoundStart, data});
@@ -182,52 +197,95 @@ stim::Circuit make_color_memory(uint32_t distance, uint32_t rounds, const Circui
             check_order[basis * nf + k] = order++;
         }
     }
-    if (bell_flagged) for (int basis = 0; basis < 2; ++basis) {
-        for (int color = 0; color < 3; ++color) {
-            std::vector<uint32_t> aa, bb, active, bell;
-            size_t half_weight = 0;
-            for (uint32_t k = 0; k < nf; ++k) if (faces[k].color == color) {
-                aa.push_back(a[k]); bb.push_back(b[k]);
-                active.insert(active.end(), {a[k], b[k]});
-                bell.insert(bell.end(), {a[k], b[k]});
-                half_weight = std::max(half_weight, supports[k].size() / 2);
+    if (bell_flagged) {
+        // Author: OpenAI Codex. Opposite polygon vertices are contacted in
+        // parallel, with each Bell ancilla following its clockwise half-face.
+        // Missing boundary vertices leave holes in the full polygon schedule.
+        struct Contact {uint32_t face,side,qubit;};
+        const size_t depth=octagons ? 4:3;
+        std::vector<std::vector<Contact>> contacts(depth);
+        std::vector<std::set<uint32_t>> occupied(depth);
+        auto add_face = [&](uint32_t k,const std::vector<Point>& walk,const std::vector<size_t>& slots) {
+            const auto half=walk.size()/2;
+            for (size_t j=0;j<walk.size();j++) {
+                if (std::find(faces[k].vertices.begin(),faces[k].vertices.end(),walk[j])==faces[k].vertices.end()) continue;
+                const auto q=index.at(walk[j]);
+                const auto slot=slots[j%half];
+                if (!occupied[slot].insert(q).second)
+                    throw std::logic_error("Clockwise Bell extraction has a data-qubit gate collision");
+                contacts[slot].push_back({k,uint32_t(j/half),q});
             }
-            if (aa.empty()) continue;
-            policy.append(cycle, {CircuitOperationKind::Reset, active});
-            slow_idle(cycle, active);
-            cycle.safe_append_u("TICK", {});
-            h(cycle, aa);
-            cx(cycle, bell);
-            for (size_t step = 0; step < half_weight; ++step) {
-                std::vector<uint32_t> pairs;
-                for (uint32_t k = 0; k < nf; ++k) if (faces[k].color == color) {
-                    const auto& s = supports[k];
-                    if (step >= s.size() / 2) continue;
-                    for (int side = 0; side < 2; ++side) {
-                        uint32_t anc = side == 0 ? a[k] : b[k];
-                        uint32_t q = s[step + side * (s.size() / 2)];
-                        if (basis == 0) pairs.insert(pairs.end(), {anc, q});
-                        else pairs.insert(pairs.end(), {q, anc});
-                    }
+        };
+        auto clockwise = [&](uint32_t k) {
+            auto walk=faces[k].cycle;
+            if (octagons) {
+                double x=0,y=0;
+                for (auto q:walk) {auto p=position(q,true);x+=p.first/walk.size();y+=p.second/walk.size();}
+                std::sort(walk.begin(),walk.end(),[&](Point u,Point v) {
+                    const auto pu=position(u,true),pv=position(v,true);
+                    return std::atan2(pu.second-y,pu.first-x)>std::atan2(pv.second-y,pv.first-x);
+                });
+            }
+            return walk;
+        };
+        for (uint32_t k=0;k<nf;k++) {
+            if (octagons && faces[k].color==0) continue;
+            auto walk=clockwise(k);
+            if (octagons && faces[k].vertices.size()==4) {
+                std::set<int> rows;
+                for (auto q:faces[k].vertices) rows.insert(q.second);
+                // Sloping-boundary octagon fragments have a one-slot phase
+                // shift relative to bottom fragments and complete octagons.
+                if (rows.size()==3) std::rotate(walk.begin(),walk.begin()+3,walk.end());
+            }
+            std::vector<size_t> slots(depth);std::iota(slots.begin(),slots.end(),0);
+            add_face(k,walk,slots);
+        }
+        if (octagons) for (uint32_t k=0;k<nf;k++) if (faces[k].color==0) {
+            auto walk=clockwise(k);
+            std::vector<size_t> slots;
+            for (size_t first=0;first<depth && slots.empty();first++)
+                for (size_t second=0;second<depth;second++) {
+                    if (first==second) continue;
+                    bool free=true;
+                    for (size_t j=0;j<4;j++) free &= !occupied[j%2 ? second:first].contains(index.at(walk[j]));
+                    if (free) {slots={first,second};break;}
                 }
-                cx(cycle, pairs);
+            if (slots.empty()) throw std::logic_error("No clockwise square slots in Bell 4.8.8 extraction");
+            if (slots[0]>slots[1]) {
+                std::rotate(walk.begin(),walk.begin()+1,walk.end());
+                std::swap(slots[0],slots[1]);
             }
-            cx(cycle, bell);
-            h(cycle, aa);
-            // Preserve a single readout-flip channel on all active ancillas,
-            // followed by the historical a-then-b measurement record ordering.
-            std::vector<uint32_t> readout = aa;
-            readout.insert(readout.end(), bb.begin(), bb.end());
-            policy.append(cycle, {CircuitOperationKind::Measure, readout});
-            policy.append(cycle, {CircuitOperationKind::PostMeasurement, active});
-            slow_idle(cycle, active);
-            cycle.safe_append_u("TICK", {});
-            for (uint32_t j = 0; j < aa.size(); ++j) {
-                uint32_t k = (aa[j] - n) / 2;
-                check_order[basis * nf + k] = order + j + (basis == 0 ? 0 : aa.size());
-                flag_order[basis * nf + k] = order + j + (basis == 0 ? aa.size() : 0);
+            add_face(k,walk,slots);
+        }
+        std::vector<uint32_t> active,bell,readout=a;
+        readout.insert(readout.end(),b.begin(),b.end());
+        for (uint32_t k=0;k<nf;k++) {
+            active.insert(active.end(),{a[k],b[k]});
+            bell.insert(bell.end(),{a[k],b[k]});
+        }
+        for (int basis=0;basis<2;basis++) {
+            h(cycle,a);
+            cx(cycle,bell);
+            for (const auto& layer:contacts) {
+                std::vector<uint32_t> pairs;
+                for (const auto& contact:layer) {
+                    const auto anc=contact.side ? b[contact.face]:a[contact.face];
+                    if (basis==0) pairs.insert(pairs.end(),{anc,contact.qubit});
+                    else pairs.insert(pairs.end(),{contact.qubit,anc});
+                }
+                cx(cycle,pairs);
             }
-            order += active.size();
+            cx(cycle,bell);
+            h(cycle,a);
+            policy.append(cycle,{CircuitOperationKind::MeasureReset,readout});
+            slow_idle(cycle,active);
+            cycle.safe_append_u("TICK",{});
+            for (uint32_t k=0;k<nf;k++) {
+                check_order[basis*nf+k]=order+k+(basis==0 ? 0:nf);
+                flag_order[basis*nf+k]=order+k+(basis==0 ? nf:0);
+            }
+            order+=active.size();
         }
     }
     auto rec = [](uint32_t back) { return back | stim::TARGET_RECORD_BIT; };

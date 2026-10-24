@@ -58,8 +58,10 @@ in Figure 2 of Gidney and Jones, arXiv:2312.08813 (the layouts are Figure 1):
 https://arxiv.org/pdf/2312.08813
 
 Each extraction prepares a in |+> and b in |0>, and applies CX(a,b), making
-a Bell pair. The face vertices are ordered around the perimeter and split
-into two equal contiguous halves. Each half interacts with its own ancilla.
+a Bell pair. Complete face polygons are ordered clockwise and split into
+two equal contiguous halves. Each half interacts with its own ancilla;
+truncated boundary faces retain the missing polygon slots instead of
+renumbering their remaining vertices.
 For an X check, the ancillas control CX gates targeting data; for a Z
 check, data control CX gates targeting the ancillas. Matching steps on the
 two halves run in parallel. After another CX(a,b), measure a in X and b in Z.
@@ -69,18 +71,21 @@ b gives the check and a gives the flag. The ideal flag is always zero,
 independently of the data state and of all previous flags. No feedback is
 needed. The same gadget applies to four-, six-, and eight-vertex faces.
 
-A round consists of X extraction for red, green, and blue faces, followed
-by Z extraction for red, green, and blue faces. Faces of the same color
-have disjoint data supports, so they run in parallel without gate collisions.
-A boundary face with a shorter support finishes its interactions earlier
-and idles through the remaining interaction steps for that color.
+A round consists of joint X extraction for every face color, followed by
+joint Z extraction for every face color. Author: OpenAI Codex (parallel
+clockwise scheduling revision). Opposite polygon contacts run together:
+three data-contact layers per basis for 6.6.6 and four for 4.8.8. Sloping
+4.8.8 octagon fragments retain a one-layer phase shift, and the disjoint
+red squares use the available clockwise contact slots. Construction checks
+that no two contacts touch a data qubit in the same layer. There are no
+color-by-color extraction subrounds.
 
-This deliberately uses six color/basis subrounds. It implements the local
-bell-flagged gadget, rather than reproducing the paper's optimized global
-schedule. In particular, its depth and idle-noise exposure differ from the
-paper's benchmark circuits. Full noisy circuit distance/fault tolerance,
-especially for the eight-body extension, is not asserted by the validation
-below; flags and noiseless parity checks alone do not establish it.
+All ancillas are initialized with the data. At each X->Z and Z->X transition,
+one common MR measurement/reset prepares every ancilla for the next basis.
+Thus every data qubit has two 2p waiting channels per round. Total repeating
+depth, including H, Bell preparation/uncomputation and MR, is 16 ticks for
+6.6.6 and 18 for 4.8.8. Full noisy circuit distance/fault tolerance is not
+asserted by noiseless validation alone.
 
 Detector metadata
 -----------------
@@ -130,7 +135,7 @@ block, so text size does not grow linearly with the requested round count.
 SI1000 noise
 ------------
 
-The implementation uses Z-basis hardware operations: R, H, CX, M.
+The implementation uses Z-basis hardware operations: R, H, CX, MR, M.
 Preparing |+> is R then H; X readout is H then M. Every H and CX layer
 is explicitly separated by TICKs. Rates follow the superconducting-inspired
 SI1000 convention, e.g. NoiseModel.si1000 in:
@@ -140,16 +145,19 @@ https://github.com/quantumlib/chromobius/blob/main/src/gen/_core/_noise.py
   CX:               DEPOLARIZE2(p) afterwards, on the same pair.
   R:                X_ERROR(2p) afterwards.
   M:                X_ERROR(5p) immediately before measurement, and
-                    DEPOLARIZE1(p) afterwards.
+                    DEPOLARIZE1(p) afterwards (final data readout).
+  MR:               X_ERROR(5p) before measurement/reset and X_ERROR(2p)
+                    afterwards; no postmeasurement depolarization on the
+                    freshly reset ancilla.
   Idle:             DEPOLARIZE1(p/10) per layer.
   Waiting for R/M:  an additional, separate DEPOLARIZE1(2p) channel on
                     idle qubits in that reset/measurement layer.
 
 The pre-M flip is equivalent to a readout-bit flip for these measurements:
 ancillas are reset before reuse, and data measurement is destructive.
-The waiting channel is applied to all idle qubits, including other colors'
-ancillas, not just data. Separate reset and measurement layers each incur
-waiting noise. All rate arguments must be finite and 0 <= p <= 0.2, since
+Every joint MR incurs one waiting interval on all data qubits. Ancillas
+are reset together, with no separate reset waiting layer between bases.
+All rate arguments must be finite and 0 <= p <= 0.2, since
 the largest probability is 5p. At p=0 no noise instructions are emitted.
 The existing surface/toric generators have their own older noise helpers;
 these color-code functions use the rates explicitly listed here.
@@ -197,3 +205,24 @@ Data/check tags preserve spatial/temporal provenance in Stim DEM errors and
 through component-rate rewriting. Native generators support nonuniform data
 and check rates. CLI: -cap/--code-capacity and -pheno/--phenomenological;
 see docs/ideal_noise_models.md for full interface and model assumptions.
+
+Superdense extraction (Author: OpenAI Codex)
+------------------------------------------
+cc666_superdense and cc488_superdense in circuit_generator.h implement the
+triangular superdense schedules of arXiv:2609.21376v3. Both accept a noise
+policy, memory basis, opposite-basis option and component-rate distribution.
+The CNOT representation is the default; native CZ is an optional compilation.
+CLI: --superdense, --superdense-start-phase 0|1. CLI extraction uses CNOTs.
+cc666 supports odd d>=3 and uses eight CNOT layers per complete cycle.
+cc488 uses the published shared-ancilla brickwork layout, all 90 local
+boundary scheduling classes, and alternating twelve-layer cycles. This
+specific family supports d=3,7,11,15,..., not every odd distance.
+Detectors track incoming/outgoing check parities and logical Pauli-frame
+updates derived by binary CSS Choi elimination. Colors and bases retain the
+six-coordinate format. Independent 4.8.8 routing flags are colorless and
+single-cycle detectors. No comparison of successive flags is performed.
+Use Tesseract for noisy superdense decoding: the existing concatenated-MWPM
+implementation rejects some of these circuits' hyperedge shapes.
+See docs/superdense_color_code_circuits.md for API, circuit boundaries,
+metadata conventions and validation; docs/superdense_source_NOTICE.md
+records upstream authors and the retained source license.

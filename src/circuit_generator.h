@@ -34,6 +34,21 @@ stim::Circuit cc488_circuit(uint32_t distance, uint32_t rounds,
     bool include_opposite_basis_detectors = false,
     const ComponentErrorDistribution& noise_distribution = {});
 
+// Author: OpenAI Codex. Superdense extraction, arXiv:2609.21376v3.
+// Both bases are acquired per reset/measure cycle. 6.6.6: odd d>=3;
+// brickwork 4.8.8: d=4m-1 only. Policies must implement gate sequences.
+// CNOT is the default; true selects native CZ compilation.
+// Detector coordinates: (x,y,round,color,basis,is_flag), flags color=-1.
+stim::Circuit cc666_superdense(uint32_t distance, uint32_t rounds,
+    const CircuitNoisePolicy& policy, bool is_memory_x,
+    bool include_opposite_basis_detectors = false,
+    const ComponentErrorDistribution& noise_distribution = {}, bool native_cz = false);
+stim::Circuit cc488_superdense(uint32_t distance, uint32_t rounds,
+    const CircuitNoisePolicy& policy, bool is_memory_x,
+    bool include_opposite_basis_detectors = false,
+    const ComponentErrorDistribution& noise_distribution = {}, uint32_t start_phase = 0,
+    bool native_cz = false);
+
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 

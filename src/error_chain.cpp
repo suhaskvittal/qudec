@@ -169,7 +169,7 @@ ErrorChainSummary evaluate_error_chains(const stim::DetectorErrorModel& dem,
         if (failed) increment(summary.failures);
         if ((failed && summary.failures <= config.print_failures) || summary.tested <= config.print_chains)
         {
-            if (!display) display = std::make_unique<ErrorChainDisplay>(dem,config.code,config.distance);
+            if (!display) display = std::make_unique<ErrorChainDisplay>(dem,config.code,config.distance,config.superdense);
             if (failed) out << "Failure " << summary.failures << " at chain " << summary.tested;
             else out << "Chain " << summary.tested << " (decoded correctly)";
             out << ": events=";

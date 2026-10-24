@@ -54,6 +54,9 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
     int64_t noise_seed = 0;
     // Contributor: OpenAI Codex. Ideal data/readout noise selectors.
     bool code_capacity{false}, phenomenological{false};
+    // Author: OpenAI Codex. Opt-in superdense extraction and its cycle phase.
+    bool superdense{false};
+    int64_t superdense_start_phase{0};
     double measurement_error_rate{-1};
 
     /*
@@ -121,6 +124,8 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
         .optional("", "--cluster-gap-histogram", "Print cluster-gap bins (requires --cluster-gap)", print_cluster_gap_histogram, false)
         .optional("", "--correlated", "PyMatching: use two-pass correlated MWPM", correlated_pymatching, false)
         .optional("", "--include-opposite-basis-detectors", "Include interior opposite-basis check detectors", include_opposite_basis_detectors, false)
+        .optional("", "--superdense", "Use CNOT superdense color-code extraction (SI1000)", superdense, false)
+        .optional("", "--superdense-start-phase", "4.8.8 superdense starting phase: 0 or 1", superdense_start_phase, 0)
         .optional("", "--debug", "Color-code decoders: populate and print decoder-specific debug information", decoder_debug, false)
         .optional("", "--concat-boundary-gap", "ConcatMWPM: ensemble even/odd spatial-boundary sectors in stage one", concat_boundary_gap, false)
         .optional("", "--concat-flag-renormalization", "ConcatMWPM: use raw flag-fault probabilities and p^m ordinary-edge suppression", concat_flag_renormalization, false)
@@ -217,6 +222,12 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
         throw std::invalid_argument("Unknown code family: " + code_name);
     if (color_decoder && (code_name != "cc666" && code_name != "cc488"))
         throw std::invalid_argument(decoder_name+" requires --code cc666 or cc488");
+    if (superdense && (code_name=="sc" || code_capacity || phenomenological))
+        throw std::invalid_argument("--superdense requires a color code and SI1000 noise");
+    if ((!superdense && superdense_start_phase) || superdense_start_phase<0 ||
+        superdense_start_phase>(code_name=="cc488" ? 1:0))
+        throw std::invalid_argument("Invalid --superdense-start-phase or missing --superdense");
+    chain_config.superdense=superdense;
     if ((decoder_name == "restriction" || decoder_name == "correlated_restriction") && code_name != "cc666")
         throw std::invalid_argument(decoder_name+" currently requires --code cc666");
     if ((decoder_name == "restriction" || decoder_name == "correlated_restriction") &&
@@ -298,7 +309,14 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
         : phenomenological ? static_cast<const CircuitNoisePolicy&>(pheno_noise)
                            : static_cast<const CircuitNoisePolicy&>(circuit_noise);
     stim::Circuit circuit;
-    if (code_name == "cc666")
+    if (superdense && world_rank==0)
+        std::cout<<"Superdense extraction: code="<<code_name<<" gates=CNOT"
+                 <<" start_phase="<<superdense_start_phase<<'\n';
+    if (superdense && code_name == "cc666")
+        circuit = cc666_superdense(d,r,operation_policy,false,include_opposite_basis_detectors,noise_distribution);
+    else if (superdense && code_name == "cc488")
+        circuit = cc488_superdense(d,r,operation_policy,false,include_opposite_basis_detectors,noise_distribution,superdense_start_phase);
+    else if (code_name == "cc666")
         circuit = cc666_circuit(d,r,operation_policy,false,include_opposite_basis_detectors,noise_distribution);
     else if (code_name == "cc488")
         circuit = cc488_circuit(d,r,operation_policy,false,include_opposite_basis_detectors,noise_distribution);

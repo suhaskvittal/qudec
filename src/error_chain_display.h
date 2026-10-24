@@ -12,7 +12,8 @@
 class ErrorChainDisplay
 {
 public:
-    ErrorChainDisplay(const stim::DetectorErrorModel&, const std::string& code, uint32_t distance);
+    ErrorChainDisplay(const stim::DetectorErrorModel&, const std::string& code, uint32_t distance,
+        bool superdense = false);
     std::string detector_label(size_t id) const;
     void draw(dec::SyndromeRef syndrome, std::ostream&) const;
 private:

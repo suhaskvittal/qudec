@@ -18,6 +18,7 @@ struct ErrorChainConfig
     uint64_t print_chains{0};
     std::string code{};
     uint32_t distance{0};
+    bool superdense{false}; // Author: OpenAI Codex. Select matching display geometry.
 };
 struct ErrorChainSummary
 {

@@ -97,7 +97,11 @@ public:
     size_t ambiguous_boundary_events() const;
     // Verify the actual integer matching/search weights against -log(probability).
     size_t audit_weights() const;
-    const Model model;
+    // Author: OpenAI Codex. Reuse union-topology matching workspaces; zero
+    // probability events are disabled. Updates may select a subset of the
+    // constructor's event supports and change their frames and probabilities.
+    void update(Model);
+    Model model;
     Statistics statistics;
 
 private:
@@ -106,6 +110,9 @@ private:
     std::array<std::shared_ptr<SubDecoder>, 3> subdecoders_;
     bool boundary_gap_;
     EnsembleConfig config_;
+    bool uniform_;
+    std::map<std::vector<size_t>,size_t> event_slots_;
+    std::vector<size_t> active_events_;
     std::optional<Result> decode_color(const std::vector<uint8_t>&, int color, int mask, size_t member, bool trace,
         std::map<std::vector<uint64_t>,bool>& seen, DebugTrace* debug);
 };

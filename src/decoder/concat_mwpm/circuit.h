@@ -106,18 +106,21 @@ private:
     {
         std::unique_ptr<Decoder> decoder;
         std::vector<FlagWeight> weights;
+        Model input_model;
     };
     std::vector<double> flag_p_; // Marginal P(flag=1), indexed by original detector ID.
     std::vector<double> measurement_p_; // Indexed by original global flag ID.
     const bool use_flags_;
-    const size_t cache_capacity_;
     const bool boundary_gap_;
     // Contributor: OpenAI Codex. Reused for each independently flag-conditioned context.
     const EnsembleConfig ensemble_;
     const FlagRenormalization renormalization_;
     std::vector<int> colors_;
     std::vector<Class> classes_;
-    std::map<std::string, Context> contexts_;
+    // Author: OpenAI Codex. One persistent decoder replaces whole-pattern caching.
+    Context context_;
+    std::string current_flags_;
+    bool context_ready_{false};
 
     std::map<size_t,std::vector<size_t>> flag_neighborhoods(const std::vector<uint8_t>&) const;
     Context make_context(const std::vector<uint8_t>&) const;

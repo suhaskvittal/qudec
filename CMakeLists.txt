@@ -78,6 +78,7 @@ set(QUDEC_FILES
     src/circuit_generator.cpp
     src/circuit_noise_policy.cpp
     src/color_code_circuits.cpp
+    src/superdense_color_code_circuits.cpp # Author: OpenAI Codex.
     src/decoder/pymatching.cpp
     src/decoder/blossom5.cpp
     src/decoder/cluster_gap.cpp # Contributor: OpenAI Codex.
@@ -182,13 +183,23 @@ target_link_libraries(qudec_eval_gap PRIVATE qudeclib)
 include(CTest)
 if(BUILD_TESTING)
     # Contributor: OpenAI Codex (weighted union-find regression cases).
-    foreach(test IN ITEMS concat_flag_renormalization concat_equivalence_classes decoder_debug error_chain circuit_noise_policy component_error_distribution color_code_circuits ideal_color_code_circuits restriction concat_mwpm concat_permissions concat_ensemble correlated_restriction cluster_gap uf seeded_matching libra libra_assignment libra_rare_event pymatching_reporting
+    foreach(test IN ITEMS superdense_color_code_circuits concat_inplace concat_flag_renormalization concat_equivalence_classes decoder_debug error_chain circuit_noise_policy component_error_distribution color_code_circuits ideal_color_code_circuits restriction concat_mwpm concat_permissions concat_ensemble correlated_restriction cluster_gap uf seeded_matching libra libra_assignment libra_rare_event pymatching_reporting
                           libra_splitting libra_local_splitting rare_event_sampler libra_integration)
         add_executable(${test}_test tests/${test}_test.cpp)
         target_compile_options(${test}_test PRIVATE ${COMPILE_OPTIONS} -fno-fast-math)
         target_link_libraries(${test}_test PRIVATE qudeclib)
         add_test(NAME ${test} COMMAND ${test}_test)
     endforeach()
+    # Author: OpenAI Codex. Superdense extraction selection and display.
+    add_test(NAME superdense_666_cli COMMAND qudec tesseract 3 --code cc666 --superdense --mc-max-samples 1)
+    add_test(NAME superdense_488_cli COMMAND qudec tesseract 3 --code cc488 --superdense
+        --superdense-start-phase 1 --include-opposite-basis-detectors --mc-max-samples 1)
+    set_tests_properties(superdense_666_cli PROPERTIES PASS_REGULAR_EXPRESSION "gates=CNOT")
+    add_test(NAME chains_superdense_cli COMMAND qudec_chains tesseract --code cc488 -d 3 --superdense
+        -k 1 -n 2 --print-chains 1)
+    set_tests_properties(chains_superdense_cli PROPERTIES PASS_REGULAR_EXPRESSION "Color-code lattice")
+    add_test(NAME superdense_488_invalid_cli COMMAND qudec tesseract 5 --code cc488 --superdense --mc-max-samples 1)
+    set_tests_properties(superdense_488_invalid_cli PROPERTIES WILL_FAIL TRUE)
     # Author: OpenAI Codex. Shared chain CLI and decoder-option smoke checks.
     add_test(NAME chains_cap_cli COMMAND qudec_chains concat_mwpm -d 3 -k 1 --all
         --error-model code_capacity --concat-ensemble 2)

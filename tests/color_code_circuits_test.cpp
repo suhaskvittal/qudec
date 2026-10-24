@@ -9,9 +9,11 @@
 #include <functional>
 #include <bit>
 #include <iostream>
+#include <iomanip>
 #include <limits>
 #include <random>
 #include <set>
+#include <sstream>
 #include <stdexcept>
 
 namespace {
@@ -109,7 +111,8 @@ void check_schedule_and_noise(const stim::Circuit& circuit, double p) {
     circuit.for_each_operation([&](const stim::CircuitInstruction& op) {
         if (op.gate_type == stim::GateType::TICK) busy.clear();
         if (op.gate_type == stim::GateType::R || op.gate_type == stim::GateType::H ||
-            op.gate_type == stim::GateType::CX || op.gate_type == stim::GateType::M)
+            op.gate_type == stim::GateType::CX || op.gate_type == stim::GateType::M ||
+            op.gate_type == stim::GateType::MR)
             for (auto t : op.targets)
                 require(busy.insert(t.qubit_value()).second, "Gate collision within a tick");
         auto near = [](double x, double y) { return std::abs(x - y) < 1e-12; };
@@ -149,7 +152,7 @@ void check_flag_independence(Generator generate, int basis) {
     count = 0;
     stim::Circuit faulty;
     original.for_each_operation([&](const stim::CircuitInstruction& op) {
-        if (!inserted && op.gate_type == stim::GateType::M)
+        if (!inserted && (op.gate_type == stim::GateType::M || op.gate_type == stim::GateType::MR))
             if (count <= record && record < count + op.targets.size()) {
                 faulty.safe_append_ua("X_ERROR", {op.targets[record - count].qubit_value()}, 1);
                 inserted = true;
@@ -167,6 +170,29 @@ void check_flag_independence(Generator generate, int basis) {
     }
     require(inserted && fired == 1 && !obs.data.not_zero(), "Single flag readout fault should fire exactly once");
 }
+
+// Author: OpenAI Codex. Physical concurrency and resonator-wait budget.
+void check_parallel_rounds(const stim::Circuit& c,uint32_t n,uint32_t rounds,double p) {
+    size_t resets=0,transitions=0;
+    std::vector<size_t> waits(n);
+    c.for_each_operation([&](const auto& op) {
+        if (op.gate_type==stim::GateType::R) {
+            ++resets;
+            require(op.targets.size()==2*n-1,"Initialization must reset data and all Bell ancillas together");
+        }
+        if (op.gate_type==stim::GateType::MR) {
+            ++transitions;
+            require(op.targets.size()==n-1,"Basis transition must measure/reset every color together");
+            std::set<uint32_t> targets;
+            for (auto t:op.targets) targets.insert(t.qubit_value());
+            for (uint32_t q=n;q<2*n-1;q++) require(targets.contains(q),"Ancilla missing from joint basis transition");
+        }
+        if (op.gate_type==stim::GateType::DEPOLARIZE1 && std::abs(op.args[0]-2*p)<1e-12)
+            for (auto t:op.targets) if (t.qubit_value()<n) ++waits[t.qubit_value()];
+    });
+    require(resets==1 && transitions==2*rounds,"Extra reset/readout subrounds in Bell extraction");
+    for (auto count:waits) require(count==2*rounds,"Each data qubit must have exactly two 2p waits per round");
+}
 } // namespace
 
 int main() {
@@ -178,7 +204,7 @@ int main() {
         };
         check_flag_independence(generate, 0);
         check_flag_independence(generate, 1);
-        for (uint32_t d : {3, 5, 7, 9}) for (bool x : {false, true})
+        for (uint32_t d : {3, 5, 7, 9, 11, 15}) for (bool x : {false, true})
             for (uint32_t rounds : {1, 2, 5}) {
                 const uint32_t n = oct ? (d * d + 2 * d - 1) / 2 : (3 * d * d + 1) / 4;
                 auto c = generate(d, rounds, 0, x, {});
@@ -195,9 +221,14 @@ int main() {
                 // No graphlike decomposition: color-code errors are hyperedges.
                 auto noisy = generate(d, rounds, 0.001, x, {});
                 check_schedule_and_noise(noisy, 0.001);
+                check_parallel_rounds(noisy,n,rounds,0.001);
                 auto dem = stim::circuit_to_dem(noisy, {});
                 require(dem.count_errors() > 0, "No SI1000 errors in noisy model");
-                require(stim::Circuit(noisy.str()).approx_equals(noisy, 1e-5), "Stim text round trip failed");
+                // Larger honeycomb coordinates need explicit stream precision;
+                // Stim's default six significant digits round sqrt(3) positions.
+                std::ostringstream text;
+                text<<std::setprecision(17)<<noisy;
+                require(stim::Circuit(text.str()).approx_equals(noisy,1e-12), "Stim text round trip failed");
             }
         for (double p : {-0.1, 0.201, std::numeric_limits<double>::quiet_NaN(),
                          std::numeric_limits<double>::infinity()}) {
@@ -213,5 +244,5 @@ int main() {
         (void)generate(3, 1, 0.2, false, {});
     }
     std::cout << "Color code circuits: geometry, distance, flag independence, SI1000 DEMs, "
-                 "and 49152 zero-noise shots passed\n";
+                 "joint basis transitions, two waits per round, and 73728 zero-noise shots passed\n";
 }

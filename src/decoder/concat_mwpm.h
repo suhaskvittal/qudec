@@ -26,7 +26,7 @@ public:
     {
         bool memory_x{false};
         bool use_flags{true};
-        size_t flag_cache_capacity{16};
+        size_t flag_cache_capacity{16}; // Compatibility; graphs now update in place without a pattern cache.
         // Contributor: OpenAI Codex. Even/odd spatial-boundary sectors in the first matching stage.
         bool boundary_gap{false};
         // Contributor: OpenAI Codex. Includes one unperturbed graph per color.

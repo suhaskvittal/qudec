@@ -48,6 +48,7 @@ void adapters()
         require(custom.seen.contains(CircuitOperationKind::Reset) &&
             custom.seen.contains(CircuitOperationKind::Unitary2) &&
             custom.seen.contains(CircuitOperationKind::Measure) &&
+            custom.seen.contains(CircuitOperationKind::MeasureReset) &&
             custom.seen.contains(CircuitOperationKind::MeasurementIdle),"Gate hooks missing");
         RecordingPolicy product(pheno);
         require(generate(product,3)==generate(pheno,3),"Custom product policy bypassed");
