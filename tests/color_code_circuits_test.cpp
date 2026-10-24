@@ -183,7 +183,9 @@ int main() {
                 const uint32_t n = oct ? (d * d + 2 * d - 1) / 2 : (3 * d * d + 1) / 4;
                 auto c = generate(d, rounds, 0, x, {});
                 require(c.count_qubits() == 2 * n - 1, "Wrong qubit count");
-                require(c.count_detectors() == (n - 1) * (oct ? 4 * rounds : 3 * rounds + 1), "Wrong detector count");
+                // Contributor: OpenAI Codex. There are (n-1)/2 faces; each
+                // basis contributes one check/flag detector per face.
+                require(c.count_detectors() == (n - 1) * (oct ? 4 * rounds : 3 * rounds + 1) / 2, "Wrong detector count");
                 require(c.count_measurements() == 2 * (n - 1) * rounds + n, "Wrong measurement count");
                 check_absolute_parities(c);
                 auto [dets, obs] = stim::sample_batch_detection_events<64>(c, 1024, rng);

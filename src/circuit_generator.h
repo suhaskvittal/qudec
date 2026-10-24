@@ -1,5 +1,6 @@
 /*
  *  author: Claude Sonnet 5.1
+ *  contributor: OpenAI Codex
  *  date:   26 July 2026
  * */
 
@@ -8,10 +9,30 @@
 
 #include <stim.h>
 #include "component_error_distribution.h"
+#include "circuit_noise_policy.h"
 
 #include <cstdint>
 #include <type_traits>
 #include <utility>
+
+// Model-independent entry points. Supply a policy defining each operation and
+// its injected errors. The model-named functions below are compatibility adapters.
+stim::Circuit sc_circuit(uint32_t distance, uint32_t rounds,
+    const CircuitNoisePolicy& policy, bool is_memory_x,
+    bool include_opposite_basis_detectors = false,
+    const ComponentErrorDistribution& noise_distribution = {});
+stim::Circuit toric_circuit(uint32_t distance, uint32_t rounds,
+    const CircuitNoisePolicy& policy, bool is_memory_x,
+    bool include_opposite_basis_detectors = false,
+    const ComponentErrorDistribution& noise_distribution = {});
+stim::Circuit cc666_circuit(uint32_t distance, uint32_t rounds,
+    const CircuitNoisePolicy& policy, bool is_memory_x,
+    bool include_opposite_basis_detectors = false,
+    const ComponentErrorDistribution& noise_distribution = {});
+stim::Circuit cc488_circuit(uint32_t distance, uint32_t rounds,
+    const CircuitNoisePolicy& policy, bool is_memory_x,
+    bool include_opposite_basis_detectors = false,
+    const ComponentErrorDistribution& noise_distribution = {});
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
@@ -113,5 +134,27 @@ inline stim::Circuit cc488_si1000(uint32_t distance, uint32_t rounds, double p, 
     return cc488_si1000(distance,rounds,p,is_memory_x,false,
                         std::forward<T>(noise_distribution));
 }
+
+// Contributor: OpenAI Codex. Ideal-check color-code memories. Independent
+// X(p) and Z(p) data errors precede each extraction round. Preparation,
+// check gates and final data readout are perfect; phenomenological check
+// outcomes flip with probability measurement_p. Neither model has flags.
+// Code capacity always has one extraction round; phenomenological rounds>=1.
+// Detector metadata matches SI1000: (x,y,time,color,basis,is_flag=0).
+// Other-basis detectors compare interior rounds only when requested.
+stim::Circuit cc666_code_capacity(uint32_t distance, double p, bool is_memory_x,
+    bool include_opposite_basis_detectors = false,
+    const ComponentErrorDistribution& noise_distribution = {});
+stim::Circuit cc488_code_capacity(uint32_t distance, double p, bool is_memory_x,
+    bool include_opposite_basis_detectors = false,
+    const ComponentErrorDistribution& noise_distribution = {});
+stim::Circuit cc666_phenomenological(uint32_t distance, uint32_t rounds,
+    double data_p, double measurement_p, bool is_memory_x,
+    bool include_opposite_basis_detectors = false,
+    const ComponentErrorDistribution& noise_distribution = {});
+stim::Circuit cc488_phenomenological(uint32_t distance, uint32_t rounds,
+    double data_p, double measurement_p, bool is_memory_x,
+    bool include_opposite_basis_detectors = false,
+    const ComponentErrorDistribution& noise_distribution = {});
 
 #endif // CIRCUIT_GENERATOR_h

@@ -1,0 +1,190 @@
+Author: OpenAI Codex.
+
+• Take d = 9, p = 3%, with four X errors:
+
+  a=q5 ──R8── b=q6 ──G12── c=q14 ──B16── d=q24
+
+  The shared checks R8, G12, and B16 cancel. The fired detectors are G0, B5, B15, R18, R19, G21.
+
+  Below, bracketed checks fired; other labeled checks are quiet. Letters mark the four errors.
+
+  .-----.-----------.-----.-----------.-----.-----------.-----.-----------.
+   \     \         /       \         /       \         /       \         /
+    \ B4  \ [G0]  /         \  G1   /         \  G2   /         \  G3   /
+     \     .-----a   [B5]    .-----.    B6     .-----.    B7     .-----.
+      \   /       \         /       \         /       \         /     /
+       \ /         \       /         \       /         \       / R11 /
+        .    R8     .-----.    R9     .-----.    R10    .-----.     /
+         \         /       \         /       \         /       \   /
+          \       /         \       /         \       /         \ /
+           .-----b    G12    .-----.    G13    .-----.    G14    .
+            \     \         /       \         /       \         /
+             \[B15]\       /         \       /         \       /
+              \     .-----c    B16    .-----.    B17    .-----.
+               \   /       \         /       \         /     /
+                \ /         \       /         \       / R20 /
+                 .   [R18]   .-----d   [R19]   .-----.     /
+                  \         /       \         /       \   /
+                   \       /         \       /         \ /
+                    .-----.   [G21]   .-----.    G22    .
+                     \     \         /       \         /
+                      \ B23 \       /         \       /
+                       \     .-----.    B24    .-----.
+                        \   /       \         /     /
+                         \ /         \       / R26 /
+                          .    R25    .-----.     /
+                           \         /       \   /
+                            \       /         \ /
+                             .-----.    G27    .
+                              \     \         /
+                               \ B28 \       /
+                                \     .-----.
+                                 \   /     /
+                                  \ / R29 /
+                                   .     /
+                                    \   /
+                                     \ /
+                                      .
+
+
+  !R original:
+      G0–B5
+      B15–Gb
+      G21–B23–Gb
+
+  !R complementary:
+      G0–B5
+      B15–Gb
+      G21–B24–G27–Bb
+
+  !G original:
+      B5–R9–B16–R19
+      B15–R18
+
+  !G complementary:
+      B5–Rb
+      B15–R18
+      R19–B24–R26–Bb
+
+  !B original:
+      G0–Rb
+      R18–Gb
+      R19–G21
+
+  !B complementary:
+      G0–R8–Gb
+      R18–Gb
+      R19–G21
+
+  After the second stage:
+
+   Candidate           Correction qubit IDs     Size    Logical prediction
+  ━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━  ━━━━━━  ━━━━━━━━━━━━━━━━━━━━
+   !R original         4, 5, 16, 19, 20, 24        6    0 — correct
+  ──────────────────  ───────────────────────  ──────  ────────────────────
+   !R complementary    7, 8, 31, 39, 45            5    1 — wrong
+  ──────────────────  ───────────────────────  ──────  ────────────────────
+   !G original         8, 10, 12, 17, 18, 24       6    0 — correct
+  ──────────────────  ───────────────────────  ──────  ────────────────────
+   !G complementary    7, 8, 31, 44, 49            5    1 — wrong
+  ──────────────────  ───────────────────────  ──────  ────────────────────
+   !B original         7, 8, 31, 44, 49            5    1 — wrong
+  ──────────────────  ───────────────────────  ──────  ────────────────────
+   !B complementary    2, 3, 7, 13, 18, 24         6    0 — correct
+
+
+
+
+distance=9 p=0.03 pattern=5;6;14;24; connected=1 truth=0 legacy_obs=1
+q5: R8 G0 B5
+q6: R8 G12 B15
+q14: R18 G12 B16
+q24: R19 G21 B16
+syndrome: G0 B5 B15 R18 R19 G21
+!R original first_weight=11.1356303323 full_weight=20.856592139 observable=0
+first edges:
+ G0 B5
+ B15 boundaryG
+ G21 B23
+ B23 boundaryG
+correction: q20 q16 q19 q24 q5 q4
+!R complementary first_weight=13.9195379154 full_weight=17.3804934492 observable=1
+first edges:
+ G0 B5
+ B15 boundaryG
+ B24 G27
+ G21 B24
+ G27 boundaryB
+correction: q7 q31 q8 q39 q45
+!G original first_weight=11.1356303323 full_weight=20.856592139 observable=0
+first edges:
+ B16 R19
+ B5 R9
+ R9 B16
+ B15 R18
+correction: q17 q8 q12 q18 q10 q24
+!G complementary first_weight=13.9195379154 full_weight=17.3804934492 observable=1
+first edges:
+ B5 boundaryR
+ B15 R18
+ R26 boundaryB
+ R19 B24
+ B24 R26
+correction: q8 q31 q7 q49 q44
+!B original first_weight=8.35172274922 full_weight=17.3804934492 observable=1
+first edges:
+ G0 boundaryR
+ R19 G21
+ R18 boundaryG
+correction: q8 q7 q44 q31 q49
+!B complementary first_weight=11.1356303323 full_weight=20.856592139 observable=0
+first edges:
+ G0 R8
+ R8 boundaryG
+ R19 G21
+ R18 boundaryG
+correction: q7 q3 q2 q24 q13 q18
+returned !B original
+
+--------------
+
+!R complementary matching
+
+
+  .-----.-----------.-----.-----------.-----.-----------.-----.-----------.
+   \     \         /       \         /       \         /       \         /
+    \ B4  \ [G0]  M         \  G1   /         \  G2   /         \  G3   /
+     \     .-----x   [B5]    .-----.    B6     .-----.    B7     .-----.
+      \   /       \         /       \         /       \         /     /
+       \ /         \       /         \       /         \       / R11 /
+        .    R8     .-----.    R9     .-----.    R10    .-----.     /
+         \         /       \         /       \         /       \   /
+          \       /         \       /         \       /         \ /
+           .-----x    G12    .-----.    G13    .-----.    G14    .
+            \     \         /       \         /       \         /
+             \[B15]M       M         \       /         \       /
+              \     .-----x    B16    .-----.    B17    .-----.
+               \   /       \         /       \         /     /
+                \ /         \       /         \       / R20 /
+                 .   [R18]   .--M--x   [R19]   .-----.     /
+                  \         /       \         /       \   /
+                   \       /         \       /         \ /
+                    .-----.   [G21]   .-----.    G22    .
+                     \     \         /       \         /
+                      \ B23 \       /         \       /
+                       \     .-----.    B24    .-----.
+                        \   /       \         /     /
+                         \ /         \       / R26 /
+                          .    R25    .-----.     /
+                           \         /       \   /
+                            \       /         \ /
+                             .-----.    G27    .
+                              \     \         /
+                               \ B28 \       /
+                                \     .-----.
+                                 \   /     /
+                                  \ / R29 /
+                                   .     /
+                                    \   /
+                                     \ /
+                                      .

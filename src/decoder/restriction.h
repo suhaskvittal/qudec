@@ -29,6 +29,7 @@ public:
         // The validated spacetime baseline is phenomenological noise.
         bool use_flags{false};
         size_t ensemble_size{1};
+        bool debug{false}; // Populate Result::debug_info.
     };
 
     const size_t num_detectors;
@@ -41,11 +42,12 @@ public:
     // Code capacity: one syndrome bit per lattice check, perfect measurements.
     // The validated code-capacity ensemble uses 16 trials with a fixed seed.
     explicit RestrictionDecoder(restriction::Lattice, size_t ensemble_size = 16,
-                                uint64_t seed = 0);
+                                uint64_t seed = 0, bool debug = false);
 
     Result decode(SyndromeRef, ObsRef);
 
 private:
+    bool debug_{false};
     std::unique_ptr<restriction::RestrictionDecoder> spatial_;
     std::unique_ptr<restriction::CircuitRestrictionDecoder> spacetime_;
 };

@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
+#include <string>
 #include <vector>
 
 namespace dec
@@ -94,6 +95,10 @@ struct Result
 
     // Decoder specific parameters:
     MatchingData matching_data;
+
+    // Contributor: OpenAI Codex. Opt-in, decoder-specific diagnostic text.
+    // Empty by default; production samplers need not interpret its format.
+    std::string debug_info;
 };
 
 ////////////////////////////////////////////////////////////////

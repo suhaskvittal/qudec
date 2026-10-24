@@ -18,7 +18,8 @@ struct ComponentErrorDistribution {
     double probability(double nominal_probability, uint64_t component_id) const;
 };
 
-// Supports the scalar Pauli/depolarizing channels used by SI1000. Preserves
+// Supports scalar Pauli/depolarizing channels and MPP readout probabilities.
+// Contributor: OpenAI Codex (phenomenological check-rate components). Preserves
 // gates, annotations, tags and REPEAT structure; refuses unsupported noise.
 // Depolarizing rates saturate at 3/4 (one qubit) or 15/16 (two qubits), the
 // maximally mixed channels, because Stim DEM conversion rejects over-mixing.

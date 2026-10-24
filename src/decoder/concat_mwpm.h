@@ -27,6 +27,12 @@ public:
         bool memory_x{false};
         bool use_flags{true};
         size_t flag_cache_capacity{16};
+        // Contributor: OpenAI Codex. Even/odd spatial-boundary sectors in the first matching stage.
+        bool boundary_gap{false};
+        // Contributor: OpenAI Codex. Includes one unperturbed graph per color.
+        size_t ensemble_size{1};
+        uint64_t ensemble_seed{20261024};
+        bool debug{false}; // Populate Result::debug_info on each decode.
     };
     struct Statistics
     {
@@ -41,7 +47,8 @@ public:
 
     // Pass the UNDECOMPOSED DEM, with detector coordinates
     // (x,y,time,color,basis,is_flag). Check colors are 0/1/2; flags are
-    // colorless and flags from both bases condition the matching graphs.
+    // colorless; X-check extraction flags condition Z memory and Z-check
+    // extraction flags condition X memory.
     explicit ConcatMWPM(const stim::DetectorErrorModel&);
     ConcatMWPM(const stim::DetectorErrorModel&, config_type);
     ~ConcatMWPM();
@@ -57,6 +64,7 @@ public:
 private:
     std::unique_ptr<concat::CircuitDecoder> decoder_;
     Statistics stats_;
+    bool debug_{false};
 };
 } // namespace dec
 #endif

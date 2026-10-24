@@ -2,7 +2,7 @@
  *  author: OpenAI Codex
  *  date:   22 October 2026
  *
- *  Regressions for flag inference, full-F penalties, colorless flags,
+ *  Regressions for flag inference, unpenalized events, colorless flags,
  *  capacity matching, and the saved d7 Bell-flagged two-hook syndrome.
  * */
 #include "circuit_generator.h"
@@ -45,21 +45,24 @@ flag_weights(bool memory_x)
     const double pm = .003+.001-2*.003*.001;
     require(std::abs(core.flag_measurement_probabilities()[3]-pm) < 1e-15,
             "Flag prior includes non-isolated events or loses XOR merging");
-    require(std::abs(core.flag_measurement_probabilities()[4]-.007) < 1e-15,
-            "Per-flag prior was replaced by a common rate");
+    require(std::abs(core.flag_measurement_probabilities()[4]) < 1e-15,
+            "Ignored same-basis flag retained a conditioning prior");
+    require(core.flag_globals==std::vector<size_t>{3},"Incorrect extraction-basis flag selection");
     const auto absent = core.inspect({0,0,0,0,0,0});
     const auto associated = core.inspect({1,1,1,1,0,0});
     const auto unrelated = core.inspect({0,0,0,0,1,0});
     const auto both = core.inspect({1,1,1,1,1,0});
-    const double mixture = (1-pm)*.0003+pm*.0001;
+    const double marginal=.5*(1-(1-2*.0003)*(1-2*.003)*(1-2*.001)*(1-2*.02));
+    require(std::abs(core.flag_flip_probabilities()[3]-marginal)<1e-15,"Marginal omitted a data-correlated flag fault");
+    const double representative_probability = .0003/marginal;
     require(std::abs(absent.weights.at(0).effective_probability-.0001) < 1e-15,
             "Unflagged prior changed with empty flag syndrome");
-    require(std::abs(associated.weights.at(0).effective_probability-mixture) < 1e-15,
-            "Single-flag mixture is incorrect");
-    require(std::abs(unrelated.weights.at(0).effective_probability-.0001*.007) < 1e-15,
-            "Unrelated observed flag failed to penalize unflagged error");
-    require(std::abs(both.weights.at(0).effective_probability-mixture*.007) < 1e-15,
-            "Full observed flag set was not used");
+    require(std::abs(associated.weights.at(0).effective_probability-representative_probability) < 1e-15,
+            "Incorrect flagged representative probability");
+    require(std::abs(unrelated.weights.at(0).effective_probability-.0001) < 1e-15,
+            "Remote isolated flag changed an event without detector incidence");
+    require(std::abs(both.weights.at(0).effective_probability-representative_probability) < 1e-15,
+            "Unrelated flag changed the selected representative");
     require(associated.audited_graph_edges == 6 && both.audited_graph_edges == 6,
             "Six matching graphs failed the actual weight audit");
     dec::ConcatMWPM decoder(dem,{.memory_x=memory_x,.flag_cache_capacity=1});
@@ -73,6 +76,67 @@ flag_weights(bool memory_x)
     require(!decoder.decode(empty,truth).flipped_obs[0],"Vacuum decode failed");
     require(decoder.decode(syndrome,truth).flipped_obs[0],"Cache eviction changed the result");
     require(decoder.statistics().shots == 4,"Statistics missed decoded shots");
+}
+
+void
+incident_flag_weights()
+{
+    // Two spatially disjoint flag neighborhoods; D8 shares D0's position/color
+    // but belongs to another round. No mismatch penalty applies to any edge.
+    const stim::DetectorErrorModel dem(R"(
+        error(0.02) D0 L0
+        error(0.001) D0 D1 D2 L0
+        error(0.004) D0 D1 D2 D6 L0
+        error(0.03) D1 D2 L0
+        error(0.025) D3 L0
+        error(0.001) D3 D4 D5 L0
+        error(0.005) D3 D4 D5 D7 L0
+        error(0.04) D0 D8
+        error(0.05) D8 L0
+        error(0.01) D6
+        error(0.02) D7
+        detector(0,0,0,0,1,0) D0
+        detector(1,0,0,1,1,0) D1
+        detector(2,0,0,2,1,0) D2
+        detector(3,0,0,0,1,0) D3
+        detector(4,0,0,1,1,0) D4
+        detector(5,0,0,2,1,0) D5
+        detector(0,0,0,99,0,1) D6
+        detector(3,0,0,-1,0,1) D7
+        detector(0,0,1,0,1,0) D8
+    )");
+    dec::concat::CircuitDecoder core(dem,false);
+    auto weight_for = [&](const auto& inspected,std::vector<size_t> globals) -> const dec::concat::FlagWeight&
+    {
+        for (const auto& weight : inspected.weights)
+        {
+            std::vector<size_t> checks;
+            for (auto v : weight.checks) checks.push_back(core.check_globals[v]);
+            if (checks == globals) return weight;
+        }
+        throw std::runtime_error("Missing test class");
+    };
+    std::vector<uint8_t> syndrome(9); syndrome[6] = 1;
+    const auto local = core.inspect(syndrome);
+    for (const auto& w : local.weights)
+        require(w.outside_flag_penalty==1,"Mismatch penalty is still enabled");
+    require(std::abs(weight_for(local,{0}).effective_probability-.02)<1e-15,"Incident unflagged edge was penalized");
+    require(std::abs(weight_for(local,{1,2}).effective_probability-.03)<1e-15,"Two shared endpoints caused a flag penalty");
+    require(std::abs(weight_for(local,{3}).effective_probability-.025)<1e-15,"Remote edge was penalized");
+    require(std::abs(weight_for(local,{8}).effective_probability-.05)<1e-15,"Flag neighborhood was flattened across rounds");
+    require(std::abs(weight_for(local,{0,8}).effective_probability-.04)<1e-15,"Mixed-round unflagged edge was penalized");
+    require(std::abs(weight_for(local,{0,1,2}).effective_probability-(.004/(.004+.01-2*.004*.01)))<1e-15,"Incorrect local representative selected");
+    syndrome[7] = 1;
+    const auto both = core.inspect(syndrome);
+    require(std::abs(weight_for(both,{0}).effective_probability-.02)<1e-15,"Unrelated second neighborhood added a penalty");
+    require(std::abs(weight_for(both,{3}).effective_probability-.025)<1e-15,"Second flag neighborhood penalized an unflagged event");
+    require(weight_for(both,{0}).incident_observed_flags == std::vector<size_t>{6},"Incident flag diagnostics incorrect");
+    require(weight_for(both,{3}).incident_observed_flags == std::vector<size_t>{7},"Remote flags leaked into diagnostics");
+    require(std::abs(weight_for(both,{0,1,2}).effective_probability-(.004/(.004+.01-2*.004*.01)))<1e-15,"Remote flag changed the selected representative");
+    dec::concat::CircuitDecoder disabled(dem,false,false);
+    const auto ignored = disabled.inspect(syndrome);
+    for (const auto& w : ignored.weights)
+        require(w.incident_observed_flags.empty() && w.outside_flag_penalty==1,"Disabled flag handling changed locality weights");
 }
 
 void
@@ -121,7 +185,8 @@ capacity()
 void
 circuit_regression()
 {
-    const auto dem = stim::circuit_to_dem(cc666_si1000(7,7,.0005,false),{});
+    // Contributor: OpenAI Codex. This saved fixture includes opposite-basis checks.
+    const auto dem = stim::circuit_to_dem(cc666_si1000(7,7,.0005,false,true),{});
     std::set<uint64_t> ids;
     for (size_t v = 0; v < dem.count_detectors(); v++) ids.insert(v);
     const auto coordinates = dem.get_detector_coordinates(ids);
@@ -173,6 +238,7 @@ main()
 {
     flag_weights(false);
     flag_weights(true);
+    incident_flag_weights();
     capacity();
     circuit_regression();
     std::cout << "Concatenated MWPM regressions passed\n";

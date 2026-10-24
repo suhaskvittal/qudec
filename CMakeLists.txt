@@ -76,6 +76,7 @@ set(TESSERACT_FILES
 set(QUDEC_FILES
     src/component_error_distribution.cpp
     src/circuit_generator.cpp
+    src/circuit_noise_policy.cpp
     src/color_code_circuits.cpp
     src/decoder/pymatching.cpp
     src/decoder/blossom5.cpp
@@ -102,6 +103,8 @@ set(QUDEC_FILES
     src/preprocessor/affinity.cpp
     src/globals.cpp
     src/sampler.cpp
+    src/error_chain_display.cpp # Author: OpenAI Codex. ASCII color-code syndromes.
+    src/error_chain.cpp # Author: OpenAI Codex. Connected-chain stress tests.
     ${TESSERACT_FILES}
 )
 
@@ -115,11 +118,11 @@ target_compile_options(qudeclib PUBLIC ${COMPILE_OPTIONS})
 target_link_libraries(qudeclib PUBLIC libstim libpymatching blossom5 Threads::Threads ZLIB::ZLIB)
 # Matching scores and rare-event bounds use IEEE infinities and finite checks.
 set_source_files_properties(src/decoder/cluster_gap.cpp src/decoder/pymatching.cpp
-    src/decoder/blossom5.cpp src/decoder/libra.cpp src/decoder/harmony.cpp src/decoder/uf.cpp src/decoder/seeded.cpp src/sampler.cpp src/preprocessor/affinity.cpp
+    src/decoder/blossom5.cpp src/decoder/libra.cpp src/decoder/harmony.cpp src/decoder/uf.cpp src/decoder/seeded.cpp src/sampler.cpp src/error_chain.cpp src/error_chain_display.cpp src/preprocessor/affinity.cpp
     PROPERTIES COMPILE_OPTIONS "-fno-fast-math")
 set_source_files_properties(src/decoder/restriction.cpp src/decoder/restriction/lattice.cpp
     src/decoder/restriction/spacetime.cpp PROPERTIES COMPILE_OPTIONS "-fno-fast-math")
-set_source_files_properties(src/color_code_circuits.cpp src/component_error_distribution.cpp PROPERTIES COMPILE_OPTIONS "-fno-fast-math")
+set_source_files_properties(src/color_code_circuits.cpp src/circuit_noise_policy.cpp src/component_error_distribution.cpp PROPERTIES COMPILE_OPTIONS "-fno-fast-math")
 set_source_files_properties(src/decoder/concat_mwpm.cpp src/decoder/concat_mwpm/matching.cpp
     src/decoder/concat_mwpm/circuit.cpp PROPERTIES COMPILE_OPTIONS "-fno-fast-math")
 set_source_files_properties(src/decoder/correlated_restriction.cpp
@@ -135,9 +138,15 @@ endif()
 # Main executable
 ###################################################
 
-add_executable(qudec main/qudec.cpp)
-target_compile_options(qudec PRIVATE ${COMPILE_OPTIONS} -fno-fast-math)
-target_link_libraries(qudec PRIVATE qudeclib)
+# Contributor: OpenAI Codex. Share circuit/decoder options across both CLIs.
+add_library(qudec_cli OBJECT main/qudec.cpp)
+target_compile_options(qudec_cli PRIVATE ${COMPILE_OPTIONS} -fno-fast-math)
+target_link_libraries(qudec_cli PUBLIC qudeclib)
+add_executable(qudec main/qudec_main.cpp)
+target_link_libraries(qudec PRIVATE qudec_cli)
+add_executable(qudec_chains main/qudec_main.cpp)
+target_compile_definitions(qudec_chains PRIVATE QUDEC_CHAINS)
+target_link_libraries(qudec_chains PRIVATE qudec_cli)
 
 # OpenAI GPT-6-Sol: Build the shared-shot decoder comparison and syndrome recorder.
 add_executable(compare_si1000 main/compare_si1000.cpp)
@@ -173,13 +182,45 @@ target_link_libraries(qudec_eval_gap PRIVATE qudeclib)
 include(CTest)
 if(BUILD_TESTING)
     # Contributor: OpenAI Codex (weighted union-find regression cases).
-    foreach(test IN ITEMS component_error_distribution color_code_circuits restriction concat_mwpm correlated_restriction cluster_gap uf seeded_matching libra libra_assignment libra_rare_event pymatching_reporting
+    foreach(test IN ITEMS concat_equivalence_classes decoder_debug error_chain circuit_noise_policy component_error_distribution color_code_circuits ideal_color_code_circuits restriction concat_mwpm concat_permissions concat_ensemble correlated_restriction cluster_gap uf seeded_matching libra libra_assignment libra_rare_event pymatching_reporting
                           libra_splitting libra_local_splitting rare_event_sampler libra_integration)
         add_executable(${test}_test tests/${test}_test.cpp)
         target_compile_options(${test}_test PRIVATE ${COMPILE_OPTIONS} -fno-fast-math)
         target_link_libraries(${test}_test PRIVATE qudeclib)
         add_test(NAME ${test} COMMAND ${test}_test)
     endforeach()
+    # Author: OpenAI Codex. Shared chain CLI and decoder-option smoke checks.
+    add_test(NAME chains_cap_cli COMMAND qudec_chains concat_mwpm -d 3 -k 1 --all
+        --error-model code_capacity --concat-ensemble 2)
+    set_tests_properties(chains_cap_cli PROPERTIES PASS_REGULAR_EXPRESSION "Chains tested: 7")
+    add_test(NAME chains_pheno_cli COMMAND qudec_chains concat_mwpm -d 3 -k 2 -n 10
+        --error-model phenomenological --concat-boundary-gap)
+    set_tests_properties(chains_pheno_cli PROPERTIES PASS_REGULAR_EXPRESSION "Chains tested: 10")
+    add_test(NAME chains_surface_cli COMMAND qudec_chains pymatching --code sc -d 3 -k 2 -n 10)
+    set_tests_properties(chains_surface_cli PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME chains_488_cli COMMAND qudec_chains concat_mwpm --code cc488 -d 3 -k 1 -n 10 -cap)
+    set_tests_properties(chains_488_cli PROPERTIES PASS_REGULAR_EXPRESSION "Chains tested: 10")
+    add_test(NAME chains_surface_cap_cli COMMAND qudec_chains pymatching --code sc -d 3 -k 1 --all -cap)
+    set_tests_properties(chains_surface_cap_cli PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME chains_surface_pheno_cli COMMAND qudec_chains pymatching --code sc -d 3 -k 2 -n 10 -pheno)
+    set_tests_properties(chains_surface_pheno_cli PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME chains_tesseract_cli COMMAND qudec_chains tesseract --code cc666 -d 3 -k 1 --all -cap)
+    set_tests_properties(chains_tesseract_cli PROPERTIES PASS_REGULAR_EXPRESSION "Chains tested: 7")
+    add_test(NAME chains_ascii_cli COMMAND qudec_chains concat_mwpm -d 3 -k 1 -cap -n 1 --print-chains 1)
+    set_tests_properties(chains_ascii_cli PROPERTIES PASS_REGULAR_EXPRESSION "Color-code lattice")
+    add_test(NAME chains_ascii_488_cli COMMAND qudec_chains concat_mwpm --code cc488 -d 3 -k 1 -cap -n 1 --print-chains 1)
+    set_tests_properties(chains_ascii_488_cli PROPERTIES PASS_REGULAR_EXPRESSION "Color-code lattice")
+    # Contributor: OpenAI Codex. Opt-in matching/flag debug output.
+    add_test(NAME chains_debug_cli COMMAND qudec_chains concat_mwpm -d 3 -k 1 -cap -n 1 --print-chains 1 --debug)
+    set_tests_properties(chains_debug_cli PROPERTIES PASS_REGULAR_EXPRESSION "Winner:")
+    add_test(NAME chains_debug_wrong_decoder_cli COMMAND qudec_chains tesseract -d 3 -cap --debug)
+    set_tests_properties(chains_debug_wrong_decoder_cli PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME color_debug_mc_cli COMMAND qudec concat_mwpm 3 -cap -p 0 --mc-max-samples 1 --debug)
+    set_tests_properties(color_debug_mc_cli PROPERTIES PASS_REGULAR_EXPRESSION "Winner:")
+    add_test(NAME chains_invalid_length_cli COMMAND qudec_chains concat_mwpm -k 0)
+    set_tests_properties(chains_invalid_length_cli PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME chains_invalid_model_cli COMMAND qudec_chains concat_mwpm --error-model invalid)
+    set_tests_properties(chains_invalid_model_cli PROPERTIES WILL_FAIL TRUE)
     # Contributor: OpenAI Codex (correlated restriction CLI smoke checks).
     add_test(NAME correlated_restriction_cli COMMAND qudec correlated_restriction 5 -p 0.0005
         --mc-max-samples 8 --mc-stop-at-errors 100 --seed 42)
@@ -192,6 +233,67 @@ if(BUILD_TESTING)
     add_test(NAME concat_mwpm_cli COMMAND qudec concat_mwpm 7 -p 0.0005
         --mc-max-samples 8 --mc-stop-at-errors 100 --seed 42)
     set_tests_properties(concat_mwpm_cli PROPERTIES PASS_REGULAR_EXPRESSION "ConcatMWPM shots=8")
+    # Contributor: OpenAI Codex (boundary-parity ensemble CLI checks).
+    # Contributor: OpenAI Codex. First-stage ensemble CLI and option validation.
+    add_test(NAME concat_ensemble_cli COMMAND qudec concat_mwpm 5 -cap -p 0.01
+        --concat-ensemble 20 --concat-seed 20261024 --mc-max-samples 8 --mc-stop-at-errors 100)
+    set_tests_properties(concat_ensemble_cli PROPERTIES PASS_REGULAR_EXPRESSION "ensemble_size=20")
+    add_test(NAME concat_ensemble_gap_cli COMMAND qudec concat_mwpm 5 -pheno -p 0
+        --concat-ensemble 20 --concat-boundary-gap --mc-max-samples 8 --mc-stop-at-errors 100)
+    set_tests_properties(concat_ensemble_gap_cli PROPERTIES PASS_REGULAR_EXPRESSION "Logical error rate: 0")
+    add_test(NAME concat_ensemble_cli_zero COMMAND qudec concat_mwpm 5 --concat-ensemble 0 --mc-max-samples 1)
+    set_tests_properties(concat_ensemble_cli_zero PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME concat_ensemble_cli_wrong_decoder COMMAND qudec pymatching 3 --concat-ensemble 20 --mc-max-samples 1)
+    set_tests_properties(concat_ensemble_cli_wrong_decoder PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME concat_ensemble_cli_negative_seed COMMAND qudec concat_mwpm 5 --concat-seed -1 --mc-max-samples 1)
+    set_tests_properties(concat_ensemble_cli_negative_seed PROPERTIES WILL_FAIL TRUE)
+
+    add_test(NAME concat_boundary_gap_cli COMMAND qudec concat_mwpm 5 -p 0.0005
+        --concat-boundary-gap --mc-max-samples 8 --mc-stop-at-errors 100 --seed 42)
+    set_tests_properties(concat_boundary_gap_cli PROPERTIES PASS_REGULAR_EXPRESSION "boundary_gap=1")
+    add_test(NAME concat_boundary_gap_cli_noiseless COMMAND qudec concat_mwpm 5 -p 0
+        --concat-boundary-gap --mc-max-samples 8 --mc-stop-at-errors 100 --seed 42)
+    set_tests_properties(concat_boundary_gap_cli_noiseless PROPERTIES PASS_REGULAR_EXPRESSION "Logical error rate: 0")
+    add_test(NAME concat_boundary_gap_cli_wrong_decoder COMMAND qudec pymatching 3
+        --concat-boundary-gap --mc-max-samples 1)
+    set_tests_properties(concat_boundary_gap_cli_wrong_decoder PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME concat_boundary_gap_cli_old_option COMMAND qudec concat_mwpm 5
+        --concat-permissions --mc-max-samples 1)
+    set_tests_properties(concat_boundary_gap_cli_old_option PROPERTIES WILL_FAIL TRUE)
+    # Contributor: OpenAI Codex. Native ideal-noise selectors and alias checks.
+    foreach(selector IN ITEMS -cap --code-capacity -pheno --phenomenological)
+        string(REPLACE "-" "_" selector_name "${selector}")
+        add_test(NAME ideal_noise_cli${selector_name} COMMAND qudec concat_mwpm 5 ${selector}
+            --concat-boundary-gap -p 0 --mc-max-samples 8 --mc-stop-at-errors 100)
+        set_tests_properties(ideal_noise_cli${selector_name} PROPERTIES PASS_REGULAR_EXPRESSION "Logical error rate: 0")
+    endforeach()
+    add_test(NAME ideal_noise_cli_cap_rounds COMMAND qudec concat_mwpm 5 -cap -r 3 --mc-max-samples 1)
+    set_tests_properties(ideal_noise_cli_cap_rounds PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME ideal_noise_cli_conflict COMMAND qudec concat_mwpm 5 -cap -pheno --mc-max-samples 1)
+    set_tests_properties(ideal_noise_cli_conflict PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME ideal_noise_cli_surface COMMAND qudec pymatching 5 -cap --code sc --mc-max-samples 1)
+    set_tests_properties(ideal_noise_cli_surface PROPERTIES PASS_REGULAR_EXPRESSION "Logical error rate:")
+    add_test(NAME ideal_noise_cli_measurement_override COMMAND qudec concat_mwpm 5 -pheno
+        --measurement-error-rate 0.002 -p 0 --mc-max-samples 8 --mc-stop-at-errors 100)
+    set_tests_properties(ideal_noise_cli_measurement_override PROPERTIES PASS_REGULAR_EXPRESSION "measurement_p=0.002")
+    add_test(NAME ideal_noise_cli_cc488 COMMAND qudec concat_mwpm 5 -cap --code cc488
+        --concat-boundary-gap -p 0.01 --mc-max-samples 8 --mc-stop-at-errors 100)
+    set_tests_properties(ideal_noise_cli_cc488 PROPERTIES PASS_REGULAR_EXPRESSION "code_capacity: distance=5 rounds=1")
+    add_test(NAME ideal_noise_cli_nonuniform COMMAND qudec concat_mwpm 5 -pheno --code cc666
+        --concat-boundary-gap -p 0.001 --noise-log-stddev 0.3 --noise-seed 9 --mc-max-samples 8 --mc-stop-at-errors 100)
+    set_tests_properties(ideal_noise_cli_nonuniform PROPERTIES PASS_REGULAR_EXPRESSION "Component noise: log_stddev=0.3")
+    add_test(NAME ideal_noise_cli_pheno_round_override COMMAND qudec concat_mwpm 5 -pheno -r 2 -p 0
+        --mc-max-samples 8 --mc-stop-at-errors 100)
+    set_tests_properties(ideal_noise_cli_pheno_round_override PROPERTIES PASS_REGULAR_EXPRESSION "phenomenological rounds=2")
+    foreach(decoder IN ITEMS restriction correlated_restriction)
+        add_test(NAME ideal_noise_cli_${decoder}_cc488 COMMAND qudec ${decoder} 5 -cap --code cc488 --mc-max-samples 1)
+        set_tests_properties(ideal_noise_cli_${decoder}_cc488 PROPERTIES WILL_FAIL TRUE)
+        add_test(NAME ideal_noise_cli_${decoder}_capacity COMMAND qudec ${decoder} 5 -cap --mc-max-samples 1)
+        set_tests_properties(ideal_noise_cli_${decoder}_capacity PROPERTIES WILL_FAIL TRUE)
+        add_test(NAME ideal_noise_cli_${decoder}_pheno_one_round COMMAND qudec ${decoder} 5 -pheno -r 1 --mc-max-samples 1)
+        set_tests_properties(ideal_noise_cli_${decoder}_pheno_one_round PROPERTIES WILL_FAIL TRUE)
+    endforeach()
+
     add_test(NAME concat_mwpm_cli_noiseless COMMAND qudec concat_mwpm 7 -p 0
         --mc-max-samples 8 --mc-stop-at-errors 100 --seed 42)
     set_tests_properties(concat_mwpm_cli_noiseless PROPERTIES PASS_REGULAR_EXPRESSION "Logical error rate: 0")

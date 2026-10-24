@@ -182,3 +182,18 @@ Google LLC. Source:
 https://github.com/quantumlib/chromobius/blob/main/src/clorco/color_code/_color_code_layouts.py
 The license is retained in docs/color_code_layout_LICENSE. The extraction
 schedule, Stim metadata, noise placement, and tests are implemented here.
+
+
+Native ideal-noise models (Contributor: OpenAI Codex)
+---------------------------------------------------
+The same cc666 and cc488 geometries now also expose cc*_code_capacity and
+cc*_phenomenological in circuit_generator.h. Code capacity has one noisy
+X(p)/Z(p) data layer, one perfect MPP extraction, and perfect final readout.
+Phenomenological noise has data faults before each of r ideal extraction
+rounds and independent MPP result flips q, with perfect preparation/readout.
+No flag detectors are added. Memory-basis detectors include the first round
+and final-readout closure; opposite-basis interior detectors remain optional.
+Data/check tags preserve spatial/temporal provenance in Stim DEM errors and
+through component-rate rewriting. Native generators support nonuniform data
+and check rates. CLI: -cap/--code-capacity and -pheno/--phenomenological;
+see docs/ideal_noise_models.md for full interface and model assumptions.

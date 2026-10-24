@@ -24,6 +24,25 @@ stim::Circuit transform(const stim::Circuit& input, const ComponentErrorDistribu
                 transform(op.repeat_block_body(input), distribution), op.tag);
             continue;
         }
+        // Contributor: OpenAI Codex. Each Pauli product is one fixed check-
+        // readout component, so phenomenological MPP probabilities vary by
+        // check/basis and remain fixed when that check is repeated in time.
+        if (op.gate_type == stim::GateType::MPP && !op.args.empty()) {
+            for (size_t start = 0; start < op.targets.size();) {
+                size_t end = start + 1;
+                while (end < op.targets.size() && op.targets[end].is_combiner()) end += 2;
+                uint64_t id = mix(static_cast<uint64_t>(op.gate_type));
+                for (unsigned char ch : op.tag) hash_combine(id,ch);
+                std::vector<uint32_t> targets;
+                for (size_t k = start; k < end; k++) {
+                    targets.push_back(op.targets[k].data);
+                    hash_combine(id,op.targets[k].data);
+                }
+                out.safe_append_ua("MPP",targets,distribution.probability(op.args[0],id),op.tag);
+                start = end;
+            }
+            continue;
+        }
         bool pair = op.gate_type == stim::GateType::DEPOLARIZE2;
         bool supported = pair || op.gate_type == stim::GateType::DEPOLARIZE1 ||
             op.gate_type == stim::GateType::X_ERROR || op.gate_type == stim::GateType::Y_ERROR ||

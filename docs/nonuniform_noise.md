@@ -1,7 +1,8 @@
 # Nonuniform component error rates
 
-All SI1000 circuit generators support a fixed, random distribution of component
-error rates. This represents device disorder: a component's probability stays
+All SI1000 circuit generators and the native code-capacity/phenomenological
+color-code generators support a fixed, random distribution of component error
+rates. This represents device disorder: a component's probability stays
 fixed for all circuit rounds and simulation shots. It is sampled when building
 the circuit, separately from sampling faults during shots. The sampler and
 decoder both use the resulting nonuniform detector error model, so decoder
@@ -136,3 +137,10 @@ The regression test `component_error_distribution_test` checks zero-spread
 identity, seeded reproducibility, fixed rates across rounds and expanded repeat
 blocks, preserved multipliers across physical error rates, empirical lognormal
 moments, probability bounds, input validation, and all four SI1000 generators.
+
+<!-- Contributor: OpenAI Codex. -->
+For `-pheno`/`--phenomenological`, each MPP Pauli product is a separate check-
+readout component. Its sampled rate is fixed across rounds and is distinct for
+X and Z checks. Splitting grouped products preserves the native measurement
+provenance tag used by ConcatMWPM. See [ideal noise models](ideal_noise_models.md)
+for p/q and round-count conventions.

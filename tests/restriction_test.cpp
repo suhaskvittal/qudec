@@ -18,7 +18,9 @@
 int
 main()
 {
-    const auto dem = stim::circuit_to_dem(cc666_si1000(7,7,0.0005,false), {});
+    // Contributor: OpenAI Codex. The saved fixture explicitly includes X checks
+    // in a Z-memory experiment, so request the optional opposite-basis detectors.
+    const auto dem = stim::circuit_to_dem(cc666_si1000(7,7,0.0005,false,true), {});
     std::set<uint64_t> ids;
     for (size_t v = 0; v < dem.count_detectors(); v++) ids.insert(v);
     const auto coordinates = dem.get_detector_coordinates(ids);

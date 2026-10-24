@@ -1,0 +1,387 @@
+Author: OpenAI Codex.
+
+Distance-11 cc666 concatenated-MWPM failure example
+================================================
+
+Model: single-round code capacity, independent X errors, p=0.01.
+Decoder: boundary-permission extension, four permission masks per color,
+up to twelve final candidates. Allowed boundaries accept any number of matches;
+allowing a boundary does not force a match to it.
+
+Actual faults: X37 X38 X39 X40 X41.
+True logical flip: 1.
+Net detection events: G16 B21 G28 R34 B39 G42 B43.
+
+Individual fault supports (before XOR cancellation):
+  q37: G16 B21 R24
+  q38: R24 G28 B31
+  q39: B31 R34 G36
+  q40: G36 B39 R40
+  q41: R40 G42 B43
+Shared checks R24, B31, G36, R40 each flip twice and cancel.
+These shared checks connect the five faults into a chain.
+
+LATTICE
+=======
+Brackets mark fired checks; other checks are quiet.
+Dots are data qubits. The five x markers are q37,q38,q39,q40,q41,
+in that order from top to bottom.
+
+.-----.-----------.-----.-----------.-----.-----------.-----.-----------.-----.-----------.
+ \     \         /       \         /       \         /       \         /       \         /
+  \ B5  \  G0   /         \  G1   /         \  G2   /         \  G3   /         \  G4   /
+   \     .-----.    B6     .-----.    B7     .-----.    B8     .-----.    B9     .-----.
+    \   /       \         /       \         /       \         /       \         /     /
+     \ /         \       /         \       /         \       /         \       / R14 /
+      .    R10    .-----.    R11    .-----.    R12    .-----.    R13    .-----.     /
+       \         /       \         /       \         /       \         /       \   /
+        \       /         \       /         \       /         \       /         \ /
+         .-----.    G15    .-----.   [G16]   .-----.    G17    .-----.    G18    .
+          \     \         /       \         /       \         /       \         /
+           \ B19 \       /         \       /         \       /         \       /
+            \     .-----.    B20    .-----x   [B21]   .-----.    B22    .-----.
+             \   /       \         /       \         /       \         /     /
+              \ /         \       /         \       /         \       / R26 /
+               .    R23    .-----.    R24    .-----.    R25    .-----.     /
+                \         /       \         /       \         /       \   /
+                 \       /         \       /         \       /         \ /
+                  .-----.    G27    .-----x   [G28]   .-----.    G29    .
+                   \     \         /       \         /       \         /
+                    \ B30 \       /         \       /         \       /
+                     \     .-----.    B31    .-----.    B32    .-----.
+                      \   /       \         /       \         /     /
+                       \ /         \       /         \       / R35 /
+                        .    R33    .-----x   [R34]   .-----.     /
+                         \         /       \         /       \   /
+                          \       /         \       /         \ /
+                           .-----.    G36    .-----.    G37    .
+                            \     \         /       \         /
+                             \ B38 \       /         \       /
+                              \     .-----x   [B39]   .-----.
+                               \   /       \         /     /
+                                \ /         \       / R41 /
+                                 .    R40    .-----.     /
+                                  \         /       \   /
+                                   \       /         \ /
+                                    .-----x   [G42]   .
+                                     \     \         /
+                                      \[B43]\       /
+                                       \     .-----.
+                                        \   /     /
+                                         \ / R44 /
+                                          .     /
+                                           \   /
+                                            \ /
+                                             .
+
+DECODER OUTCOME
+===============
+All four permission masks produce the same final correction for a given color.
+
+Color  Correction qubits                      Size  Logical  Result
+!R     44,49,50,51,54,55,58,62                   8      0     WRONG; selected
+!G     39,40,41,44,46,52,54,60,61                9      1     correct
+!B     37,41,45,48,53,61,62,64,70                9      1     correct
+
+Selection minimizes the original full-event log-odds correction weight.
+At p=0.01, each data fault has weight log(99):
+  !R final weight = 36.7609588011
+  !G final weight = 41.3560786512
+  !B final weight = 41.3560786512
+Thus the decoder selects !R despite the correct logical predictions from !G/!B.
+The selected correction has the observed syndrome, but leaves a logical error.
+
+SAVED MATCHING DECISIONS
+=======================
+The paths below are first-stage restricted-lattice paths. "final" lists
+second-stage correction qubits, weight and logical prediction; the saved trace
+does not contain individual second-stage matching paths.
+Intermediate check labels on a path need not be detection events.
+Masks enable the two retained colors in cyclic R,G,B order:
+  !R: bit 1 = G boundary, bit 2 = B boundary
+  !G: bit 1 = B boundary, bit 2 = R boundary
+  !B: bit 1 = R boundary, bit 2 = G boundary
+Mask 0 allows neither; mask 3 allows both.
+
+chains d=11 p=0.01 errors: q37 q38 q39 q40 q41 truth=1
+syndrome: G16 B21 G28 R34 B39 G42 B43
+!R mask=0 permitted boundaries: assignment_weight=19.5103734739
+  B21 -- G16
+  B43 -- G42
+  G28 -- B32 -- G37 -- B39
+  final weight=36.7609588011 logical=0 qubits: q55 q54 q62 q51 q44 q58 q49 q50
+!R mask=1 permitted boundaries: boundaryG assignment_weight=19.5103734739
+  B21 -- G16
+  G28 -- B32 -- G37 -- B39
+  G42 -- B43
+  final weight=36.7609588011 logical=0 qubits: q55 q54 q62 q51 q44 q58 q49 q50
+!R mask=2 permitted boundaries: boundaryB assignment_weight=19.5103734739
+  B21 -- G16
+  B43 -- G42
+  G28 -- B32 -- G37 -- B39
+  final weight=36.7609588011 logical=0 qubits: q55 q54 q62 q51 q44 q58 q49 q50
+!R mask=3 permitted boundaries: boundaryG boundaryB assignment_weight=19.5103734739
+  B21 -- G16
+  G28 -- B32 -- G37 -- B39
+  G42 -- B43
+  final weight=36.7609588011 logical=0 qubits: q55 q54 q62 q51 q44 q58 q49 q50
+!G mask=0 permitted boundaries: assignment_weight=19.5103734739
+  B21 -- R25 -- B32 -- R34
+  B39 -- R40 -- B43
+  final weight=41.3560786512 logical=1 qubits: q60 q44 q52 q61 q54 q40 q46 q39 q41
+!G mask=1 permitted boundaries: boundaryB assignment_weight=19.5103734739
+  B21 -- R25 -- B32 -- R34
+  B39 -- R40 -- B43
+  final weight=41.3560786512 logical=1 qubits: q60 q44 q52 q61 q54 q40 q46 q39 q41
+!G mask=2 permitted boundaries: boundaryR assignment_weight=19.5103734739
+  B21 -- R25 -- B32 -- R34
+  B39 -- R40 -- B43
+  final weight=41.3560786512 logical=1 qubits: q60 q44 q52 q61 q54 q40 q46 q39 q41
+!G mask=3 permitted boundaries: boundaryB boundaryR assignment_weight=19.5103734739
+  B21 -- R25 -- B32 -- R34
+  B39 -- R40 -- B43
+  final weight=41.3560786512 logical=1 qubits: q60 q44 q52 q61 q54 q40 q46 q39 q41
+!B mask=0 permitted boundaries: assignment_weight=19.5103734739
+  G16 -- R24 -- G28
+  R34 -- G37 -- R41 -- G42
+  final weight=41.3560786512 logical=1 qubits: q37 q48 q41 q61 q62 q45 q53 q64 q70
+!B mask=1 permitted boundaries: boundaryR assignment_weight=19.5103734739
+  G16 -- R24 -- G28
+  R34 -- G37 -- R41 -- G42
+  final weight=41.3560786512 logical=1 qubits: q37 q48 q41 q61 q62 q45 q53 q64 q70
+!B mask=2 permitted boundaries: boundaryG assignment_weight=19.5103734739
+  G16 -- R24 -- G28
+  R34 -- G37 -- R41 -- G42
+  final weight=41.3560786512 logical=1 qubits: q37 q48 q41 q61 q62 q45 q53 q64 q70
+!B mask=3 permitted boundaries: boundaryR boundaryG assignment_weight=19.5103734739
+  G16 -- R24 -- G28
+  R34 -- G37 -- R41 -- G42
+  final weight=41.3560786512 logical=1 qubits: q37 q48 q41 q61 q62 q45 q53 q64 q70
+RETURN !R mask=0 logical=0 size=8
+
+
+DETAILED SECOND-STAGE REPLAY (Author: OpenAI Codex)
+================================================
+Replayed with traced generic capacity model; all twelve candidate event sets,
+logical predictions and weights were checked against the original artifact decoder.
+V denotes a virtual detector for a first-stage projected edge. Only selected
+projected edges fire their virtual detectors; unselected virtual detectors are
+also present in the second-stage graph and have zero syndrome.
+
+Author: OpenAI Codex.
+d11 code capacity, p=.01; X37 X38 X39 X40 X41.
+!R mask=0 allowed: weight=36.7609588011 logical=0
+  first-stage paths:
+    B21 -- G16
+    B43 -- G42
+    G28 -- B32 -- G37 -- B39
+  second-stage paths:
+    V38 -- R34 via: q55
+    V30 -- R34 -- V35 via: q54 q62
+    V18 -- R12 -- V5 -- boundary via: q44 q51 q58
+    V42 -- R44 -- boundary via: q49 q50
+    V5 = {G2 B8 }
+    V18 = {G16 B21 }
+    V30 = {G28 B32 }
+    V35 = {B32 G37 }
+    V38 = {G37 B39 }
+    V42 = {G42 B43 }
+  full correction: q55 q54 q62 q51 q44 q58 q49 q50
+!R mask=1 allowed: boundaryG weight=36.7609588011 logical=0
+  first-stage paths:
+    B21 -- G16
+    G28 -- B32 -- G37 -- B39
+    G42 -- B43
+  second-stage paths:
+    V38 -- R34 via: q55
+    V30 -- R34 -- V35 via: q54 q62
+    V18 -- R12 -- V5 -- boundary via: q44 q51 q58
+    V42 -- R44 -- boundary via: q49 q50
+    V5 = {G2 B8 }
+    V18 = {G16 B21 }
+    V30 = {G28 B32 }
+    V35 = {B32 G37 }
+    V38 = {G37 B39 }
+    V42 = {G42 B43 }
+  full correction: q55 q54 q62 q51 q44 q58 q49 q50
+!R mask=2 allowed: boundaryB weight=36.7609588011 logical=0
+  first-stage paths:
+    B21 -- G16
+    B43 -- G42
+    G28 -- B32 -- G37 -- B39
+  second-stage paths:
+    V38 -- R34 via: q55
+    V30 -- R34 -- V35 via: q54 q62
+    V18 -- R12 -- V5 -- boundary via: q44 q51 q58
+    V42 -- R44 -- boundary via: q49 q50
+    V5 = {G2 B8 }
+    V18 = {G16 B21 }
+    V30 = {G28 B32 }
+    V35 = {B32 G37 }
+    V38 = {G37 B39 }
+    V42 = {G42 B43 }
+  full correction: q55 q54 q62 q51 q44 q58 q49 q50
+!R mask=3 allowed: boundaryG boundaryB weight=36.7609588011 logical=0
+  first-stage paths:
+    B21 -- G16
+    G28 -- B32 -- G37 -- B39
+    G42 -- B43
+  second-stage paths:
+    V38 -- R34 via: q55
+    V30 -- R34 -- V35 via: q54 q62
+    V18 -- R12 -- V5 -- boundary via: q44 q51 q58
+    V42 -- R44 -- boundary via: q49 q50
+    V5 = {G2 B8 }
+    V18 = {G16 B21 }
+    V30 = {G28 B32 }
+    V35 = {B32 G37 }
+    V38 = {G37 B39 }
+    V42 = {G42 B43 }
+  full correction: q55 q54 q62 q51 q44 q58 q49 q50
+!G mask=0 allowed: weight=41.3560786512 logical=1
+  first-stage paths:
+    B21 -- R25 -- B32 -- R34
+    B39 -- R40 -- B43
+  second-stage paths:
+    G16 -- V16 -- G17 -- V23 via: q44 q52 q60
+    V28 -- G28 -- V33 via: q61 q54
+    G28 -- V32 -- G36 -- V39 via: q46 q39 q40
+    G42 -- V41 via: q41
+    V16 = {R12 B21 }
+    V23 = {B21 R25 }
+    V28 = {R25 B32 }
+    V32 = {B31 R34 }
+    V33 = {B32 R34 }
+    V39 = {B39 R40 }
+    V41 = {R40 B43 }
+  full correction: q60 q44 q52 q61 q54 q40 q46 q39 q41
+!G mask=1 allowed: boundaryB weight=41.3560786512 logical=1
+  first-stage paths:
+    B21 -- R25 -- B32 -- R34
+    B39 -- R40 -- B43
+  second-stage paths:
+    G16 -- V16 -- G17 -- V23 via: q44 q52 q60
+    V28 -- G28 -- V33 via: q61 q54
+    G28 -- V32 -- G36 -- V39 via: q46 q39 q40
+    G42 -- V41 via: q41
+    V16 = {R12 B21 }
+    V23 = {B21 R25 }
+    V28 = {R25 B32 }
+    V32 = {B31 R34 }
+    V33 = {B32 R34 }
+    V39 = {B39 R40 }
+    V41 = {R40 B43 }
+  full correction: q60 q44 q52 q61 q54 q40 q46 q39 q41
+!G mask=2 allowed: boundaryR weight=41.3560786512 logical=1
+  first-stage paths:
+    B21 -- R25 -- B32 -- R34
+    B39 -- R40 -- B43
+  second-stage paths:
+    G16 -- V16 -- G17 -- V23 via: q44 q52 q60
+    V28 -- G28 -- V33 via: q61 q54
+    G28 -- V32 -- G36 -- V39 via: q46 q39 q40
+    G42 -- V41 via: q41
+    V16 = {R12 B21 }
+    V23 = {B21 R25 }
+    V28 = {R25 B32 }
+    V32 = {B31 R34 }
+    V33 = {B32 R34 }
+    V39 = {B39 R40 }
+    V41 = {R40 B43 }
+  full correction: q60 q44 q52 q61 q54 q40 q46 q39 q41
+!G mask=3 allowed: boundaryB boundaryR weight=41.3560786512 logical=1
+  first-stage paths:
+    B21 -- R25 -- B32 -- R34
+    B39 -- R40 -- B43
+  second-stage paths:
+    G16 -- V16 -- G17 -- V23 via: q44 q52 q60
+    V28 -- G28 -- V33 via: q61 q54
+    G28 -- V32 -- G36 -- V39 via: q46 q39 q40
+    G42 -- V41 via: q41
+    V16 = {R12 B21 }
+    V23 = {B21 R25 }
+    V28 = {R25 B32 }
+    V32 = {B31 R34 }
+    V33 = {B32 R34 }
+    V39 = {B39 R40 }
+    V41 = {R40 B43 }
+  full correction: q60 q44 q52 q61 q54 q40 q46 q39 q41
+!B mask=0 allowed: weight=41.3560786512 logical=1
+  first-stage paths:
+    G16 -- R24 -- G28
+    R34 -- G37 -- R41 -- G42
+  second-stage paths:
+    B21 -- V20 via: q37
+    B39 -- V40 -- B43 via: q48 q41
+    V26 -- B21 -- V27 -- B32 -- V36 via: q45 q53 q61 q62
+    V42 -- boundary via: q64
+    V39 -- boundary via: q70
+    V20 = {G16 R24 }
+    V26 = {R24 G28 }
+    V27 = {R25 G28 }
+    V36 = {R34 G37 }
+    V39 = {G37 R41 }
+    V40 = {R40 G42 }
+    V42 = {R41 G42 }
+  full correction: q37 q48 q41 q61 q62 q45 q53 q64 q70
+!B mask=1 allowed: boundaryR weight=41.3560786512 logical=1
+  first-stage paths:
+    G16 -- R24 -- G28
+    R34 -- G37 -- R41 -- G42
+  second-stage paths:
+    B21 -- V20 via: q37
+    B39 -- V40 -- B43 via: q48 q41
+    V26 -- B21 -- V27 -- B32 -- V36 via: q45 q53 q61 q62
+    V42 -- boundary via: q64
+    V39 -- boundary via: q70
+    V20 = {G16 R24 }
+    V26 = {R24 G28 }
+    V27 = {R25 G28 }
+    V36 = {R34 G37 }
+    V39 = {G37 R41 }
+    V40 = {R40 G42 }
+    V42 = {R41 G42 }
+  full correction: q37 q48 q41 q61 q62 q45 q53 q64 q70
+!B mask=2 allowed: boundaryG weight=41.3560786512 logical=1
+  first-stage paths:
+    G16 -- R24 -- G28
+    R34 -- G37 -- R41 -- G42
+  second-stage paths:
+    B21 -- V20 via: q37
+    B39 -- V40 -- B43 via: q48 q41
+    V26 -- B21 -- V27 -- B32 -- V36 via: q45 q53 q61 q62
+    V42 -- boundary via: q64
+    V39 -- boundary via: q70
+    V20 = {G16 R24 }
+    V26 = {R24 G28 }
+    V27 = {R25 G28 }
+    V36 = {R34 G37 }
+    V39 = {G37 R41 }
+    V40 = {R40 G42 }
+    V42 = {R41 G42 }
+  full correction: q37 q48 q41 q61 q62 q45 q53 q64 q70
+!B mask=3 allowed: boundaryR boundaryG weight=41.3560786512 logical=1
+  first-stage paths:
+    G16 -- R24 -- G28
+    R34 -- G37 -- R41 -- G42
+  second-stage paths:
+    B21 -- V20 via: q37
+    B39 -- V40 -- B43 via: q48 q41
+    V26 -- B21 -- V27 -- B32 -- V36 via: q45 q53 q61 q62
+    V42 -- boundary via: q64
+    V39 -- boundary via: q70
+    V20 = {G16 R24 }
+    V26 = {R24 G28 }
+    V27 = {R25 G28 }
+    V36 = {R34 G37 }
+    V39 = {G37 R41 }
+    V40 = {R40 G42 }
+    V42 = {R41 G42 }
+  full correction: q37 q48 q41 q61 q62 q45 q53 q64 q70
+Permission SELECTS !R mask=0, logical=0 (WRONG).
+Actual fault projections for !R:
+q37: R24 G16 B21 
+q38: R24 G28 B31 
+q39: R34 G36 B31 
+q40: R40 G36 B39 
+q41: R40 G42 B43 

@@ -25,7 +25,8 @@ ConcatMWPM::ConcatMWPM(const stim::DetectorErrorModel& dem)
 ConcatMWPM::ConcatMWPM(const stim::DetectorErrorModel& dem, config_type conf)
     :num_detectors(dem.count_detectors()), num_observables(dem.count_observables()),
      decoder_(std::make_unique<concat::CircuitDecoder>(dem,conf.memory_x,
-                                                       conf.use_flags,conf.flag_cache_capacity))
+                                                       conf.use_flags,conf.flag_cache_capacity,
+                                                       conf.boundary_gap,concat::EnsembleConfig{conf.ensemble_size,conf.ensemble_seed})), debug_(conf.debug)
 {
 }
 
@@ -39,8 +40,8 @@ ConcatMWPM::decode(SyndromeRef syndrome, ObsRef)
     const auto start = std::chrono::steady_clock::now();
     std::vector<uint8_t> bits(num_detectors);
     for (size_t v = 0; v < num_detectors; v++) bits[v] = syndrome[v];
-    const auto frame = decoder_->decode(bits);
     Result result;
+    const auto frame = decoder_->decode(bits,debug_ ? &result.debug_info : nullptr);
     result.flipped_obs = ObsType(num_observables);
     result.flipped_obs[0] = frame & 1;
     result.matching_data.frame_flips = result.flipped_obs;

@@ -10,6 +10,7 @@
 #include <cmath>
 #include <ostream>
 #include <stdexcept>
+#include <sstream>
 
 #if defined(ENABLE_MPI)
 #include <mpi.h>
@@ -19,7 +20,7 @@ namespace dec
 {
 
 CorrelatedRestrictionDecoder::CorrelatedRestrictionDecoder(const stim::DetectorErrorModel& dem, config_type conf)
-    :num_detectors(dem.count_detectors()), num_observables(dem.count_observables()), correlated_(conf.correlated)
+    :num_detectors(dem.count_detectors()), num_observables(dem.count_observables()), correlated_(conf.correlated), debug_(conf.debug)
 {
     if (!std::isfinite(conf.physical_p) || conf.physical_p < 0 || conf.physical_p >= 0.1)
         throw std::invalid_argument("Correlated restriction requires 0 <= p < 0.1");
@@ -31,9 +32,9 @@ CorrelatedRestrictionDecoder::CorrelatedRestrictionDecoder(const stim::DetectorE
         conf.memory_x,scale,conf.use_flags,1,true);
 }
 
-CorrelatedRestrictionDecoder::CorrelatedRestrictionDecoder(uint32_t distance, uint32_t rounds, double p, bool correlated)
+CorrelatedRestrictionDecoder::CorrelatedRestrictionDecoder(uint32_t distance, uint32_t rounds, double p, bool correlated, bool debug)
     :num_detectors(restriction::make_code_capacity_lattice(false,distance,p).num_checks*
-                   (rounds == 1 ? 1 : rounds+1)), num_observables(1), correlated_(correlated)
+                   (rounds == 1 ? 1 : rounds+1)), num_observables(1), correlated_(correlated), debug_(debug)
 {
     if (!std::isfinite(p) || p < 0 || p >= 0.5)
         throw std::invalid_argument("Capacity/phenomenological correlation requires 0 < p < 0.5");
@@ -51,16 +52,41 @@ CorrelatedRestrictionDecoder::decode(SyndromeRef syndrome, ObsRef)
     std::vector<uint8_t> bits(num_detectors);
     for (size_t v = 0; v < num_detectors; v++) bits[v] = syndrome[v];
     uint64_t frame;
+    Result result;
     if (circuit_)
-            frame = correlated_ ? circuit_->decode_correlated(bits).observable_mask
-                                : circuit_->decode(bits).observable_mask;
+    {
+        const auto correction = correlated_ ? circuit_->decode_correlated(bits,debug_ ? &result.debug_info : nullptr)
+                                           : circuit_->decode(bits,debug_ ? &result.debug_info : nullptr);
+        frame = correction.observable_mask;
+        if (debug_)
+        {
+            std::ostringstream out;
+            out << "Lifted correction: ensemble_member=" << correction.ensemble_member << " observable=" << frame << " qubits:";
+            for (auto q : correction.lifted.correction) out << " q" << q;
+            out << "\nConnected components=" << correction.lifted.diagnostics.components
+                << " local_lifts=" << correction.lifted.diagnostics.local_lifts << '\n';
+            result.debug_info += out.str();
+        }
+    }
     else
     {
         const auto out = model_->decode(bits);
         if (!std::isfinite(out.weight)) throw std::runtime_error("Correlated restriction lifting failed");
         frame = out.observable;
+        if (debug_)
+        {
+            std::ostringstream text;
+            text << "Restriction model: termination=" << out.termination << " weight=" << out.weight
+                 << " iterations=" << out.iterations << " chose_initial=" << out.chose_initial << '\n';
+            for (int c = 0; c < 3; c++)
+            {
+                text << "  !" << "RGB"[c] << " selected graph edges:";
+                for (const auto& [x,y] : out.state[c]) text << " (" << x << ',' << y << ')';
+                text << '\n';
+            }
+            result.debug_info = text.str();
+        }
     }
-    Result result;
     result.flipped_obs = ObsType(num_observables);
     result.flipped_obs[0] = frame & 1;
     result.matching_data.frame_flips = result.flipped_obs;

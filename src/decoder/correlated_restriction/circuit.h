@@ -90,10 +90,10 @@ public:
     CircuitRestrictionDecoder(const stim::DetectorErrorModel&, Lattice,
                               bool memory_x, double physical_p, bool use_flags = true,
                               size_t ensemble_size = 1, bool corrected_flag_weights = true);
-    CircuitResult decode(const syndrome_type& full_syndrome);
+    CircuitResult decode(const syndrome_type& full_syndrome, std::string* debug_info = nullptr);
     // Original and single-update candidates, for paired diagnostics.
     std::array<Variant,2> decode_single_pass(const syndrome_type&);
-    CircuitResult decode_correlated(const syndrome_type&);
+    CircuitResult decode_correlated(const syndrome_type&, std::string* debug_info = nullptr);
     // Every candidate still follows matching -> components -> lifting.
     // Allows a model-specific, time-resolved likelihood score after lifting.
     std::vector<CircuitResult> decode_candidates(const syndrome_type&);
@@ -152,10 +152,12 @@ private:
     std::unordered_map<std::string, std::unique_ptr<Context>> contexts_;
 
     std::unique_ptr<Context> make_context(const syndrome_type&, size_t trial = 0) const;
-    CircuitResult decode_context(Context&, const syndrome_type&, std::vector<CircuitResult>* candidates = nullptr);
+    CircuitResult decode_context(Context&, const syndrome_type&, std::vector<CircuitResult>* candidates = nullptr, std::string* debug_info = nullptr);
     std::unique_ptr<Context> update_context(const Context&, const State&) const;
     CircuitResult lift_matching(const Context&, const syndrome_type&, const MatchingOutput&,
                                std::vector<CircuitResult>* = nullptr);
+    void append_debug(const Context&, const MatchingOutput&, const syndrome_type&,
+                      const char* stage, std::string&) const;
     Context& context_for(const syndrome_type&);
     MatchingOutput matching(Context&, const syndrome_type&);
     MatchingOutput matching_positive(Context&, const syndrome_type&);

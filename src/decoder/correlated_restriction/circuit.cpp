@@ -17,6 +17,8 @@
 #include <random>
 #include <set>
 #include <stdexcept>
+#include <sstream>
+#include <iomanip>
 
 namespace dec::correlated_restriction
 {
@@ -559,13 +561,13 @@ CircuitRestrictionDecoder::context_for(const syndrome_type& full_syndrome)
 }
 
 CircuitResult
-CircuitRestrictionDecoder::decode(const syndrome_type& full_syndrome)
+CircuitRestrictionDecoder::decode(const syndrome_type& full_syndrome, std::string* debug_info)
 {
     auto& context = context_for(full_syndrome);
-    auto best = decode_context(context,full_syndrome);
+    auto best = decode_context(context,full_syndrome,nullptr,debug_info);
     for (size_t i = 0; i < context.alternatives.size(); i++)
     {
-        auto candidate = decode_context(*context.alternatives[i],full_syndrome);
+        auto candidate = decode_context(*context.alternatives[i],full_syndrome,nullptr,debug_info);
         // Same physical correction criterion as the code-capacity ensemble.
         // Benchmark against one trial: temporal evidence can favor a different
         // logical class than the smallest flattened physical correction.
@@ -595,13 +597,14 @@ CircuitRestrictionDecoder::decode_candidates(const syndrome_type& full_syndrome)
 
 CircuitResult
 CircuitRestrictionDecoder::decode_context(Context& context, const syndrome_type& full_syndrome,
-                                        std::vector<CircuitResult>* candidates)
+                                        std::vector<CircuitResult>* candidates, std::string* debug_info)
 {
     syndrome_type residual(check_to_global_.size());
     for (size_t v = 0; v < residual.size(); v++) residual[v] = full_syndrome[check_to_global_[v]];
     // Stage 1: restricted matching on the reweighted graphs. Never consume
     // matched flag events, alter the syndrome, or apply a consensus frame.
     auto matched = matching(context, residual);
+    if (debug_info) append_debug(context,matched,full_syndrome,"initial",*debug_info);
     return lift_matching(context,full_syndrome,matched,candidates);
 }
 
@@ -830,20 +833,53 @@ CircuitRestrictionDecoder::decode_single_pass(const syndrome_type& full_syndrome
 }
 
 CircuitResult
-CircuitRestrictionDecoder::decode_correlated(const syndrome_type& full_syndrome)
+CircuitRestrictionDecoder::decode_correlated(const syndrome_type& full_syndrome, std::string* debug_info)
 {
     require(full_syndrome.size() == num_detectors_, "Wrong syndrome size");
     auto& original = context_for(full_syndrome);
     syndrome_type residual(check_to_global_.size());
     for (size_t v = 0; v < residual.size(); v++) residual[v] = full_syndrome[check_to_global_[v]];
     const auto initial = matching(original,residual);
+    if (debug_info) append_debug(original,initial,full_syndrome,"initial",*debug_info);
     State evidence;
     for (int c = 0; c < 3; c++)
         for (auto e : initial.graph_edges[c])
             if (!evidence[c].erase(e)) evidence[c].insert(e);
     auto updated = update_context(original,evidence);
     const auto second = matching(*updated,residual);
+    if (debug_info) append_debug(*updated,second,full_syndrome,"correlated one-pass",*debug_info);
     return lift_matching(*updated,full_syndrome,second);
+}
+
+// Contributor: OpenAI Codex. Diagnostics from the actual matching pass.
+void CircuitRestrictionDecoder::append_debug(const Context& context,const MatchingOutput& matched,
+    const syndrome_type&,const char* stage,std::string& debug) const
+{
+    std::ostringstream out;
+    out << std::setprecision(12) << "Restriction " << stage << " matching and weights\n";
+    auto name = [&](det_id_type v)
+    {
+        if (v < 0) return std::string("BoundarySink");
+        if (vertices_.at(v).is_boundary) return std::string(1,"RGB"[vertices_[v].color])+"Boundary";
+        return "D"+std::to_string(check_to_global_.at(v));
+    };
+    for (int c = 0; c < 3; c++)
+    {
+        out << "  !" << "RGB"[c] << " (" << "RGB"[(c+1)%3] << "RGB"[(c+2)%3] << ") selected graph edges:\n";
+        for (const auto& edge : matched.graph_edges[c])
+        {
+            const double p = context.edges[c].at(edge).probability;
+            out << "    " << name(edge.first) << " -- " << name(edge.second)
+                << " p=" << p << " W=" << std::log((1-p)/p) << '\n';
+        }
+        for (const auto& assignment : matched.assignments) if (assignment.ignored_color == c)
+        {
+            out << "    match " << name(assignment.x) << " <-> " << name(assignment.y) << " expanded edges:";
+            for (const auto& [x,y] : assignment.path) out << " (" << name(x) << ',' << name(y) << ')';
+            out << '\n';
+        }
+    }
+    debug += out.str();
 }
 
 } // namespace dec::correlated_restriction

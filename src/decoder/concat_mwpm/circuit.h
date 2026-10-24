@@ -2,7 +2,7 @@
  *  author: OpenAI Codex
  *  date:   22 October 2026
  *
- *  Bell-flagged SI1000 adapter for concatenated MWPM.
+ *  Colored-DEM adapter for concatenated MWPM; Bell flags are used when present.
  * */
 #ifndef DECODER_CONCAT_MWPM_CIRCUIT_h
 #define DECODER_CONCAT_MWPM_CIRCUIT_h
@@ -19,6 +19,8 @@ struct CircuitFault
     double probability;
     std::vector<size_t> detectors;
     uint64_t observable;
+    // Contributor: OpenAI Codex. Reserved native-generator noise tags.
+    BoundaryHint boundary_hint{BoundaryHint::Unknown};
 };
 
 struct FlagWeight
@@ -29,6 +31,14 @@ struct FlagWeight
     double effective_probability;
     size_t relevant_flags;
     size_t fired_flags;
+    // Contributor: OpenAI Codex. Incidence is diagnostic only; unflagged-event penalties are disabled.
+    std::vector<size_t> incident_observed_flags;
+    double outside_flag_penalty{1}; // Retained diagnostic; always one.
+    size_t selected_variant{SIZE_MAX}; // Index in the equivalence class; SIZE_MAX = disabled.
+    size_t flag_distance{SIZE_MAX}; // |selected flags XOR full observed flags|.
+    std::vector<size_t> selected_flags;
+    double representative_probability{0}; // Before conditional normalization.
+    double conditional_denominator{1};
 };
 
 struct CircuitResult
@@ -38,6 +48,9 @@ struct CircuitResult
     std::vector<FlagWeight> weights;
     Model model;
     size_t audited_graph_edges;
+    // Contributor: OpenAI Codex. All feasible original/boundary-parity candidates.
+    std::vector<Result> candidates;
+    size_t ambiguous_boundary_events{0};
 };
 
 class CircuitDecoder
@@ -45,9 +58,10 @@ class CircuitDecoder
 public:
     // Uses the full original DEM and infers each flag's isolated-flip prior.
     CircuitDecoder(const stim::DetectorErrorModel&, bool memory_x,
-                   bool use_flags = true, size_t cache_capacity = 16);
-    uint64_t decode(const std::vector<uint8_t>& full_syndrome);
-    CircuitResult inspect(const std::vector<uint8_t>& full_syndrome);
+                   bool use_flags = true, size_t cache_capacity = 16,
+                   bool boundary_gap = false, EnsembleConfig ensemble = {});
+    uint64_t decode(const std::vector<uint8_t>& full_syndrome, std::string* debug_info = nullptr);
+    CircuitResult inspect(const std::vector<uint8_t>& full_syndrome, DebugTrace* debug = nullptr);
     std::vector<uint8_t> fault_syndrome(const std::vector<size_t>& ids) const;
     uint64_t fault_observable(const std::vector<size_t>& ids) const;
 
@@ -57,32 +71,46 @@ public:
     std::vector<size_t> check_globals, flag_globals;
     size_t class_count() const { return classes_.size(); }
     const std::vector<double>& flag_measurement_probabilities() const { return measurement_p_; }
+    // Contributor: OpenAI Codex. Full per-flag parity marginals, not flag-only priors.
+    const std::vector<double>& flag_flip_probabilities() const { return flag_p_; }
 
-private:
+    // Contributor: OpenAI Codex. Class membership depends only on check support.
+    // Logical effects are per-variant metadata, never part of the class key.
     struct Variant
     {
         std::vector<size_t> flags;
         double probability;
+        uint64_t observable;
     };
     struct Class
     {
-        std::vector<size_t> checks;
-        uint64_t observable;
+        std::vector<size_t> checks; // Local memory-sector detector IDs, including time.
         std::vector<size_t> flags;
         std::vector<Variant> variants;
+        BoundaryHint boundary_hint{BoundaryHint::Unknown};
+        bool explicit_boundary_provenance{false};
     };
+    // Inspect detector-only class construction and each member's logical effect.
+    const std::vector<Class>& equivalence_classes() const { return classes_; }
+
+private:
     struct Context
     {
         std::unique_ptr<Decoder> decoder;
         std::vector<FlagWeight> weights;
     };
+    std::vector<double> flag_p_; // Marginal P(flag=1), indexed by original detector ID.
     std::vector<double> measurement_p_; // Indexed by original global flag ID.
     const bool use_flags_;
     const size_t cache_capacity_;
+    const bool boundary_gap_;
+    // Contributor: OpenAI Codex. Reused for each independently flag-conditioned context.
+    const EnsembleConfig ensemble_;
     std::vector<int> colors_;
     std::vector<Class> classes_;
     std::map<std::string, Context> contexts_;
 
+    std::map<size_t,std::vector<size_t>> flag_neighborhoods(const std::vector<uint8_t>&) const;
     Context make_context(const std::vector<uint8_t>&) const;
     Context& context(const std::vector<uint8_t>&);
     std::vector<uint8_t> memory_syndrome(const std::vector<uint8_t>&) const;

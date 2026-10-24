@@ -1,5 +1,6 @@
 /*
  *  author: Claude Sonnet 5.1
+ *  contributor: OpenAI Codex
  *  date:   26 July 2026
  * */
 
@@ -50,86 +51,31 @@ idle_qubits(const std::vector<uint32_t>& all, const std::vector<uint32_t>& activ
     return out;
 }
 
-/*
- * The SI1000 noise model, holding the per-location error rates derived from `p`
- * and providing the noisy-gate appenders used to build the circuit.
- * */
-struct si1000_model
+// Author: OpenAI Codex. Adapt the geometric schedule to the public operation
+// policy. Idle target computation belongs to scheduling, rather than noise.
+struct scheduled_operations
 {
-    double p;
-
-    // Anti-basis flip: for a Z-basis (de)coherent op an X error is relevant,
-    // and vice-versa. `basis` is the measurement/reset basis ('Z' or 'X').
-    void
-    anti_basis_flip(stim::Circuit& c, const std::vector<uint32_t>& targets, double pr, char basis) const
+    const CircuitNoisePolicy& policy;
+    void append_unitary_1(stim::Circuit& c, std::string_view gate,
+        const std::vector<uint32_t>& qs) const
+    { if (!qs.empty()) policy.append(c,{CircuitOperationKind::Unitary1,qs,gate,'Z',true}); }
+    void append_cx_layer(stim::Circuit& c, const std::vector<uint32_t>& qs,
+        const std::vector<uint32_t>& all) const
     {
-        if (pr <= 0 || targets.empty())
-            return;
-        c.safe_append_ua(basis == 'X' ? "Z_ERROR" : "X_ERROR", targets, pr);
+        policy.append(c,{CircuitOperationKind::Unitary2,qs,"CX",'Z',true});
+        const auto idle=idle_qubits(all,qs);
+        if (!idle.empty()) policy.append(c,{CircuitOperationKind::GateIdle,idle,{},'Z',true});
     }
-
-    // Single-qubit gate: gate, then DEPOLARIZE1(p/10).
-    void
-    append_unitary_1(stim::Circuit& c, std::string_view name, const std::vector<uint32_t>& targets) const
+    void append_reset(stim::Circuit& c, const std::vector<uint32_t>& qs,char basis) const
+    { policy.append(c,{CircuitOperationKind::Reset,qs,{},basis,true}); }
+    void append_measure_reset(stim::Circuit& c,const std::vector<uint32_t>& qs,
+        const std::vector<uint32_t>& data) const
     {
-        if (targets.empty())
-            return;
-        c.safe_append_u(name, targets);
-        c.safe_append_ua("DEPOLARIZE1", targets, p / 10.0);
+        policy.append(c,{CircuitOperationKind::MeasureReset,qs,{},'Z',true});
+        if (!data.empty()) policy.append(c,{CircuitOperationKind::MeasurementIdle,data,{},'Z',true});
     }
-
-    // Two-qubit CX layer: gate, DEPOLARIZE2(p) on the pairs, then idle
-    // DEPOLARIZE1(p) on every qubit untouched by the layer.
-    void
-    append_cx_layer(stim::Circuit& c,
-                    const std::vector<uint32_t>& targets,
-                    const std::vector<uint32_t>& all_qubits) const
-    {
-        c.safe_append_u("CX", targets);
-        c.safe_append_ua("DEPOLARIZE2", targets, p);
-
-        auto idle = idle_qubits(all_qubits, targets);
-        if (!idle.empty())
-            c.safe_append_ua("DEPOLARIZE1", idle, p);
-    }
-
-    // Reset (always Z-basis for ancilla; data uses the memory basis): gate,
-    // then X_ERROR(2p) (anti-basis flip).
-    void
-    append_reset(stim::Circuit& c, const std::vector<uint32_t>& targets, char basis) const
-    {
-        std::string gate("R");
-        gate.push_back(basis);
-        c.safe_append_u(gate, targets);
-        anti_basis_flip(c, targets, 2.0 * p, basis);
-    }
-
-    // Combined measure+reset for the ancilla (Z basis): X_ERROR(5p) before,
-    // MR, then X_ERROR(2p) after (reset flip). No post-measure depolarize.
-    // Data qubits are idle during this layer -> DEPOLARIZE1(2p).
-    void
-    append_measure_reset(stim::Circuit& c,
-                         const std::vector<uint32_t>& targets,
-                         const std::vector<uint32_t>& data_qubits) const
-    {
-        anti_basis_flip(c, targets, 5.0 * p, 'Z');
-        c.safe_append_u("MR", targets);
-        anti_basis_flip(c, targets, 2.0 * p, 'Z');
-        if (!data_qubits.empty())
-            c.safe_append_ua("DEPOLARIZE1", data_qubits, 4.0 * p);
-    }
-
-    // Final destructive data measurement in the memory basis: anti-basis
-    // flip(5p) before, M, then DEPOLARIZE1(p) after.
-    void
-    append_measure(stim::Circuit& c, const std::vector<uint32_t>& targets, char basis) const
-    {
-        anti_basis_flip(c, targets, 5.0 * p, basis);
-        std::string gate("M");
-        gate.push_back(basis);
-        c.safe_append_u(gate, targets);
-        c.safe_append_ua("DEPOLARIZE1", targets, p);
-    }
+    void append_measure(stim::Circuit& c,const std::vector<uint32_t>& qs,char basis) const
+    { policy.append(c,{CircuitOperationKind::Measure,qs,{},basis,true}); }
 };
 
 /*
@@ -162,7 +108,7 @@ struct toric_coord
 ////////////////////////////////////////////////////////////////
 
 stim::Circuit
-sc_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
+sc_circuit(uint32_t distance, uint32_t rounds, const CircuitNoisePolicy& policy, bool is_memory_x,
           bool include_opposite_basis_detectors,
           const ComponentErrorDistribution& noise_distribution)
 {
@@ -172,11 +118,10 @@ sc_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
         throw std::invalid_argument("sc_si1000: need rounds >= 1.");
     if (distance < 2)
         throw std::invalid_argument("sc_si1000: need distance >= 2.");
-    if (p < 0 || p > 1)
-        throw std::invalid_argument("sc_si1000: need 0 <= p <= 1.");
+    policy.validate(rounds);
 
     const uint32_t d = distance;
-    const si1000_model model{p};
+    const scheduled_operations model{policy};
 
     // Place data qubits and collect the logical observable supports.
     std::set<surface_coord> data_coords;
@@ -303,17 +248,40 @@ sc_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
 
     // Repeated syndrome-extraction cycle.
     Circuit cycle_actions;
-    cycle_actions.safe_append_u("TICK", {});
-    model.append_unitary_1(cycle_actions, "H", x_measurement_qubits);
-    for (const auto& targets : cnot_targets)
+    policy.append(cycle_actions, {CircuitOperationKind::RoundStart, data_qubits});
+    // Contributor: OpenAI Codex. Ideal product checks share geometry and all
+    // detector/readout bookkeeping with the surface-code gate schedule.
+    if (policy.check_implementation() == CheckImplementation::Product)
+    {
+        for (auto measure_qubit : measurement_qubits)
+        {
+            const auto measure = q2p.at(measure_qubit);
+            const bool x_basis = x_measure_coords.contains(measure);
+            std::vector<uint32_t> product;
+            for (auto delta : x_order)
+            {
+                const auto data = measure+delta;
+                if (!data_coords.contains(data)) continue;
+                if (!product.empty()) product.push_back(GateTarget::combiner().data);
+                product.push_back((x_basis ? GateTarget::x(p2q.at(data)) : GateTarget::z(p2q.at(data))).data);
+            }
+            policy.append(cycle_actions,{CircuitOperationKind::ProductMeasurement,product});
+        }
+    }
+    else
     {
         cycle_actions.safe_append_u("TICK", {});
-        model.append_cx_layer(cycle_actions, targets, all_qubits);
+        model.append_unitary_1(cycle_actions, "H", x_measurement_qubits);
+        for (const auto& targets : cnot_targets)
+        {
+            cycle_actions.safe_append_u("TICK", {});
+            model.append_cx_layer(cycle_actions, targets, all_qubits);
+        }
+        cycle_actions.safe_append_u("TICK", {});
+        model.append_unitary_1(cycle_actions, "H", x_measurement_qubits);
+        cycle_actions.safe_append_u("TICK", {});
+        model.append_measure_reset(cycle_actions, measurement_qubits, data_qubits);
     }
-    cycle_actions.safe_append_u("TICK", {});
-    model.append_unitary_1(cycle_actions, "H", x_measurement_qubits);
-    cycle_actions.safe_append_u("TICK", {});
-    model.append_measure_reset(cycle_actions, measurement_qubits, data_qubits);
 
     // Head: coords, reset, first cycle, and the first-round detectors.
     Circuit head;
@@ -384,7 +352,7 @@ sc_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
 ////////////////////////////////////////////////////////////////
 
 stim::Circuit
-toric_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
+toric_circuit(uint32_t distance, uint32_t rounds, const CircuitNoisePolicy& policy, bool is_memory_x,
              bool include_opposite_basis_detectors,
           const ComponentErrorDistribution& noise_distribution)
 {
@@ -394,12 +362,13 @@ toric_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
         throw std::invalid_argument("toric_si1000: need rounds >= 1.");
     if (distance < 2)
         throw std::invalid_argument("toric_si1000: need distance >= 2.");
-    if (p < 0 || p > 1)
-        throw std::invalid_argument("toric_si1000: need 0 <= p <= 1.");
+    policy.validate(rounds);
+    if (policy.check_implementation() != CheckImplementation::GateSequence)
+        throw std::invalid_argument("surface/toric schedules require a gate-level operation policy");
 
     const uint32_t L = distance;
     const int mod = 2 * (int)L;
-    const si1000_model model{p};
+    const scheduled_operations model{policy};
 
     // Place data qubits (odd/even mixed parity) and ancilla qubits: X-check
     // vertices at (even, even), Z-check plaquettes at (odd, odd).
@@ -516,6 +485,7 @@ toric_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
 
     // Repeated syndrome-extraction cycle.
     Circuit cycle_actions;
+    policy.append(cycle_actions, {CircuitOperationKind::RoundStart, data_qubits});
     cycle_actions.safe_append_u("TICK", {});
     model.append_unitary_1(cycle_actions, "H", x_measurement_qubits);
     for (const auto& targets : cnot_targets)
@@ -596,3 +566,11 @@ toric_si1000(uint32_t distance, uint32_t rounds, double p, bool is_memory_x,
 
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
+
+// Author: OpenAI Codex. Legacy adapters contain no circuit-generation logic.
+stim::Circuit sc_si1000(uint32_t d,uint32_t r,double p,bool x,bool opposite,
+    const ComponentErrorDistribution& distribution)
+{ return sc_circuit(d,r,SI1000NoisePolicy(p),x,opposite,distribution); }
+stim::Circuit toric_si1000(uint32_t d,uint32_t r,double p,bool x,bool opposite,
+    const ComponentErrorDistribution& distribution)
+{ return toric_circuit(d,r,SI1000NoisePolicy(p),x,opposite,distribution); }

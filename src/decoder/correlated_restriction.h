@@ -29,6 +29,7 @@ public:
         bool memory_x{false};
         bool use_flags{true};
         bool correlated{true};
+        bool debug{false}; // Populate Result::debug_info.
     };
     struct Statistics
     {
@@ -46,7 +47,7 @@ public:
     // colorless and flags from both bases condition the matching graphs.
     CorrelatedRestrictionDecoder(const stim::DetectorErrorModel&, config_type);
     // One round selects capacity; d rounds select phenomenological noise.
-    CorrelatedRestrictionDecoder(uint32_t distance, uint32_t rounds, double p, bool correlated = true);
+    CorrelatedRestrictionDecoder(uint32_t distance, uint32_t rounds, double p, bool correlated = true, bool debug = false);
     ~CorrelatedRestrictionDecoder();
     CorrelatedRestrictionDecoder(const CorrelatedRestrictionDecoder&) = delete;
     CorrelatedRestrictionDecoder& operator=(const CorrelatedRestrictionDecoder&) = delete;
@@ -61,6 +62,7 @@ private:
     std::unique_ptr<correlated_restriction::CircuitRestrictionDecoder> circuit_;
     std::unique_ptr<correlated_restriction::Decoder> model_;
     bool correlated_;
+    bool debug_{false};
     Statistics stats_;
 };
 } // namespace dec

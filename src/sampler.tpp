@@ -76,6 +76,9 @@ monte_carlo_sampler(const stim::DetectorErrorModel& dem,
         for (size_t i = 0; i < local_samples; i++)
         {
             auto result = decoder.decode(detector_table[i], obs_table[i]);
+            // Contributor: OpenAI Codex. Opt-in diagnostic text is decoder-owned.
+            if constexpr (requires { result.debug_info; })
+                if (!result.debug_info.empty()) std::cout << result.debug_info;
             if (is_decoding_error(result, obs_table[i], num_observables))
             {
                 new_errors++;
@@ -176,6 +179,8 @@ rare_event_sampler(const stim::DetectorErrorModel& dem,
             uint64_t new_errors = 0;
             for (size_t i = 0; i < local; ++i) {
                 auto result = decoder.decode(syndromes[i], truths[i]);
+                if constexpr (requires { result.debug_info; })
+                    if (!result.debug_info.empty()) std::cout << result.debug_info;
                 if (is_decoding_error(result, truths[i], observables)) {
                     ++new_errors;
                     if (conf.verbosity) error_callback(syndromes[i], truths[i], result);
