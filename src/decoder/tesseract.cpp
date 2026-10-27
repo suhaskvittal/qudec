@@ -8,6 +8,9 @@
 #include "decoder/tesseract.h"
 
 #include <vector>
+#include <iomanip>
+#include <sstream>
+#include <iostream>
 
 namespace dec
 {
@@ -42,6 +45,27 @@ Tesseract::decode(SyndromeRef syn, ObsRef)
     Result out{.flipped_obs=ObsType(num_observables)};
     for (int k : flipped)
         out.flipped_obs[k] ^= 1;
+    // OpenAI Codex: Report retained hyperedges using original flattened DEM IDs.
+    if (debug_ || decoder_.config.verbose)
+    {
+        std::ostringstream text;
+        text << std::setprecision(17)
+             << "Tesseract final solution (original flattened DEM error IDs)\n"
+             << "Total cost=" << decoder_.cost_from_errors(decoder_.predicted_errors_buffer)
+             << " low_confidence=" << decoder_.low_confidence_flag << '\n';
+        for (auto id:decoder_.predicted_errors_buffer)
+        {
+            const auto& error=decoder_.errors.at(decoder_.dem_error_to_error.at(id));
+            text << "DEM_E" << id << " p=" << error.get_probability()
+                 << " cost=" << error.likelihood_cost << " detectors={";
+            for (auto d:error.symptom.detectors) text << " D" << d;
+            text << " } observables={";
+            for (auto l:error.symptom.observables) text << " L" << l;
+            text << " }\n";
+        }
+        out.debug_info=text.str();
+        if (decoder_.config.verbose) std::cout << out.debug_info;
+    }
     return out;
 }
 

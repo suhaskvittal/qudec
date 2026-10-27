@@ -61,6 +61,19 @@ struct Result
     // Contributor: OpenAI Codex. Ensemble provenance and coalesced second-stage input.
     size_t member{0};
     std::vector<size_t> virtual_detectors;
+    // Author: OpenAI Codex. Best sampled opposing-frame margin, natural-log units.
+    // Missing means no opposing frame was found; this is not infinite confidence.
+    std::optional<double> candidate_gap;
+
+};
+
+// Contributor: OpenAI Codex. Adaptive first-stage ensemble decision.
+struct GatedResult
+{
+    Result result;
+    double gap_db;
+    bool used_ensemble;
+    int baseline_color{-1};
 };
 
 // Contributor: OpenAI Codex. Fixed first-stage graph ensemble; member zero is unperturbed.
@@ -74,6 +87,17 @@ struct EnsembleConfig
 struct Statistics
 {
     size_t first_calls{0}, second_calls{0}, duplicates{0}, infeasible{0};
+};
+
+// Author: OpenAI Codex. Transferable first-stage work for grouped MPI decoding.
+// Selected IDs name the shared projection topology; path data is optional.
+struct FirstStageResult
+{
+    int color, boundary_mask;
+    size_t member;
+    std::vector<size_t> selected;
+    std::vector<std::vector<size_t>> paths;
+    std::vector<std::vector<int64_t>> nodes;
 };
 
 // Contributor: OpenAI Codex. Names map local checks to original DEM detectors.
@@ -91,9 +115,18 @@ public:
     explicit Decoder(Model, bool uniform_restricted_weights = false,
                      bool boundary_gap = false, EnsembleConfig config = {});
     Result decode(const std::vector<uint8_t>& syndrome);
+    GatedResult decode_gated(const std::vector<uint8_t>& syndrome, double threshold_db,
+        DebugTrace* debug = nullptr);
     std::array<Result, 3> decode_colors(const std::vector<uint8_t>& syndrome, bool trace = true);
     // Contributor: OpenAI Codex. Three original or every feasible boundary-parity candidate (normally six).
     std::vector<Result> decode_candidates(const std::vector<uint8_t>& syndrome, bool trace = true, DebugTrace* debug = nullptr);
+    std::vector<FirstStageResult> decode_first_stage(const std::vector<uint8_t>&,
+        size_t worker, size_t workers, bool paths = false);
+    // The complete first-stage array must have serial member/color/sector order.
+    // Coalescing occurs globally before distributing second-stage work.
+    std::vector<Result> decode_second_stage(const std::vector<uint8_t>&,
+        const std::vector<FirstStageResult>&, size_t worker, size_t workers,
+        bool trace = false, DebugTrace* debug = nullptr);
     size_t ambiguous_boundary_events() const;
     // Verify the actual integer matching/search weights against -log(probability).
     size_t audit_weights() const;
@@ -111,10 +144,12 @@ private:
     bool boundary_gap_;
     EnsembleConfig config_;
     bool uniform_;
+    bool collect_gap_{false};
     std::map<std::vector<size_t>,size_t> event_slots_;
     std::vector<size_t> active_events_;
     std::optional<Result> decode_color(const std::vector<uint8_t>&, int color, int mask, size_t member, bool trace,
-        std::map<std::vector<uint64_t>,bool>& seen, DebugTrace* debug);
+        std::map<std::vector<uint64_t>,bool>& seen, DebugTrace* debug,
+        const FirstStageResult* first = nullptr);
 };
 
 } // namespace dec::concat

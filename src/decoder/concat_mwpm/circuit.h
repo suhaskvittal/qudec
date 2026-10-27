@@ -8,6 +8,7 @@
 #define DECODER_CONCAT_MWPM_CIRCUIT_h
 
 #include "decoder/concat_mwpm/matching.h"
+#include "decoder/concat_mwpm/flag_bp.h"
 #include <string>
 #include <tuple>
 
@@ -67,9 +68,20 @@ public:
     CircuitDecoder(const stim::DetectorErrorModel&, bool memory_x,
                    bool use_flags = true, size_t cache_capacity = 16,
                    bool boundary_gap = false, EnsembleConfig ensemble = {},
-                   FlagRenormalization renormalization = {});
+                   FlagRenormalization renormalization = {}, bool gap_gating = false,
+                   double gap_threshold_db = 20.0, bool belief_propagation = false);
     uint64_t decode(const std::vector<uint8_t>& full_syndrome, std::string* debug_info = nullptr);
+    // Author: OpenAI Codex. Natural-log gap from the most recent serial decode.
+    std::optional<double> candidate_gap() const { return candidate_gap_; }
+
+    GatedResult decode_gated(const std::vector<uint8_t>& full_syndrome,double threshold_db,
+        std::string* debug_info = nullptr);
     CircuitResult inspect(const std::vector<uint8_t>& full_syndrome, DebugTrace* debug = nullptr);
+    // Author: OpenAI Codex. Two-phase grouped decoding; no MPI dependency here.
+    std::vector<FirstStageResult> decode_first_stage(const std::vector<uint8_t>&,
+        size_t worker,size_t workers,bool paths = false);
+    std::vector<Result> decode_second_stage(const std::vector<uint8_t>&,
+        const std::vector<FirstStageResult>&,size_t worker,size_t workers,std::string* debug = nullptr);
     std::vector<uint8_t> fault_syndrome(const std::vector<size_t>& ids) const;
     uint64_t fault_observable(const std::vector<size_t>& ids) const;
 
@@ -112,18 +124,27 @@ private:
     std::vector<double> measurement_p_; // Indexed by original global flag ID.
     const bool use_flags_;
     const bool boundary_gap_;
+    const bool gap_gating_;
+    const double gap_threshold_db_;
     // Contributor: OpenAI Codex. Reused for each independently flag-conditioned context.
     const EnsembleConfig ensemble_;
     const FlagRenormalization renormalization_;
+    // Author: OpenAI Codex. Flags and opposite-basis checks condition BP;
+    // only memory-basis checks enter either matching stage.
+    std::vector<size_t> bp_aux_globals_;
+    // Author: OpenAI Codex. Posterior auxiliary inference replaces representative selection.
+    std::unique_ptr<FlagBP> flag_bp_;
     std::vector<int> colors_;
     std::vector<Class> classes_;
     // Author: OpenAI Codex. One persistent decoder replaces whole-pattern caching.
     Context context_;
     std::string current_flags_;
     bool context_ready_{false};
+    std::optional<double> candidate_gap_;
 
     std::map<size_t,std::vector<size_t>> flag_neighborhoods(const std::vector<uint8_t>&) const;
     Context make_context(const std::vector<uint8_t>&) const;
+    Context make_bp_context(const std::vector<uint8_t>&) const;
     Context& context(const std::vector<uint8_t>&);
     std::vector<uint8_t> memory_syndrome(const std::vector<uint8_t>&) const;
 };

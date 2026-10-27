@@ -52,17 +52,24 @@ read_coordinates(const stim::DetectorErrorModel& dem)
 
 CircuitDecoder::CircuitDecoder(const stim::DetectorErrorModel& dem, bool memory_x,
                                bool use_flags, size_t cache_capacity, bool boundary_gap, EnsembleConfig ensemble,
-                               FlagRenormalization renormalization)
+                               FlagRenormalization renormalization, bool gap_gating,double gap_threshold_db,bool belief_propagation)
     :num_detectors(dem.count_detectors()), faults(read_faults(dem)),
      coordinates(read_coordinates(dem)),
      flag_p_(num_detectors,0), measurement_p_(num_detectors, 0), use_flags_(use_flags),
-     boundary_gap_(boundary_gap), ensemble_(ensemble), renormalization_(renormalization)
+     boundary_gap_(boundary_gap), gap_gating_(gap_gating), gap_threshold_db_(gap_threshold_db),
+     ensemble_(ensemble), renormalization_(renormalization)
 {
+    if (belief_propagation && (!use_flags || renormalization.enabled))
+        throw std::invalid_argument("Concat BP requires flags and cannot be combined with flag renormalization");
     if (renormalization.enabled && (!std::isfinite(renormalization.physical_error_rate) ||
         renormalization.physical_error_rate < 0 || renormalization.physical_error_rate >= 1))
         throw std::invalid_argument("Flag renormalization needs 0 <= physical error rate < 1");
     if (ensemble.size == 0 || !(ensemble.spread_scale >= 0) || !std::isfinite(ensemble.spread_scale))
         throw std::invalid_argument("Invalid concatenated matching ensemble configuration");
+    if (!std::isfinite(gap_threshold_db) || gap_threshold_db<0)
+        throw std::invalid_argument("Concat gap-gating threshold must be finite and nonnegative");
+    if (gap_gating && boundary_gap)
+        throw std::invalid_argument("--concat-gap-gating cannot be combined with --concat-boundary-gap");
     if (dem.count_observables() != 1 || cache_capacity == 0)
         throw std::invalid_argument("Concatenated MWPM needs one observable and positive cache capacity");
     std::vector<size_t> local(num_detectors, SIZE_MAX);
@@ -73,9 +80,10 @@ CircuitDecoder::CircuitDecoder(const stim::DetectorErrorModel& dem, bool memory_
         if (c[5] == 1)
         {
             if (c[4] != 0 && c[4] != 1) throw std::invalid_argument("Invalid flag extraction basis metadata");
-            // Contributor: OpenAI Codex. X-check flags detect X hooks relevant
-            // to Z-memory checks, and conversely for Z-check flags in X memory.
-            if (c[4] == (memory_x ? 1 : 0))
+            // Contributor: OpenAI Codex. BP uses both extraction bases: same-basis
+            // flags can inform measurement faults as well as opposite-basis hooks.
+            // Preserve the hook-only filter for the legacy flag protocol.
+            if (belief_propagation || c[4] == (memory_x ? 1 : 0))
             {
                 keep_flag[global] = true;
                 flag_globals.push_back(global);
@@ -220,6 +228,43 @@ CircuitDecoder::CircuitDecoder(const stim::DetectorErrorModel& dem, bool memory_
                 throw std::invalid_argument("Circuit event does not fit Algorithm 1 for every color");
         }
     }
+    // Author: OpenAI Codex. Preserve original auxiliary signatures before
+    // marginalizing opposite-basis checks into matching equivalence classes.
+    // Pure auxiliary faults participate in BP without becoming matching edges.
+    if (belief_propagation)
+    {
+        for (size_t d=0;d<num_detectors;d++) if (local[d]==SIZE_MAX)
+            bp_aux_globals_.push_back(d);
+        std::map<std::vector<size_t>,size_t> class_ids;
+        for (size_t id=0;id<classes_.size();id++) class_ids[classes_[id].checks]=id;
+        using BPKey=std::tuple<size_t,uint64_t,std::vector<size_t>>;
+        std::map<BPKey,double> merged;
+        for (const auto& fault:faults)
+        {
+            if (fault.probability==0) continue;
+            std::vector<size_t> checks,auxiliary;
+            for (auto d:fault.detectors)
+            {
+                if (local[d]!=SIZE_MAX) checks.push_back(local[d]);
+                else auxiliary.push_back(d);
+            }
+            if (checks.empty() && auxiliary.empty()) continue;
+            std::sort(checks.begin(),checks.end());
+            std::sort(auxiliary.begin(),auxiliary.end());
+            const size_t id=checks.empty() ? SIZE_MAX:class_ids.at(checks);
+            auto& p=merged[{id,fault.observable,auxiliary}];
+            p+=fault.probability-2*p*fault.probability;
+        }
+        std::vector<FlagBPVariable> variables;
+        variables.reserve(merged.size());
+        for (const auto& [key,p]:merged)
+        {
+            const auto& [id,observable,auxiliary]=key;
+            variables.push_back({p,auxiliary,id,observable});
+        }
+        flag_bp_=std::make_unique<FlagBP>(num_detectors,std::move(variables));
+    }
+
 }
 
 // Contributor: OpenAI Codex. A flag can identify several possible fault supports.
@@ -248,6 +293,7 @@ CircuitDecoder::flag_neighborhoods(const std::vector<uint8_t>& syndrome) const
 CircuitDecoder::Context
 CircuitDecoder::make_context(const std::vector<uint8_t>& syndrome) const
 {
+    if (flag_bp_) return make_bp_context(syndrome);
     Model model{colors_, {}, renormalization_.enabled};
     Context out;
     std::vector<size_t> observed_flags;
@@ -324,12 +370,44 @@ CircuitDecoder::make_context(const std::vector<uint8_t>& syndrome) const
     return out;
 }
 
+// Author: OpenAI Codex. Approximate class marginals by summing posterior
+// mass within a logical frame and retaining its dominant frame. Competing
+// frames are not represented as parallel matching hyperedges.
+CircuitDecoder::Context
+CircuitDecoder::make_bp_context(const std::vector<uint8_t>& syndrome) const
+{
+    const auto posterior=flag_bp_->posterior(syndrome);
+    std::vector<std::map<uint64_t,double>> frames(classes_.size());
+    const auto& variables=flag_bp_->variables();
+    for (size_t i=0;i<variables.size();i++) if (variables[i].class_id!=SIZE_MAX)
+        frames[variables[i].class_id][variables[i].observable]+=posterior[i];
+    Context out;
+    out.input_model.colors=colors_;
+    out.input_model.events.reserve(classes_.size());
+    out.weights.reserve(classes_.size());
+    for (size_t i=0;i<classes_.size();i++)
+    {
+        const auto& group=classes_[i];
+        const auto best=std::max_element(frames[i].begin(),frames[i].end(),
+            [](const auto& a,const auto& b){return a.second<b.second;});
+        const double probability=std::clamp(best->second,1e-12,1-1e-9);
+        out.input_model.events.push_back({probability,group.checks,best->first,group.boundary_hint});
+        FlagWeight weight{};
+        weight.checks=group.checks;weight.observable=best->first;
+        weight.effective_probability=probability;
+        weight.representative_probability=probability;
+        out.weights.push_back(std::move(weight));
+    }
+    return out;
+}
+
 CircuitDecoder::Context&
 CircuitDecoder::context(const std::vector<uint8_t>& syndrome)
 {
     if (syndrome.size() != num_detectors) throw std::invalid_argument("Wrong full syndrome length");
     std::string key;
-    for (auto f : flag_globals) key.push_back(use_flags_ && syndrome[f]);
+    const auto& conditioning=flag_bp_ ? bp_aux_globals_:flag_globals;
+    for (auto d:conditioning) key.push_back(use_flags_ && syndrome[d]);
     if (!context_.decoder)
     {
         // Author: OpenAI Codex. Compile every possible event/projection once.
@@ -362,9 +440,20 @@ CircuitDecoder::memory_syndrome(const std::vector<uint8_t>& full) const
 uint64_t
 CircuitDecoder::decode(const std::vector<uint8_t>& full, std::string* debug_info)
 {
-    if (!debug_info) return context(full).decoder->decode(memory_syndrome(full)).observable;
+    if (gap_gating_ && ensemble_.size>1)
+    {
+        const auto gated=decode_gated(full,gap_threshold_db_,debug_info);
+        return gated.result.observable;
+    }
+    if (!debug_info)
+    {
+        const auto result=context(full).decoder->decode(memory_syndrome(full));
+        candidate_gap_=result.candidate_gap;
+        return result.observable;
+    }
     std::ostringstream out;
     out << std::setprecision(12) << "ConcatMWPM debug (natural-log weights W=-log(p))\n";
+    if (flag_bp_) out << "BP flag posteriors update both stages (including available opposite-basis checks); selection uses posterior event weights.\n";
     auto label = [&](size_t id)
     {
         const auto& c = coordinates.at(id);
@@ -377,12 +466,75 @@ CircuitDecoder::decode(const std::vector<uint8_t>& full, std::string* debug_info
     for (auto v : check_globals) trace.detector_labels.push_back(label(v));
     const auto inspected = inspect(full,&trace);
     const auto& best = inspected.correction;
+    candidate_gap_=best.candidate_gap;
     out << "Winner: !" << "RGB"[best.color] << " member=" << best.member << " boundary_mask=" << best.boundary_mask
         << " weight=" << best.weight << " observable=" << best.observable << " correction:";
     for (auto id : best.events) out << " E" << id;
     out << "\nSelection: minimum model correction weight; first candidate wins ties.\n";
     *debug_info = out.str();
     return best.observable;
+}
+
+GatedResult
+CircuitDecoder::decode_gated(const std::vector<uint8_t>& full,double threshold_db,std::string* debug_info)
+{
+    if (!gap_gating_ || ensemble_.size<=1)
+        throw std::logic_error("Concat gap gating is not active for this decoder");
+    if (boundary_gap_)
+        throw std::invalid_argument("--concat-gap-gating cannot be combined with --concat-boundary-gap");
+    auto& core=*context(full).decoder;
+    if (!debug_info)
+    {
+        auto result=core.decode_gated(memory_syndrome(full),threshold_db);
+        candidate_gap_=result.result.candidate_gap;
+        return result;
+    }
+    std::ostringstream out;
+    out<<std::setprecision(12)<<"ConcatMWPM gap-gated decode (W=-log(p))\n";
+    DebugTrace trace{out,{}};
+    for (auto id:check_globals)
+    {
+        const auto& c=coordinates.at(id);
+        std::ostringstream label;
+        label<<'D'<<id<<'['<<"RGB"[int(c[3])]<<",t="<<c[2]<<','<<(c[4]==0 ? 'X':'Z')<<']';
+        trace.detector_labels.push_back(label.str());
+    }
+    auto result=core.decode_gated(memory_syndrome(full),threshold_db,&trace);
+    const auto& best=result.result;
+    candidate_gap_=best.candidate_gap;
+    out<<"Winner: !"<<"RGB"[best.color]<<" member="<<best.member<<" weight="<<best.weight
+       <<" observable="<<best.observable<<" correction:";
+    for (auto event:best.events) out<<" E"<<event;
+    out<<"\nSelection: baseline winner's first-stage gap gates remaining ensemble members.\n";
+    *debug_info=out.str();
+    return result;
+}
+
+std::vector<FirstStageResult>
+CircuitDecoder::decode_first_stage(const std::vector<uint8_t>& full,size_t worker,size_t workers,bool paths)
+{
+    return context(full).decoder->decode_first_stage(memory_syndrome(full),worker,workers,paths);
+}
+
+std::vector<Result>
+CircuitDecoder::decode_second_stage(const std::vector<uint8_t>& full,
+    const std::vector<FirstStageResult>& first,size_t worker,size_t workers,std::string* debug)
+{
+    auto& decoder=*context(full).decoder;
+    if (!debug) return decoder.decode_second_stage(memory_syndrome(full),first,worker,workers);
+    std::ostringstream out;
+    out<<std::setprecision(12)<<"ConcatMWPM MPI worker="<<worker<<" (W=-log(p))\n";
+    DebugTrace trace{out,{}};
+    for (auto id:check_globals)
+    {
+        const auto& c=coordinates.at(id);
+        std::ostringstream label;
+        label<<'D'<<id<<'['<<"RGB"[int(c[3])]<<",t="<<c[2]<<','<<(c[4]==0 ? 'X':'Z')<<']';
+        trace.detector_labels.push_back(label.str());
+    }
+    auto candidates=decoder.decode_second_stage(memory_syndrome(full),first,worker,workers,true,&trace);
+    *debug=out.str();
+    return candidates;
 }
 
 CircuitResult
@@ -397,6 +549,11 @@ CircuitDecoder::inspect(const std::vector<uint8_t>& full, DebugTrace* debug)
     {
         if (candidate.weight < colors[candidate.color].weight-1e-9) colors[candidate.color] = candidate;
         if (candidate.weight < best.weight-1e-9) best = candidate;
+    }
+    for (const auto& candidate:candidates) if (candidate.observable!=best.observable)
+    {
+        const double gap=std::max(0.0,candidate.weight-best.weight);
+        if (!best.candidate_gap || gap<*best.candidate_gap) best.candidate_gap=gap;
     }
     // Author: OpenAI Codex. Incidence neighborhoods are diagnostic only; avoid
     // their construction in ordinary decoding's flag-update path.

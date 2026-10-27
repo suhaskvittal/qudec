@@ -96,6 +96,7 @@ set(QUDEC_FILES
     src/decoder/concat_mwpm.cpp
     src/decoder/concat_mwpm/matching.cpp
     src/decoder/concat_mwpm/circuit.cpp
+    src/decoder/concat_mwpm/flag_bp.cpp
     # Contributor: OpenAI Codex (fractional-weight correlated restriction).
     src/decoder/correlated_restriction.cpp
     src/decoder/correlated_restriction/matching.cpp
@@ -125,7 +126,7 @@ set_source_files_properties(src/decoder/restriction.cpp src/decoder/restriction/
     src/decoder/restriction/spacetime.cpp PROPERTIES COMPILE_OPTIONS "-fno-fast-math")
 set_source_files_properties(src/color_code_circuits.cpp src/circuit_noise_policy.cpp src/component_error_distribution.cpp PROPERTIES COMPILE_OPTIONS "-fno-fast-math")
 set_source_files_properties(src/decoder/concat_mwpm.cpp src/decoder/concat_mwpm/matching.cpp
-    src/decoder/concat_mwpm/circuit.cpp PROPERTIES COMPILE_OPTIONS "-fno-fast-math")
+    src/decoder/concat_mwpm/circuit.cpp src/decoder/concat_mwpm/flag_bp.cpp PROPERTIES COMPILE_OPTIONS "-fno-fast-math")
 set_source_files_properties(src/decoder/correlated_restriction.cpp
     src/decoder/correlated_restriction/matching.cpp src/decoder/correlated_restriction/circuit.cpp
     PROPERTIES COMPILE_OPTIONS "-fno-fast-math")
@@ -140,7 +141,7 @@ endif()
 ###################################################
 
 # Contributor: OpenAI Codex. Share circuit/decoder options across both CLIs.
-add_library(qudec_cli OBJECT main/qudec.cpp)
+add_library(qudec_cli OBJECT main/qudec.cpp main/tesseract_options.cpp)
 target_compile_options(qudec_cli PRIVATE ${COMPILE_OPTIONS} -fno-fast-math)
 target_link_libraries(qudec_cli PUBLIC qudeclib)
 add_executable(qudec main/qudec_main.cpp)
@@ -183,13 +184,41 @@ target_link_libraries(qudec_eval_gap PRIVATE qudeclib)
 include(CTest)
 if(BUILD_TESTING)
     # Contributor: OpenAI Codex (weighted union-find regression cases).
-    foreach(test IN ITEMS superdense_color_code_circuits concat_inplace concat_flag_renormalization concat_equivalence_classes decoder_debug error_chain circuit_noise_policy component_error_distribution color_code_circuits ideal_color_code_circuits restriction concat_mwpm concat_permissions concat_ensemble correlated_restriction cluster_gap uf seeded_matching libra libra_assignment libra_rare_event pymatching_reporting
+    foreach(test IN ITEMS concat_candidate_gap concat_bp concat_gap_gating concat_parallel superdense_color_code_circuits concat_inplace concat_flag_renormalization concat_equivalence_classes decoder_debug error_chain circuit_noise_policy component_error_distribution color_code_circuits ideal_color_code_circuits restriction concat_mwpm concat_permissions concat_ensemble correlated_restriction cluster_gap uf seeded_matching libra libra_assignment libra_rare_event pymatching_reporting
                           libra_splitting libra_local_splitting rare_event_sampler libra_integration)
         add_executable(${test}_test tests/${test}_test.cpp)
         target_compile_options(${test}_test PRIVATE ${COMPILE_OPTIONS} -fno-fast-math)
         target_link_libraries(${test}_test PRIVATE qudeclib)
         add_test(NAME ${test} COMMAND ${test}_test)
     endforeach()
+    # Author: OpenAI Codex. BP updates are shared by MC and chain CLI entry points.
+    add_test(NAME concat_bp_cli COMMAND qudec concat_mwpm 3 --code cc666 -p 0
+        --concat-bp --concat-ensemble 3 --mc-max-samples 8)
+    set_tests_properties(concat_bp_cli PROPERTIES PASS_REGULAR_EXPRESSION "Logical error rate: 0")
+    add_test(NAME concat_bp_chains_cli COMMAND qudec_chains concat_mwpm -d 3 -k 1 -n 2
+        --concat-bp --concat-ensemble 3 --debug --print-chains 1)
+    set_tests_properties(concat_bp_chains_cli PROPERTIES PASS_REGULAR_EXPRESSION "BP flag posteriors update both stages")
+    add_test(NAME concat_bp_conflict_cli COMMAND qudec concat_mwpm 3 --concat-bp
+        --concat-flag-renormalization --mc-max-samples 1)
+    set_tests_properties(concat_bp_conflict_cli PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME concat_bp_decoder_cli COMMAND qudec pymatching 3 --concat-bp --mc-max-samples 1)
+    set_tests_properties(concat_bp_decoder_cli PROPERTIES WILL_FAIL TRUE)
+    # Author: OpenAI Codex. Shared CLI settings reach the actual Tesseract config.
+    add_executable(tesseract_options_test tests/tesseract_options_test.cpp main/tesseract_options.cpp)
+    target_compile_options(tesseract_options_test PRIVATE ${COMPILE_OPTIONS} -fno-fast-math)
+    target_link_libraries(tesseract_options_test PRIVATE qudeclib)
+    add_test(NAME tesseract_options COMMAND tesseract_options_test)
+    add_test(NAME tesseract_config_cli COMMAND qudec tesseract 3 --code cc666 -cap
+        --tesseract-beam 20 --tesseract-beam-climbing --tesseract-pqlimit 1000000
+        --tesseract-num-det-orders 3 --tesseract-det-order-bfs --tesseract-det-order-index
+        --tesseract-det-order-coordinate --tesseract-det-order-seed 518278944 --mc-max-samples 16)
+    set_tests_properties(tesseract_config_cli PROPERTIES PASS_REGULAR_EXPRESSION "order_methods=bfs,index,coordinate order_seed=518278944")
+    add_test(NAME tesseract_config_chains_cli COMMAND qudec_chains tesseract -d 3 -cap -k 1 -n 2
+        --tesseract-beam 10 --tesseract-sparsify-errors --tesseract-sparsify-base-degree 1
+        --tesseract-sparsify-max-degree 3 --tesseract-sparsify-reactivate-limit 8)
+    set_tests_properties(tesseract_config_chains_cli PROPERTIES PASS_REGULAR_EXPRESSION "Chains tested: 2")
+    add_test(NAME tesseract_wrong_decoder_cli COMMAND qudec pymatching 3 --tesseract-beam 5 --mc-max-samples 1)
+    set_tests_properties(tesseract_wrong_decoder_cli PROPERTIES WILL_FAIL TRUE)
     # Author: OpenAI Codex. Superdense extraction selection and display.
     add_test(NAME superdense_666_cli COMMAND qudec tesseract 3 --code cc666 --superdense --mc-max-samples 1)
     add_test(NAME superdense_488_cli COMMAND qudec tesseract 3 --code cc488 --superdense
@@ -200,6 +229,19 @@ if(BUILD_TESTING)
     set_tests_properties(chains_superdense_cli PROPERTIES PASS_REGULAR_EXPRESSION "Color-code lattice")
     add_test(NAME superdense_488_invalid_cli COMMAND qudec tesseract 5 --code cc488 --superdense --mc-max-samples 1)
     set_tests_properties(superdense_488_invalid_cli PROPERTIES WILL_FAIL TRUE)
+    # Author: OpenAI Codex. Opt-in first-stage cluster-gap ensemble trigger.
+    add_test(NAME concat_gap_gating_cli COMMAND qudec concat_mwpm 3 -cap --concat-ensemble 5
+        --concat-gap-gating --mc-max-samples 16)
+    set_tests_properties(concat_gap_gating_cli PROPERTIES PASS_REGULAR_EXPRESSION "gap_threshold_db=20")
+    add_test(NAME concat_gap_gating_zero_cli COMMAND qudec concat_mwpm 3 -cap --concat-ensemble 5
+        --concat-gap-gating --concat-gap-gating-threshold-db 0 --mc-max-samples 16)
+    set_tests_properties(concat_gap_gating_zero_cli PROPERTIES PASS_REGULAR_EXPRESSION "gap_expansions=0")
+    add_test(NAME concat_gap_gating_debug_cli COMMAND qudec_chains concat_mwpm -d 3 -cap -k 1 -n 1
+        --concat-ensemble 5 --concat-gap-gating --debug --print-chains 1)
+    set_tests_properties(concat_gap_gating_debug_cli PROPERTIES PASS_REGULAR_EXPRESSION "Stage 2 matching")
+    add_test(NAME concat_gap_gating_invalid_cli COMMAND qudec concat_mwpm 3 -cap
+        --concat-gap-gating --concat-gap-gating-threshold-db -1 --mc-max-samples 1)
+    set_tests_properties(concat_gap_gating_invalid_cli PROPERTIES WILL_FAIL TRUE)
     # Author: OpenAI Codex. Shared chain CLI and decoder-option smoke checks.
     add_test(NAME chains_cap_cli COMMAND qudec_chains concat_mwpm -d 3 -k 1 --all
         --error-model code_capacity --concat-ensemble 2)
@@ -323,6 +365,11 @@ if(BUILD_TESTING)
     set_tests_properties(libra_cli_rare_event PROPERTIES
         PASS_REGULAR_EXPRESSION "Rare-event omitted-count contribution bound:")
     if(ENABLE_MPI)
+        # Author: OpenAI Codex. Multiple decoder groups and uneven batch sizes.
+        add_test(NAME concat_parallel_mpi COMMAND ${MPIEXEC_EXECUTABLE}
+            ${MPIEXEC_NUMPROC_FLAG} 6 ${MPIEXEC_PREFLAGS}
+            $<TARGET_FILE:concat_parallel_test> ${MPIEXEC_POSTFLAGS})
+        set_tests_properties(concat_parallel_mpi PROPERTIES TIMEOUT 120)
         add_test(NAME libra_mpi_statistics COMMAND ${MPIEXEC_EXECUTABLE}
             ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS}
             $<TARGET_FILE:libra_integration_test> ${MPIEXEC_POSTFLAGS})

@@ -23,6 +23,11 @@ each member then tests every feasible even/odd first-stage boundary sector.
 It is shared across MPI ranks. The CLI requires positive `K` and a nonnegative
 ensemble seed.
 
+With ordinary boundaries, `--concat-gap-gating` can run the perturbed members
+only when the baseline winner's first-stage cluster gap is below a threshold
+(default 20 dB). Set it with `--concat-gap-gating-threshold-db`.
+See [gap gating](concat_gap_gating.md) for behavior and current combination limits.
+
 ## Algorithm
 
 Only the first matching stage changes. The unperturbed graph is retained. For

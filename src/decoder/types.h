@@ -25,6 +25,13 @@ using SyndromeRef = stim::simd_bits_range_ref<64>;
 using ObsType = SyndromeType;
 using ObsRef = SyndromeRef;
 
+// Author: OpenAI Codex. Existing serial decoders need no MPI-specific method.
+template<class D> size_t decoding_core_count(const D& decoder)
+{
+    if constexpr (requires { decoder.decoding_core_count(); }) return decoder.decoding_core_count();
+    else return 1;
+}
+
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
@@ -92,6 +99,10 @@ struct Result
     // Nonnegative cluster soft output in decibels, distinct from the exact gap.
     double cluster_gap_db{0.0};
     bool has_cluster_gap{false};
+
+    // Author: OpenAI Codex. Sampled candidate-frame gap, distinct from cluster gap.
+    double candidate_gap_db{0.0};
+    bool has_candidate_gap{false};
 
     // Decoder specific parameters:
     MatchingData matching_data;

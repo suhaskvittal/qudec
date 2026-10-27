@@ -7,6 +7,7 @@
  *  Adapted from the project implementation by OpenAI Codex, 24 October 2026.
  * */
 #include "decoder/concat_mwpm/matching.h"
+#include "decoder/cluster_gap.h"
 #include <random>
 
 #include <algorithm>
@@ -103,6 +104,43 @@ struct Decoder::Graph
     std::vector<size_t> degrees, positions;
     std::vector<bool> has_boundary;
     bool uniform_;
+    // Contributor: OpenAI Codex. Cached first-stage confidence graph.
+    std::vector<int> gap_colors;
+    int gap_ignored_color{-1};
+    std::unique_ptr<dec::ClusterGapGraph> gap_graph;
+    bool gap_dirty{true}, gap_connected{false};
+    std::vector<std::pair<size_t,double>> last_sources;
+    double last_bridge_probability{-1};
+
+    void configure_gap(const std::vector<int>& colors,int ignored_color)
+    { gap_colors=colors; gap_ignored_color=ignored_color; }
+
+    double cluster_gap_db(double bridge_probability)
+    {
+        if (gap_ignored_color<0) throw std::logic_error("Gap unavailable on this graph");
+        if (bridge_probability!=last_bridge_probability) { gap_dirty=true; last_bridge_probability=bridge_probability; }
+        if (gap_dirty)
+        {
+            gap_graph=std::make_unique<dec::ClusterGapGraph>(gap_colors.size());
+            for (size_t id=0;id<probabilities.size();id++) if (probabilities[id]>0)
+            {
+                const auto [a,b]=endpoints[id];
+                const size_t u=a<0 ? b:a;
+                const size_t v=a<0 ? (gap_colors[u]==(gap_ignored_color+1)%3 ? gap_graph->boundary_one:gap_graph->boundary_zero):b;
+                const auto& node=matcher.flooder.graph.nodes[u];
+                auto* neighbor=a<0 ? nullptr:&matcher.flooder.graph.nodes[b];
+                const auto it=std::find(node.neighbors.begin(),node.neighbors.end(),neighbor);
+                if (it==node.neighbors.end()) throw std::logic_error("Missing active gap edge");
+                gap_graph->add_edge(u,v,node.neighbor_weights[it-node.neighbors.begin()]/matcher.flooder.graph.normalising_constant);
+            }
+            if (bridge_probability>0) gap_graph->add_edge(gap_graph->boundary_zero,gap_graph->boundary_one,error_weight(bridge_probability));
+            try {gap_graph->finish();gap_connected=true;}
+            catch (const std::invalid_argument&) {gap_connected=false;}
+            gap_dirty=false;
+        }
+        if (!gap_connected) return std::numeric_limits<double>::infinity();
+        return gap_graph->gap(gap_graph->ball_coverage(last_sources))*10/std::log(10.0);
+    }
 
     Graph(size_t num_detectors, const std::vector<Event>& events, bool uniform) :uniform_(uniform)
     {
@@ -165,6 +203,7 @@ struct Decoder::Graph
     void update(const std::vector<Event>& events)
     {
         if (events.size() != probabilities.size()) throw std::invalid_argument("In-place graph event count changed");
+        gap_dirty=true;
         bool topology_changed = false, integral = true;
         double maximum = 0;
         for (size_t id = 0; id < events.size(); id++)
@@ -312,10 +351,49 @@ struct Decoder::Graph
 
     std::vector<size_t> solve(const std::vector<uint64_t>& fired,
                              std::vector<std::vector<size_t>>* paths = nullptr,
-                             std::vector<std::vector<int64_t>>* node_paths = nullptr)
+                             std::vector<std::vector<int64_t>>* node_paths = nullptr, bool collect_gap = false)
     {
         std::vector<int64_t> edges;
-        pm::decode_detection_events_to_edges(matcher, fired, edges);
+        if (!collect_gap) pm::decode_detection_events_to_edges(matcher, fired, edges);
+        else
+        {
+            pm::decode_detection_events_to_match_edges(matcher,fired,[&](const pm::Mwpm& matching)
+            {
+                last_sources.clear();
+                for (auto v:fired)
+                {
+                    double radius=0;
+                    auto* region=matching.flooder.graph.nodes[v].region_that_arrived;
+                    while (region)
+                    {
+                        radius+=region->radius.get_distance_at_time(matching.flooder.queue.cur_time);
+                        region=region->blossom_parent;
+                    }
+                    if (radius<0) throw std::runtime_error("Negative matching radius");
+                    last_sources.emplace_back(v,radius/matching.flooder.graph.normalising_constant);
+                }
+            });
+            // Preserve PyMatching path-XOR extraction order exactly.
+            const auto* nodes=matcher.flooder.graph.nodes.data();
+            const auto* search=matcher.search_flooder.graph.nodes.data();
+            std::vector<bool> flipped(probabilities.size());
+            std::vector<std::pair<size_t,std::pair<int64_t,int64_t>>> traversed;
+            for (const auto& match:matcher.flooder.match_edges)
+                matcher.search_flooder.iter_edges_on_shortest_path_from_middle(match.loc_from-nodes,
+                    match.loc_to ? match.loc_to-nodes:SIZE_MAX,[&](const pm::SearchGraphEdge& e)
+                    {
+                        auto* u=e.detector_node;auto* v=u->neighbors[e.neighbor_index];
+                        const size_t id=adjacent_events[u-search][e.neighbor_index];
+                        flipped[id]=!flipped[id];
+                        traversed.push_back({id,{u-search,v ? v-search:-1}});
+                    });
+            for (size_t i=0;i<traversed.size();)
+            {
+                const auto& [id,pair]=traversed[i];
+                if (!flipped[id]) {traversed[i]=traversed.back();traversed.pop_back();}
+                else {flipped[id]=false;edges.push_back(pair.first);edges.push_back(pair.second);i++;}
+            }
+        }
         std::map<size_t,bool> traced_parity;
         if (paths || node_paths)
         {
@@ -487,6 +565,7 @@ Decoder::Decoder(Model input, bool uniform, bool boundary_gap, EnsembleConfig co
         else
             sub->restricted = std::make_shared<Graph>(n,first_events,uniform);
         sub->ensemble.push_back(boundary_gap_ ? sub->boundary_graph : sub->restricted);
+        if (!boundary_gap_) sub->restricted->configure_gap(model.colors,c);
         // Fixed seeded graphs. Alternating spreads make ensemble prefixes nested.
         // Perturb probabilities, not final correction scores; only stage one changes.
         std::mt19937_64 rng(config.seed+0x9e3779b97f4a7c15ULL*(c+1));
@@ -610,7 +689,74 @@ Decoder::decode(const std::vector<uint8_t>& syndrome)
     Result best{0, std::numeric_limits<double>::infinity(), -1, {}, {}, {}};
     for (auto& candidate : candidates)
         if (candidate.weight < best.weight - 1e-9) best = std::move(candidate);
+    for (const auto& candidate:candidates)
+        if (candidate.observable!=best.observable)
+        {
+            const double gap=std::max(0.0,candidate.weight-best.weight);
+            if (!best.candidate_gap || gap<*best.candidate_gap) best.candidate_gap=gap;
+        }
     return best;
+}
+
+GatedResult
+Decoder::decode_gated(const std::vector<uint8_t>& syndrome,double threshold_db,DebugTrace* debug)
+{
+    if (boundary_gap_) throw std::invalid_argument("Concat gap gating supports ordinary boundaries only");
+    if (!std::isfinite(threshold_db) || threshold_db<0)
+        throw std::invalid_argument("Concat gap-gating threshold must be finite and nonnegative");
+    if (syndrome.size()!=model.colors.size()) throw std::invalid_argument("Wrong syndrome size");
+    statistics={};
+    std::array<std::map<std::vector<uint64_t>,bool>,3> seen;
+    Result best{0,std::numeric_limits<double>::infinity(),-1,{},{},{}};
+    std::map<uint64_t,double> frame_weights;
+    auto record_frame=[&](const Result& candidate)
+    {
+        auto [it,inserted]=frame_weights.emplace(candidate.observable,candidate.weight);
+        if (!inserted) it->second=std::min(it->second,candidate.weight);
+    };
+    collect_gap_=true;
+    try
+    {
+        for (int c=0;c<3;c++)
+        {
+            auto candidate=decode_color(syndrome,c,3,0,debug!=nullptr,seen[c],debug);
+            if (candidate) record_frame(*candidate);
+            if (candidate && candidate->weight<best.weight-1e-9) best=std::move(*candidate);
+        }
+        collect_gap_=false;
+    }
+    catch (...) {collect_gap_=false;throw;}
+    if (best.color<0) throw std::runtime_error("No feasible baseline candidate");
+    double bridge_probability=0,flagged_bridge=0;
+    bool supported=false;
+    for (const auto& e:model.events)
+        if (e.boundary_hint==BoundaryHint::Spatial && e.detectors.size()==1 && model.colors[e.detectors[0]]==best.color)
+        {
+            bridge_probability=xor_probability(bridge_probability,e.probability);
+            if (model.flag_renormalization && e.flag_supported)
+            {flagged_bridge=xor_probability(flagged_bridge,e.probability);supported=true;}
+        }
+    if (supported) bridge_probability=flagged_bridge;
+    if (uniform_ && bridge_probability>0) bridge_probability=.1;
+    const double gap=subdecoders_[best.color]->restricted->cluster_gap_db(bridge_probability);
+    const int baseline_color=best.color;
+    const bool expand=gap+1e-9<threshold_db && config_.size>1;
+    if (debug)
+        debug->out<<"Baseline winner: !"<<"RGB"[baseline_color]<<" first_stage_gap_db="<<gap
+                  <<" threshold_db="<<threshold_db<<" expand_ensemble="<<expand<<'\n';
+    if (expand)
+        for (size_t member=1;member<config_.size;member++) for (int c=0;c<3;c++)
+        {
+            auto candidate=decode_color(syndrome,c,3,member,debug!=nullptr,seen[c],debug);
+            if (candidate) record_frame(*candidate);
+            if (candidate && candidate->weight<best.weight-1e-9) best=std::move(*candidate);
+        }
+    for (const auto& [frame,weight]:frame_weights) if (frame!=best.observable)
+    {
+        const double margin=std::max(0.0,weight-best.weight);
+        if (!best.candidate_gap || margin<*best.candidate_gap) best.candidate_gap=margin;
+    }
+    return {std::move(best),gap,expand,baseline_color};
 }
 
 std::vector<Result>
@@ -644,9 +790,63 @@ Decoder::decode_colors(const std::vector<uint8_t>& syndrome, bool trace)
     return out;
 }
 
+std::vector<FirstStageResult>
+Decoder::decode_first_stage(const std::vector<uint8_t>& syndrome,size_t worker,size_t workers,bool paths)
+{
+    if (syndrome.size()!=model.colors.size() || !workers || worker>=workers)
+        throw std::invalid_argument("Invalid first-stage parallel partition");
+    statistics={};
+    std::vector<FirstStageResult> out;
+    size_t task=0;
+    for (size_t member=0;member<config_.size;member++) for (int c=0;c<3;c++)
+        for (int mask=boundary_gap_ ? 0:3;mask<4;mask++,task++)
+        {
+            if (task%workers!=worker) continue;
+            std::vector<uint64_t> fired;
+            for (size_t v=0;v<syndrome.size();v++) if (syndrome[v] && model.colors[v]!=c) fired.push_back(v);
+            if (boundary_gap_) for (int bit=0;bit<2;bit++)
+                if (mask&(1<<bit)) fired.push_back(model.colors.size()+(c+1+bit)%3);
+            auto& graph=*subdecoders_[c]->ensemble[member];
+            if (!graph.can_solve(fired)) {statistics.infeasible++;continue;}
+            FirstStageResult result{c,mask,member,{},{},{}};
+            statistics.first_calls++;
+            result.selected=graph.solve(fired,paths ? &result.paths:nullptr,paths ? &result.nodes:nullptr);
+            out.push_back(std::move(result));
+        }
+    return out;
+}
+
+std::vector<Result>
+Decoder::decode_second_stage(const std::vector<uint8_t>& syndrome,
+    const std::vector<FirstStageResult>& first,size_t worker,size_t workers,bool trace,DebugTrace* debug)
+{
+    if (syndrome.size()!=model.colors.size() || !workers || worker>=workers)
+        throw std::invalid_argument("Invalid second-stage parallel partition");
+    std::array<std::map<std::vector<uint64_t>,bool>,3> global_seen,local_seen;
+    std::vector<Result> out;
+    size_t task=0;
+    for (const auto& prepared:first)
+    {
+        const int c=prepared.color;
+        std::vector<uint64_t> canonical;
+        for (size_t v=0;v<syndrome.size();v++) if (syndrome[v] && model.colors[v]==c) canonical.push_back(v);
+        const auto& sub=*subdecoders_[c];
+        for (auto id:prepared.selected)
+            if (std::any_of(sub.first_events[id].detectors.begin(),sub.first_events[id].detectors.end(),
+                [&](auto v){return v<model.colors.size();})) canonical.push_back(sub.virtual_ids[id]);
+        std::sort(canonical.begin(),canonical.end());
+        if (config_.size>1 && !global_seen[c].emplace(canonical,true).second)
+        {if (!worker) statistics.duplicates++;continue;}
+        if (task++%workers!=worker) continue;
+        auto result=decode_color(syndrome,c,prepared.boundary_mask,prepared.member,trace,local_seen[c],debug,&prepared);
+        if (result) out.push_back(std::move(*result));
+    }
+    return out;
+}
+
 std::optional<Result>
 Decoder::decode_color(const std::vector<uint8_t>& syndrome, int c, int mask, size_t member, bool trace,
-                      std::map<std::vector<uint64_t>,bool>& seen, DebugTrace* debug)
+                      std::map<std::vector<uint64_t>,bool>& seen, DebugTrace* debug,const FirstStageResult* first)
 {
     auto& sub = *subdecoders_[c];
     std::vector<uint64_t> first_fired, second_fired;
@@ -706,10 +906,11 @@ Decoder::decode_color(const std::vector<uint8_t>& syndrome, int c, int mask, siz
         if (debug) debug->out << "  Stage 1 infeasible; no matching call\n";
         statistics.infeasible++; return std::nullopt;
     }
-    statistics.first_calls++;
+    if (!first) statistics.first_calls++;
     std::vector<std::vector<size_t>> first_paths;
     std::vector<std::vector<int64_t>> first_nodes;
-    const auto first_selected = graph->solve(first_fired,debug ? &first_paths : nullptr,debug ? &first_nodes : nullptr);
+    const auto first_selected = first ? first->selected : graph->solve(first_fired,debug ? &first_paths : nullptr,debug ? &first_nodes : nullptr,collect_gap_ && member==0);
+    if (first && debug) {first_paths=first->paths;first_nodes=first->nodes;}
     print_matches("Stage 1",first_nodes,first_paths,*graph,true);
     for (auto id : first_selected)
     {

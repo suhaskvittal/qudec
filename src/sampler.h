@@ -8,6 +8,7 @@
 #define SAMPLER_h
 
 #include "globals.h"
+#include "decoder/types.h"
 
 #include <stim.h>
 
