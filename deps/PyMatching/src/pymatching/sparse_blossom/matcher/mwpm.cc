@@ -477,3 +477,112 @@ void Mwpm::reset() {
     node_arena.~Arena();
     flooder.region_arena.~Arena();
 }
+
+// Contributor: OpenAI Codex. Weight changes touch only registered undirected edges,
+// including both matching and path-search copies; no graph-wide scan or rebuild.
+EdgeWeightModifications::EdgeWeightModifications(Mwpm& mwpm) : mwpm_(mwpm) {
+}
+
+EdgeWeightModifications::~EdgeWeightModifications() {
+    clear_edge_weight_modifications();
+}
+
+size_t EdgeWeightModifications::edge_id(int64_t u, int64_t v) {
+    if (u == -1) std::swap(u, v);
+    if (u < 0 || v < -1 || size_t(u) >= mwpm_.flooder.graph.nodes.size() ||
+        (v >= 0 && size_t(v) >= mwpm_.flooder.graph.nodes.size()))
+        throw std::invalid_argument("Invalid weight-override edge endpoints");
+    if (v >= 0 && u > v) std::swap(u, v);
+    const auto key = std::pair{u, v};
+    if (auto it = ids_.find(key); it != ids_.end()) return it->second;
+    if (mwpm_.flooder.negative_weight_sum != 0)
+        throw std::invalid_argument("Temporary weight overrides require a nonnegative-weight graph");
+    if (mwpm_.search_flooder.graph.nodes.size() != mwpm_.flooder.graph.nodes.size())
+        throw std::invalid_argument("Temporary weight overrides require the path-search graph");
+    auto& matching = mwpm_.flooder.graph.nodes;
+    auto& search = mwpm_.search_flooder.graph.nodes;
+    auto& a = matching[u];
+    auto& b = search[u];
+    const size_t i = a.index_of_neighbor(v == -1 ? nullptr : &matching[v]);
+    const size_t j = b.index_of_neighbor(v == -1 ? nullptr : &search[v]);
+    Edge edge{{&a.neighbor_weights.at(i), nullptr, &b.neighbor_weights.at(j), nullptr}};
+    if (v >= 0) {
+        edge.pointers[1] = &matching[v].neighbor_weights.at(matching[v].index_of_neighbor(&a));
+        edge.pointers[3] = &search[v].neighbor_weights.at(search[v].index_of_neighbor(&b));
+    }
+    for (auto ptr : edge.pointers) if (ptr && *ptr != *edge.pointers[0])
+        throw std::invalid_argument("Matching/search graph weights disagree before override");
+    const size_t id = edges_.size();
+    edges_.push_back(edge);
+    ids_.emplace(key, id);
+    return id;
+}
+
+weight_int EdgeWeightModifications::edge_weight(size_t id) const {
+    return *edges_.at(id).pointers[0];
+}
+
+void EdgeWeightModifications::modify_edge_weight(size_t id, int64_t weight) {
+    // Sparse blossom schedules integer collision times from even edge weights.
+    // Limit to the same signed 32-bit input range used during graph conversion.
+    if (weight < 0 || weight > INT32_MAX - 1 || (weight & 1))
+        throw std::invalid_argument("Override must be an even nonnegative signed-32-bit weight");
+    if (!mwpm_.flooder.queue.empty() ||
+        mwpm_.node_arena.allocated.size() != mwpm_.node_arena.available.size())
+        throw std::invalid_argument("Edge weights may only change between matching solves");
+    auto& edge = edges_.at(id);
+    if (!edge.modified) {
+        touched_.push_back(id);
+        for (size_t k = 0; k < edge.pointers.size(); k++)
+            if (edge.pointers[k]) edge.previous[k] = *edge.pointers[k];
+        edge.modified = true;
+    }
+    for (auto ptr : edge.pointers) if (ptr) *ptr = static_cast<weight_int>(weight);
+}
+
+void EdgeWeightModifications::modify_edge_weight(int64_t u, int64_t v, int64_t weight) {
+    modify_edge_weight(edge_id(u, v), weight);
+}
+
+void EdgeWeightModifications::clear_edge_weight_modifications() noexcept {
+    if (legacy_negative_correlations_) {
+        mwpm_.flooder.graph.undo_reweights();
+        mwpm_.search_flooder.graph.undo_reweights();
+        legacy_negative_correlations_ = false;
+    }
+    for (auto id : touched_) {
+        auto& edge = edges_[id];
+        for (size_t k = 0; k < edge.pointers.size(); k++)
+            if (edge.pointers[k]) *edge.pointers[k] = edge.previous[k];
+        edge.modified = false;
+    }
+    touched_.clear();
+}
+
+void EdgeWeightModifications::apply_correlations(const std::vector<int64_t>& edges) {
+    auto& graph = mwpm_.flooder.graph;
+    if (graph.loaded_from_dem_without_correlations)
+        throw std::invalid_argument("Load the DEM with enable_correlations=true before correlated decoding");
+    if (edges.size() & 1) throw std::invalid_argument("Expected pairs of matched edge endpoints");
+    // Preserve upstream's signed-graph preprocessing semantics. The general
+    // override API intentionally rejects negative-weight graphs for now.
+    if (mwpm_.flooder.negative_weight_sum != 0) {
+        legacy_negative_correlations_ = true;
+        graph.reweight_for_edges(edges);
+        mwpm_.search_flooder.graph.reweight_for_edges(edges);
+        return;
+    }
+    for (size_t k = 0; k < edges.size(); k += 2) {
+        const auto u = edges[k], v = edges[k + 1];
+        auto& node = graph.nodes.at(u);
+        const size_t slot = node.index_of_neighbor(v == -1 ? nullptr : &graph.nodes.at(v));
+        const auto& rules = graph.edges_to_implied_weights_unconverted.at(u).at(slot);
+        const auto& converted = node.neighbor_implied_weights.at(slot);
+        if (rules.size() != converted.size()) throw std::logic_error("Inconsistent implied-weight rules");
+        for (size_t r = 0; r < rules.size(); r++) {
+            const auto id = edge_id(rules[r].node1, rules[r].node2 == SIZE_MAX ? -1 : int64_t(rules[r].node2));
+            const auto weight = converted[r].implied_weight;
+            if (weight < edge_weight(id)) modify_edge_weight(id, weight);
+        }
+    }
+}

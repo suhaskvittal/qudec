@@ -15,6 +15,9 @@
 #ifndef PYMATCHING2_MWPM_H
 #define PYMATCHING2_MWPM_H
 
+#include <array>
+#include <map>
+
 #include "pymatching/sparse_blossom/flooder/graph_flooder.h"
 #include "pymatching/sparse_blossom/matcher/alternating_tree.h"
 #include "pymatching/sparse_blossom/search/search_flooder.h"
@@ -84,6 +87,40 @@ struct Mwpm {
     void create_detection_event(DetectorNode* node);
     void reset();
 };
+// Contributor: OpenAI Codex. Sparse, scoped absolute undirected weight overrides.
+// Handles remain valid only while the owning Mwpm and graph topology stay fixed.
+// Units are the graph's even, nonnegative integer weights, not probabilities.
+// Separate nested scopes restore the enclosing BP/ensemble weights on clear.
+class EdgeWeightModifications {
+   public:
+    explicit EdgeWeightModifications(Mwpm& mwpm);
+    ~EdgeWeightModifications();
+    EdgeWeightModifications(const EdgeWeightModifications&) = delete;
+    EdgeWeightModifications& operator=(const EdgeWeightModifications&) = delete;
+
+    // v == -1 denotes the boundary. Reversed endpoints return the same ID.
+    size_t edge_id(int64_t u, int64_t v);
+    weight_int edge_weight(size_t id) const;
+    void modify_edge_weight(size_t id, int64_t weight);
+    void modify_edge_weight(int64_t u, int64_t v, int64_t weight);
+    void clear_edge_weight_modifications() noexcept;
+    // Preserve existing correlated matching's lower-only implied-weight rule.
+    void apply_correlations(const std::vector<int64_t>& edges);
+    size_t modified_edge_count() const { return touched_.size(); }
+
+   private:
+    struct Edge {
+        std::array<weight_int*, 4> pointers;
+        std::array<weight_int, 4> previous{};
+        bool modified{false};
+    };
+    Mwpm& mwpm_;
+    std::map<std::pair<int64_t, int64_t>, size_t> ids_;
+    std::vector<Edge> edges_;
+    std::vector<size_t> touched_;
+    bool legacy_negative_correlations_{false};
+};
+
 }  // namespace pm
 
 #endif  // PYMATCHING2_MWPM_H

@@ -167,6 +167,8 @@ void shatter_blossoms_for_all_detection_events_and_extract_match_edges(
 
 pm::MatchingResult pm::decode_detection_events_for_up_to_64_observables(
     pm::Mwpm& mwpm, const std::vector<uint64_t>& detection_events, bool edge_correlations) {
+    // Contributor: OpenAI Codex. Shared sparse override API for the second pass.
+    pm::EdgeWeightModifications modifications(mwpm);
     if (edge_correlations) {
         // Edge correlations might also be called 2-pass matching. This is the slowest and
         // highest-accuracy reweighting rule for correlated decoding in which we first decode to edges,
@@ -174,8 +176,7 @@ pm::MatchingResult pm::decode_detection_events_for_up_to_64_observables(
         // at that edge.
         std::vector<int64_t> edges;
         decode_detection_events_to_edges(mwpm, detection_events, edges);
-        mwpm.flooder.graph.reweight_for_edges(edges);
-        mwpm.search_flooder.graph.reweight_for_edges(edges);
+        modifications.apply_correlations(edges);
     }
 
     process_timeline_until_completion(mwpm, detection_events);
@@ -185,11 +186,6 @@ pm::MatchingResult pm::decode_detection_events_for_up_to_64_observables(
             mwpm, mwpm.flooder.negative_weight_detection_events);
     res.obs_mask ^= mwpm.flooder.negative_weight_obs_mask;
     res.weight += mwpm.flooder.negative_weight_sum;
-
-    if (edge_correlations) {
-        mwpm.flooder.graph.undo_reweights();
-        mwpm.search_flooder.graph.undo_reweights();
-    }
 
     return res;
 }
@@ -201,6 +197,8 @@ void pm::decode_detection_events(
     pm::total_weight_int& weight,
     bool edge_correlations,
     const std::function<void(const pm::Mwpm&)>& before_extraction) {
+    // Contributor: OpenAI Codex. Shared sparse override API for the second pass.
+    pm::EdgeWeightModifications modifications(mwpm);
     if (edge_correlations) {
         // Edge correlations might also be called 2-pass matching. This is the slowest and
         // highest-accuracy reweighting rule for correlated decoding in which we first decode to edges,
@@ -208,8 +206,7 @@ void pm::decode_detection_events(
         // at that edge.
         std::vector<int64_t> edges;
         decode_detection_events_to_edges(mwpm, detection_events, edges);
-        mwpm.flooder.graph.reweight_for_edges(edges);
-        mwpm.search_flooder.graph.reweight_for_edges(edges);
+        modifications.apply_correlations(edges);
     }
 
     size_t num_observables = mwpm.flooder.graph.num_observables;
@@ -246,11 +243,6 @@ void pm::decode_detection_events(
         fill_bit_vector_from_obs_mask(bit_packed_res.obs_mask, obs_begin_ptr, num_observables);
         // Add negative weight sum to blossom solution weight
         weight = bit_packed_res.weight + mwpm.flooder.negative_weight_sum;
-    }
-
-    if (edge_correlations) {
-        mwpm.flooder.graph.undo_reweights();
-        mwpm.search_flooder.graph.undo_reweights();
     }
 }
 
@@ -341,13 +333,11 @@ void pm::decode_detection_events_to_edges(
 
 void pm::decode_detection_events_to_edges_with_edge_correlations(
     pm::Mwpm& mwpm, const std::vector<uint64_t>& detection_events, std::vector<int64_t>& edges) {
+    // Contributor: OpenAI Codex. Match with the same generic scoped override API.
+    pm::EdgeWeightModifications modifications(mwpm);
     decode_detection_events_to_edges(mwpm, detection_events, edges);
-    mwpm.flooder.graph.reweight_for_edges(edges);
-    mwpm.search_flooder.graph.reweight_for_edges(edges);
+    modifications.apply_correlations(edges);
     edges.clear();
 
     decode_detection_events_to_edges(mwpm, detection_events, edges);
-
-    mwpm.flooder.graph.undo_reweights();
-    mwpm.search_flooder.graph.undo_reweights();
 }
