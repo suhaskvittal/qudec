@@ -104,6 +104,28 @@ struct Decoder::Graph
     std::vector<size_t> degrees, positions;
     std::vector<bool> has_boundary;
     bool uniform_;
+    // Author: OpenAI Codex. Persistent handles cover both matching/search graphs.
+    // Destroy scopes before changing adjacency; numeric updates preserve scale/ties.
+    bool edge_weight_updates_,fixed_endpoints_;
+    std::unique_ptr<pm::EdgeWeightModifications> weight_modifications;
+    std::vector<size_t> weight_handles,changed_weights;
+    double previous_half_scale{-1};
+
+    void register_weight_handles()
+    {
+        weight_modifications=std::make_unique<pm::EdgeWeightModifications>(matcher);
+        weight_handles.assign(probabilities.size(),SIZE_MAX);
+        changed_weights.reserve(probabilities.size());
+        previous_half_scale=matcher.flooder.graph.normalising_constant/2;
+        for (size_t id=0;id<probabilities.size();id++) if (probabilities[id]>0)
+        {
+            const auto [a,b]=endpoints[id];
+            const auto handle=weight_modifications->edge_id(a,b);
+            weight_handles[id]=handle;
+            integer_weights[id]=weight_modifications->edge_weight(handle);
+        }
+    }
+
     // Contributor: OpenAI Codex. Cached first-stage confidence graph.
     std::vector<int> gap_colors;
     int gap_ignored_color{-1};
@@ -142,7 +164,9 @@ struct Decoder::Graph
         return gap_graph->gap(gap_graph->ball_coverage(last_sources))*10/std::log(10.0);
     }
 
-    Graph(size_t num_detectors, const std::vector<Event>& events, bool uniform) :uniform_(uniform)
+    Graph(size_t num_detectors, const std::vector<Event>& events, bool uniform,
+          bool edge_weight_updates=false,bool fixed_endpoints=false)
+        :uniform_(uniform),edge_weight_updates_(edge_weight_updates),fixed_endpoints_(fixed_endpoints)
     {
         stim::DetectorErrorModel dem;
         for (size_t i = 0; i < events.size(); i++)
@@ -196,6 +220,7 @@ struct Decoder::Graph
         component_boundary.resize(num_detectors, false);
         for (const auto& [edge,id] : records)
             if (edge.first < 0) component_boundary[component[edge.second]] = true;
+        if (edge_weight_updates_) register_weight_handles();
     }
 
     // Author: OpenAI Codex. No DEM conversion, matcher construction, or sentinel
@@ -204,6 +229,7 @@ struct Decoder::Graph
     {
         if (events.size() != probabilities.size()) throw std::invalid_argument("In-place graph event count changed");
         gap_dirty=true;
+        if (edge_weight_updates_ && update_weights(events)) return;
         bool topology_changed = false, integral = true;
         double maximum = 0;
         for (size_t id = 0; id < events.size(); id++)
@@ -300,6 +326,68 @@ struct Decoder::Graph
                 matching.nodes[v].neighbor_weights[slot] = w;
                 search.nodes[v].neighbor_weights[slot] = w;
             }
+        // Volatile topologies retain the legacy backend; handles are not
+        // repeatedly re-registered after every changing hook support.
+    }
+
+    // Author: OpenAI Codex. Only changed undirected edges are written. Keep the
+    // legacy per-graph quantization exactly, including global rescaling when needed.
+    // Return false before modifying graph state if active adjacency must change.
+    bool update_weights(const std::vector<Event>& events)
+    {
+        for (size_t id=0;id<events.size();id++)
+        {
+            const double p=events[id].probability==0 ? 0:(uniform_ ? .1:events[id].probability);
+            if ((p>0)!=(probabilities[id]>0) ||
+                (p>0 && !fixed_endpoints_ && edge_key(events[id].detectors)!=endpoints[id]))
+            {
+                // Handles contain raw adjacency pointers. Restore/destroy them
+                // before the legacy active-topology fallback can resize vectors.
+                weight_modifications.reset();previous_half_scale=-1;
+                // Volatile hook supports otherwise spend more on re-registering
+                // handles than on numerical updates. Keep the legacy backend for
+                // this graph after its first active-topology change.
+                edge_weight_updates_=false;
+                return false;
+            }
+        }
+        bool integral=true;
+        double maximum=0;
+        changed_weights.clear();
+        for (size_t id=0;id<events.size();id++)
+        {
+            const double p=events[id].probability==0 ? 0:(uniform_ ? .1:events[id].probability);
+            if (p>0)
+            {
+                if (!(p<=1)) throw std::invalid_argument("Need 0 < event probability <= 1");
+                if (p!=probabilities[id])
+                {
+                    const double q=p/(1+p);
+                    encoded_weights[id]=std::log((1-q)/q);
+                    changed_weights.push_back(id);
+                }
+                maximum=std::max(maximum,encoded_weights[id]);
+                integral &= std::round(encoded_weights[id])==encoded_weights[id];
+            }
+            probabilities[id]=p;
+        }
+        const double half_scale=integral ? 1:double((1<<24)-1)/maximum;
+        matcher.flooder.graph.normalising_constant=2*half_scale;
+        const auto write_weight=[&](size_t id)
+        {
+            const auto weight=static_cast<pm::weight_int>(2*std::round(encoded_weights[id]*half_scale));
+            if (weight!=integer_weights[id])
+            {
+                weight_modifications->modify_edge_weight(weight_handles[id],weight);
+                integer_weights[id]=weight;
+            }
+        };
+        if (half_scale==previous_half_scale)
+            for (auto id:changed_weights) write_weight(id);
+        else
+            for (size_t id=0;id<events.size();id++) if (probabilities[id]>0) write_weight(id);
+        previous_half_scale=half_scale;
+        return true;
     }
 
     size_t event_id(int64_t from,int64_t to) const
@@ -462,6 +550,8 @@ struct Decoder::SubDecoder
     std::vector<Event> perturbed_events;
     size_t perturbed_active_count{SIZE_MAX};
     std::vector<double> ensemble_multipliers;
+    std::vector<bool> ensemble_ready;
+    size_t active_count{0};
 };
 
 size_t
@@ -480,19 +570,22 @@ Decoder::ambiguous_boundary_events() const
 }
 
 size_t
-Decoder::audit_weights() const
+Decoder::audit_weights()
 {
     size_t count = 0;
-    for (const auto& sub : subdecoders_)
+    // Explicit diagnostics materialize deferred graphs before checking current weights.
+    for (int c=0;c<3;c++)
     {
+        for (size_t member=1;member<config_.size;member++) prepare_ensemble(c,member);
+        const auto& sub=subdecoders_[c];
         for (const auto& graph : sub->ensemble) count += graph->audit_weights();
         count += sub->monochromatic->audit_weights();
     }
     return count;
 }
 
-Decoder::Decoder(Model input, bool uniform, bool boundary_gap, EnsembleConfig config)
-    :model(compress(std::move(input),boundary_gap)), boundary_gap_(boundary_gap), config_(config), uniform_(uniform)
+Decoder::Decoder(Model input, bool uniform, bool boundary_gap, EnsembleConfig config,bool edge_weight_updates)
+    :model(compress(std::move(input),boundary_gap)), boundary_gap_(boundary_gap), config_(config), uniform_(uniform),edge_weight_updates_(edge_weight_updates)
 {
     if (config.size == 0 || !(config.spread_scale >= 0) || !std::isfinite(config.spread_scale))
         throw std::invalid_argument("Invalid ensemble configuration");
@@ -561,9 +654,9 @@ Decoder::Decoder(Model input, bool uniform, bool boundary_gap, EnsembleConfig co
                 sub->first_sources[virtual_id.at(projected_support)-n].push_back(id);
         }
         if (boundary_gap_)
-            sub->boundary_graph = std::make_shared<Graph>(n+3,first_events,uniform);
+            sub->boundary_graph = std::make_shared<Graph>(n+3,first_events,uniform,edge_weight_updates_,true);
         else
-            sub->restricted = std::make_shared<Graph>(n,first_events,uniform);
+            sub->restricted = std::make_shared<Graph>(n,first_events,uniform,edge_weight_updates_,true);
         sub->ensemble.push_back(boundary_gap_ ? sub->boundary_graph : sub->restricted);
         if (!boundary_gap_) sub->restricted->configure_gap(model.colors,c);
         // Fixed seeded graphs. Alternating spreads make ensemble prefixes nested.
@@ -577,8 +670,9 @@ Decoder::Decoder(Model input, bool uniform, bool boundary_gap, EnsembleConfig co
             for (auto& event : perturbed)
                 event.probability = std::clamp((uniform ? .1 : event.probability)*std::exp(sigma*normal(rng)),
                                                1e-12, .499999999);
-            sub->ensemble.push_back(std::make_shared<Graph>(boundary_gap_ ? n+3 : n,perturbed,false));
+            sub->ensemble.push_back(std::make_shared<Graph>(boundary_gap_ ? n+3 : n,perturbed,false,edge_weight_updates_,true));
         }
+        sub->ensemble_ready.assign(config.size,true);
         // Algorithm 1, lines 19--28: keep the c-colored detectors and
         // replace the entire other-color support by its virtual detector.
         // Pure c-colored measurement faults keep both temporal endpoints.
@@ -596,7 +690,7 @@ Decoder::Decoder(Model input, bool uniform, bool boundary_gap, EnsembleConfig co
             sub->second_events.push_back({e.probability, own, e.observable});
             sub->original_events.push_back(id);
         }
-        sub->monochromatic = std::make_unique<Graph>(n+first_events.size(), sub->second_events, false);
+        sub->monochromatic = std::make_unique<Graph>(n+first_events.size(), sub->second_events, false,edge_weight_updates_);
         subdecoders_[c] = std::move(sub);
     }
 }
@@ -618,6 +712,28 @@ Decoder::update(Model input)
         active_events_[found->second] = id;
     }
     model = std::move(input);
+    refresh_weights();
+}
+
+void
+Decoder::update_dense(const std::vector<double>& probabilities,const std::vector<uint64_t>& frames)
+{
+    if (probabilities.size()!=model.events.size() || frames.size()!=model.events.size())
+        throw std::invalid_argument("Dense update changes event count");
+    for (size_t i=0;i<probabilities.size();i++)
+    {
+        if (!(probabilities[i]>0)) throw std::invalid_argument("Dense updates require positive probabilities");
+        error_weight(probabilities[i]);
+        model.events[i].probability=probabilities[i];
+        model.events[i].observable=frames[i];
+        if (active_events_[i]!=i) throw std::logic_error("Dense update requires ordered union slots");
+    }
+    refresh_weights();
+}
+
+void
+Decoder::refresh_weights()
+{
     const size_t n = model.colors.size();
     for (int c = 0; c < 3; c++)
     {
@@ -643,31 +759,9 @@ Decoder::update(Model input)
             sub.virtual_ids[id] = present ? n+active_count++ : SIZE_MAX;
         }
         sub.ensemble[0]->update(sub.first_events);
-        if (sub.perturbed_active_count != active_count && config_.size > 1)
-        {
-            sub.ensemble_multipliers.clear();
-            sub.ensemble_multipliers.reserve((config_.size-1)*active_count);
-            std::mt19937_64 rng(config_.seed+0x9e3779b97f4a7c15ULL*(c+1));
-            for (size_t member = 1; member < config_.size; member++)
-            {
-                const double sigma = std::log(member%2 ? 2.0 : 4.0)*config_.spread_scale;
-                std::normal_distribution<double> normal(0,1);
-                for (size_t id = 0; id < active_count; id++)
-                    sub.ensemble_multipliers.push_back(std::exp(sigma*normal(rng)));
-            }
-            sub.perturbed_active_count = active_count;
-        }
-        size_t multiplier = 0;
-        for (size_t member = 1; member < config_.size; member++)
-        {
-            for (size_t id = 0; id < sub.first_events.size(); id++)
-            {
-                const double p = sub.first_events[id].probability;
-                sub.perturbed_events[id].probability = sub.virtual_ids[id] != SIZE_MAX ?
-                    std::clamp((uniform_ ? .1 : p)*sub.ensemble_multipliers[multiplier++],1e-12,.499999999) : 0;
-            }
-            sub.ensemble[member]->update(sub.perturbed_events);
-        }
+        sub.active_count=active_count;
+        std::fill(sub.ensemble_ready.begin(),sub.ensemble_ready.end(),false);
+        sub.ensemble_ready[0]=true;
         for (size_t slot = 0; slot < active_events_.size(); slot++)
         {
             auto& e = sub.second_events[slot];
@@ -680,6 +774,38 @@ Decoder::update(Model input)
         }
         sub.monochromatic->update(sub.second_events);
     }
+}
+
+// Author: OpenAI Codex. No perturbed graph is updated until it is actually used.
+void
+Decoder::prepare_ensemble(int color,size_t member)
+{
+    auto& sub=*subdecoders_[color];
+    if (sub.ensemble_ready.at(member)) return;
+    if (sub.perturbed_active_count!=sub.active_count)
+    {
+        sub.ensemble_multipliers.clear();
+        sub.ensemble_multipliers.reserve((config_.size-1)*sub.active_count);
+        std::mt19937_64 rng(config_.seed+0x9e3779b97f4a7c15ULL*(color+1));
+        for (size_t m=1;m<config_.size;m++)
+        {
+            const double sigma=std::log(m%2 ? 2.0:4.0)*config_.spread_scale;
+            std::normal_distribution<double> normal(0,1);
+            for (size_t id=0;id<sub.active_count;id++)
+                sub.ensemble_multipliers.push_back(std::exp(sigma*normal(rng)));
+        }
+        sub.perturbed_active_count=sub.active_count;
+    }
+    size_t multiplier=(member-1)*sub.active_count;
+    for (size_t id=0;id<sub.first_events.size();id++)
+    {
+        const double p=sub.first_events[id].probability;
+        sub.perturbed_events[id].probability=sub.virtual_ids[id]!=SIZE_MAX ?
+            std::clamp((uniform_ ? .1:p)*sub.ensemble_multipliers[multiplier++],1e-12,.499999999):0;
+    }
+    sub.ensemble[member]->update(sub.perturbed_events);
+    sub.ensemble_ready[member]=true;
+    statistics.ensemble_updates++;
 }
 
 Result
@@ -806,6 +932,7 @@ Decoder::decode_first_stage(const std::vector<uint8_t>& syndrome,size_t worker,s
             for (size_t v=0;v<syndrome.size();v++) if (syndrome[v] && model.colors[v]!=c) fired.push_back(v);
             if (boundary_gap_) for (int bit=0;bit<2;bit++)
                 if (mask&(1<<bit)) fired.push_back(model.colors.size()+(c+1+bit)%3);
+            prepare_ensemble(c,member);
             auto& graph=*subdecoders_[c]->ensemble[member];
             if (!graph.can_solve(fired)) {statistics.infeasible++;continue;}
             FirstStageResult result{c,mask,member,{},{},{}};
@@ -855,6 +982,7 @@ Decoder::decode_color(const std::vector<uint8_t>& syndrome, int c, int mask, siz
     Result candidate{0,0,c,{},{},{}};
     candidate.boundary_mask = mask;
     candidate.member = member;
+    prepare_ensemble(c,member);
     auto& graph = sub.ensemble[member];
     if (boundary_gap_)
         for (int bit = 0; bit < 2; bit++)

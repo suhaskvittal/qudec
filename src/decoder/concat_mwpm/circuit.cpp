@@ -263,6 +263,27 @@ CircuitDecoder::CircuitDecoder(const stim::DetectorErrorModel& dem, bool memory_
             variables.push_back({p,auxiliary,id,observable});
         }
         flag_bp_=std::make_unique<FlagBP>(num_detectors,std::move(variables));
+        // Allocate frame slots once, preserving the map's ascending-frame tie rule
+        // and variable summation order used by the original implementation.
+        std::vector<std::set<uint64_t>> labels(classes_.size());
+        for (const auto& variable:flag_bp_->variables()) if (variable.class_id!=SIZE_MAX)
+            labels[variable.class_id].insert(variable.observable);
+        bp_frame_offsets_.push_back(0);
+        for (const auto& frames:labels)
+        {
+            if (frames.empty()) throw std::logic_error("BP class has no frame");
+            bp_frame_labels_.insert(bp_frame_labels_.end(),frames.begin(),frames.end());
+            bp_frame_offsets_.push_back(bp_frame_labels_.size());
+        }
+        for (const auto& variable:flag_bp_->variables())
+        {
+            if (variable.class_id==SIZE_MAX) {bp_variable_slots_.push_back(SIZE_MAX);continue;}
+            const auto begin=bp_frame_labels_.begin()+bp_frame_offsets_[variable.class_id];
+            const auto end=bp_frame_labels_.begin()+bp_frame_offsets_[variable.class_id+1];
+            bp_variable_slots_.push_back(std::lower_bound(begin,end,variable.observable)-bp_frame_labels_.begin());
+        }
+        bp_frame_mass_.resize(bp_frame_labels_.size());
+        bp_probabilities_.resize(classes_.size());bp_frames_.resize(classes_.size());
     }
 
 }
@@ -293,7 +314,6 @@ CircuitDecoder::flag_neighborhoods(const std::vector<uint8_t>& syndrome) const
 CircuitDecoder::Context
 CircuitDecoder::make_context(const std::vector<uint8_t>& syndrome) const
 {
-    if (flag_bp_) return make_bp_context(syndrome);
     Model model{colors_, {}, renormalization_.enabled};
     Context out;
     std::vector<size_t> observed_flags;
@@ -373,32 +393,22 @@ CircuitDecoder::make_context(const std::vector<uint8_t>& syndrome) const
 // Author: OpenAI Codex. Approximate class marginals by summing posterior
 // mass within a logical frame and retaining its dominant frame. Competing
 // frames are not represented as parallel matching hyperedges.
-CircuitDecoder::Context
-CircuitDecoder::make_bp_context(const std::vector<uint8_t>& syndrome) const
+void
+CircuitDecoder::update_bp_context(const std::vector<uint8_t>& syndrome)
 {
     const auto posterior=flag_bp_->posterior(syndrome);
-    std::vector<std::map<uint64_t,double>> frames(classes_.size());
-    const auto& variables=flag_bp_->variables();
-    for (size_t i=0;i<variables.size();i++) if (variables[i].class_id!=SIZE_MAX)
-        frames[variables[i].class_id][variables[i].observable]+=posterior[i];
-    Context out;
-    out.input_model.colors=colors_;
-    out.input_model.events.reserve(classes_.size());
-    out.weights.reserve(classes_.size());
+    std::fill(bp_frame_mass_.begin(),bp_frame_mass_.end(),0);
+    for (size_t i=0;i<posterior.size();i++) if (bp_variable_slots_[i]!=SIZE_MAX)
+        bp_frame_mass_[bp_variable_slots_[i]]+=posterior[i];
     for (size_t i=0;i<classes_.size();i++)
     {
-        const auto& group=classes_[i];
-        const auto best=std::max_element(frames[i].begin(),frames[i].end(),
-            [](const auto& a,const auto& b){return a.second<b.second;});
-        const double probability=std::clamp(best->second,1e-12,1-1e-9);
-        out.input_model.events.push_back({probability,group.checks,best->first,group.boundary_hint});
-        FlagWeight weight{};
-        weight.checks=group.checks;weight.observable=best->first;
-        weight.effective_probability=probability;
-        weight.representative_probability=probability;
-        out.weights.push_back(std::move(weight));
+        size_t best=bp_frame_offsets_[i];
+        for (size_t slot=best+1;slot<bp_frame_offsets_[i+1];slot++)
+            if (bp_frame_mass_[slot]>bp_frame_mass_[best]) best=slot;
+        bp_probabilities_[i]=std::clamp(bp_frame_mass_[best],1e-12,1-1e-9);
+        bp_frames_[i]=bp_frame_labels_[best];
     }
-    return out;
+    context_.decoder->update_dense(bp_probabilities_,bp_frames_);
 }
 
 CircuitDecoder::Context&
@@ -416,13 +426,22 @@ CircuitDecoder::context(const std::vector<uint8_t>& syndrome)
         topology.events.reserve(classes_.size());
         for (const auto& group : classes_)
             topology.events.push_back({.1,group.checks,0,group.boundary_hint});
-        context_.decoder = std::make_unique<Decoder>(std::move(topology),false,boundary_gap_,ensemble_);
+        context_.decoder = std::make_unique<Decoder>(std::move(topology),false,boundary_gap_,ensemble_,
+            renormalization_.enabled || bool(flag_bp_));
+        if (flag_bp_)
+            for (size_t i=0;i<classes_.size();i++)
+                if (context_.decoder->model.events.at(i).detectors!=classes_[i].checks)
+                    throw std::logic_error("BP ordered supports differ from union model");
     }
     if (!context_ready_ || key != current_flags_)
     {
-        auto selected = make_context(syndrome);
-        context_.decoder->update(std::move(selected.input_model));
-        context_.weights = std::move(selected.weights);
+        if (flag_bp_) update_bp_context(syndrome);
+        else
+        {
+            auto selected=make_context(syndrome);
+            context_.decoder->update(std::move(selected.input_model));
+            context_.weights=std::move(selected.weights);
+        }
         current_flags_ = std::move(key);
         context_ready_ = true;
     }
@@ -558,6 +577,19 @@ CircuitDecoder::inspect(const std::vector<uint8_t>& full, DebugTrace* debug)
     // Author: OpenAI Codex. Incidence neighborhoods are diagnostic only; avoid
     // their construction in ordinary decoding's flag-update path.
     auto weights = ctx.weights;
+    if (flag_bp_)
+    {
+        // Diagnostics own detector lists only when explicitly inspected.
+        weights.reserve(classes_.size());
+        for (const auto& event:ctx.decoder->model.events)
+        {
+            FlagWeight weight{};weight.checks=event.detectors;
+            weight.observable=event.observable;
+            weight.effective_probability=event.probability;
+            weight.representative_probability=event.probability;
+            weights.push_back(std::move(weight));
+        }
+    }
     const auto neighborhoods = flag_neighborhoods(full);
     for (auto& w : weights)
         for (const auto& [flag,detectors] : neighborhoods)

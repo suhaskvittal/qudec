@@ -61,3 +61,20 @@ The scale `p^m` is global across the observed relevant extraction circuits in th
 window. A local or per-round alternative would be a separate adaptation.
 An observed flag with p=0, or numerical underflow of a renormalized probability,
 is reported as an error.
+
+## Sparse matching-weight updates
+
+Contributor: OpenAI Codex.
+
+Flag-renormalized decoding automatically applies numerical weights through
+PyMatching's `EdgeWeightModifications` API in both matching stages and every
+first-stage ensemble member. The existing flag selection, p^m probabilities,
+projection rules, fixed seeded perturbations, correction scoring, and integer
+normalization remain unchanged. Handles cache both adjacency directions in the
+matching and path-search graphs; stable-topology updates touch only changed
+integer weights. A changed normalization still requires global requantization.
+
+Changes to enabled edges or compact virtual endpoints use the existing topology
+rebuild after clearing handles and retain the legacy backend for that graph
+thereafter. This avoids repeated handle registration on volatile hook supports.
+This optimization does not change other ConcatMWPM variants or add a CLI flag.

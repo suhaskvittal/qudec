@@ -99,3 +99,51 @@ remain distinct from this final-correction gap. When gating skips ensembles,
 only candidates actually evaluated contribute. Grouped MPI computes the margin
 from gathered candidates and records statistics on the group leader; histogram
 and availability reductions are included in `mpi_accumulate`.
+
+## Sparse matching-weight updates
+
+Contributor: OpenAI Codex.
+
+BP preprocessing automatically uses PyMatching's `EdgeWeightModifications` API
+for numerical updates of both matching stages and all first-stage ensemble
+members. Undirected handles are registered once while topology is stable. Only
+changed integer weights are written, consistently to both matching and path
+reconstruction graphs. Stable-topology updates no longer reset every graph node
+or walk every adjacency entry to rewrite weights.
+
+The existing probability projection, posterior frame selection, perturbation
+seed/order, unperturbed correction scoring, and per-graph integer normalization
+are preserved. A normalization change still requires checking/rescaling all
+active weights; when it stays fixed, only changed probabilities are requantized.
+This is a sparse direct-update backend, not a traversal-time lazy overlay.
+
+If enabled edges or compact virtual-detector endpoints change, the decoder
+restores and discards its handles, uses the existing active-adjacency rebuild,
+and retains the legacy backend for that graph thereafter. This avoids repeated
+handle registration on volatile hook supports. Other ConcatMWPM modes retain
+their previous backend.
+
+BP's positive union topology normally keeps the original handles throughout
+decoding. Flag renormalization may instead need the topology fallback.
+
+## Reused BP state and deferred ensemble updates
+
+Contributor: OpenAI Codex. BP class/frame aggregation uses precompiled flat slots
+and reusable numeric buffers. Variable summation order, ascending-frame tie
+selection and posterior clipping are unchanged. The persistent model owns its
+fixed detector supports; each shot updates only numeric probabilities and frame
+labels. Per-class diagnostic detector lists are constructed only by inspection.
+
+Ensemble graph updates are demand-driven. A changed context updates the three
+unperturbed first-stage graphs and second-stage graphs immediately, but marks
+additional ensemble members stale. Each stale graph is prepared once, immediately
+before it is used. With `--concat-gap-gating`, a skipped expansion therefore
+performs no extra ensemble graph updates. Without gating, all members are still
+prepared and solved. Seeded multipliers, their ordering, quantization and scoring
+are unchanged. Explicit weight audits materialize all graphs for diagnostics.
+This changes preparation costs, not the gating threshold or confidence formula;
+gating remains opt-in and its circuit-level accuracy must be evaluated separately.
+
+The graph backend applies successive absolute weights; ordinary BP decoding does
+not clear/restore the original graph between shots. Consequently a bulk restore
+copy would introduce work rather than remove an existing restoration pass.

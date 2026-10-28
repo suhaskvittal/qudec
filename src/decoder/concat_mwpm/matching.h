@@ -87,6 +87,7 @@ struct EnsembleConfig
 struct Statistics
 {
     size_t first_calls{0}, second_calls{0}, duplicates{0}, infeasible{0};
+    size_t ensemble_updates{0}; // OpenAI Codex: graphs prepared on demand.
 };
 
 // Author: OpenAI Codex. Transferable first-stage work for grouped MPI decoding.
@@ -113,7 +114,8 @@ public:
     // Section 3 uses uniform restricted-lattice weights for code capacity.
     // Algorithm 1 uses compressed projected probabilities for noisy readout.
     explicit Decoder(Model, bool uniform_restricted_weights = false,
-                     bool boundary_gap = false, EnsembleConfig config = {});
+                     bool boundary_gap = false, EnsembleConfig config = {},
+                     bool edge_weight_updates = false);
     Result decode(const std::vector<uint8_t>& syndrome);
     GatedResult decode_gated(const std::vector<uint8_t>& syndrome, double threshold_db,
         DebugTrace* debug = nullptr);
@@ -129,21 +131,26 @@ public:
         bool trace = false, DebugTrace* debug = nullptr);
     size_t ambiguous_boundary_events() const;
     // Verify the actual integer matching/search weights against -log(probability).
-    size_t audit_weights() const;
+    size_t audit_weights();
     // Author: OpenAI Codex. Reuse union-topology matching workspaces; zero
     // probability events are disabled. Updates may select a subset of the
     // constructor's event supports and change their frames and probabilities.
     void update(Model);
+    // Author: OpenAI Codex. Same ordered, positive event supports; no model copies.
+    void update_dense(const std::vector<double>&,const std::vector<uint64_t>&);
     Model model;
     Statistics statistics;
 
 private:
+    void refresh_weights();
+    void prepare_ensemble(int color,size_t member);
     struct Graph;
     struct SubDecoder;
     std::array<std::shared_ptr<SubDecoder>, 3> subdecoders_;
     bool boundary_gap_;
     EnsembleConfig config_;
     bool uniform_;
+    bool edge_weight_updates_; // OpenAI Codex: sparse API for BP/renormalization.
     bool collect_gap_{false};
     std::map<std::vector<size_t>,size_t> event_slots_;
     std::vector<size_t> active_events_;

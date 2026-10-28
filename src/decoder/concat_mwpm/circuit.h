@@ -144,7 +144,11 @@ private:
 
     std::map<size_t,std::vector<size_t>> flag_neighborhoods(const std::vector<uint8_t>&) const;
     Context make_context(const std::vector<uint8_t>&) const;
-    Context make_bp_context(const std::vector<uint8_t>&) const;
+    // Author: OpenAI Codex. Fixed class/frame slots and reusable per-shot numeric buffers.
+    void update_bp_context(const std::vector<uint8_t>&);
+    std::vector<size_t> bp_frame_offsets_,bp_variable_slots_;
+    std::vector<uint64_t> bp_frame_labels_,bp_frames_;
+    std::vector<double> bp_frame_mass_,bp_probabilities_;
     Context& context(const std::vector<uint8_t>&);
     std::vector<uint8_t> memory_syndrome(const std::vector<uint8_t>&) const;
 };
