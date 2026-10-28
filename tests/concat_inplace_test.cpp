@@ -12,7 +12,7 @@ void require(bool ok,const char* message)
 {
     if (!ok) throw std::runtime_error(message);
 }
-void tests(bool boundary,size_t ensemble)
+void tests(size_t ensemble)
 {
     using namespace dec::concat;
     Model topology{{0,1,2,0,1,2},{
@@ -24,7 +24,7 @@ void tests(bool boundary,size_t ensemble)
         {.1,{1,4},0,BoundaryHint::Temporal},
         {.1,{2,5},0,BoundaryHint::Temporal},
         {.1,{3,4,5},0,BoundaryHint::Spatial}}};
-    Decoder persistent(topology,false,boundary,{ensemble,1729,1});
+    Decoder persistent(topology,false,{ensemble,1729,1});
     std::mt19937_64 rng(1729);
     for (size_t trial=0;trial<60;trial++)
     {
@@ -42,7 +42,7 @@ void tests(bool boundary,size_t ensemble)
             active.events.push_back(std::move(event));
         }
         persistent.update(active);
-        Decoder rebuilt(active,false,boundary,{ensemble,1729,1});
+        Decoder rebuilt(active,false,{ensemble,1729,1});
         require(persistent.audit_weights()==rebuilt.audit_weights(),"Active graph edge counts differ");
         const auto actual=persistent.decode_candidates(syndrome);
         const auto expected=rebuilt.decode_candidates(syndrome);
@@ -55,8 +55,8 @@ void tests(bool boundary,size_t ensemble)
             require(a.events==b.events && a.restricted_edges==b.restricted_edges &&
                     a.second_stage_paths==b.second_stage_paths && a.virtual_detectors==b.virtual_detectors,
                     "In-place matching paths differ from a fresh graph");
-            require(a.color==b.color && a.member==b.member && a.boundary_mask==b.boundary_mask,
-                    "In-place ensemble/boundary provenance changed");
+            require(a.color==b.color && a.member==b.member,
+                    "In-place ensemble provenance changed");
         }
     }
 }
@@ -65,7 +65,7 @@ int main()
 {
     try
     {
-        for(bool boundary:{false,true}) for(size_t ensemble:{1,5}) tests(boundary,ensemble);
+        for(size_t ensemble:{1,5}) tests(ensemble);
         std::cout<<"In-place graph updates reproduce fresh matching graphs\n";
     }
     catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}

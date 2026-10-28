@@ -16,9 +16,9 @@ cmake --build <build-directory> --target qudec_chains -j 12
 <build-directory>/qudec_chains concat_mwpm --code cc666 -d 9 -k 4 \
     --error-model code_capacity -n 10000 --concat-ensemble 20 --seed 42
 
-# Phenomenological noise and the boundary-gap extension.
+# Phenomenological noise.
 <build-directory>/qudec_chains concat_mwpm --code cc666 -d 7 -k 3 \
-    --error-model phenomenological --concat-boundary-gap -n 10000
+    --error-model phenomenological -n 10000
 
 # Exhaust all connected weight-2 combinations in a color-code capacity DEM.
 <build-directory>/qudec_chains concat_mwpm --code cc666 -d 5 -k 2 -cap --all
@@ -91,7 +91,7 @@ a nonzero exit status. Empty/impossible chain lengths are rejected. Normal
 completion returns zero even when some chains fail. Decoder statistics follow.
 
 All decoder options retain their `qudec` meaning, including `--concat-ensemble`,
-`--concat-seed`, `--concat-boundary-gap`, `--correlated`, Libra, Harmony, seeded
+`--concat-seed`, `--correlated`, Libra, Harmony, seeded
 matching and union-find settings; see `--help`. Normal Monte Carlo and rare-event
 sampler settings do not control this executable. `--method rare_event` is
 rejected. Restriction variants retain their existing cc666/two-round limitation

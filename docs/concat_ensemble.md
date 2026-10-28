@@ -2,8 +2,7 @@
 # Concatenated MWPM first-stage ensembling
 
 `qudec concat_mwpm` supports `--concat-ensemble K`. The default is `1`, which
-preserves the original decoder, including its boundary-sector candidates and tie
-choices. `K` counts one unperturbed matcher and `K-1` perturbed matchers for each
+preserves the baseline decoder. `K` counts one unperturbed matcher and `K-1` perturbed matchers for each
 of the three ignored colors. For example:
 
 ```sh
@@ -15,18 +14,18 @@ of the three ignored colors. For example:
 Use `--phenomenological` for ideal check extraction with data and measurement
 noise; its default number of rounds is the code distance. Omitting the ideal
 noise selectors uses the existing SI1000 circuit model. Ensembling is available
-for both cc666 and cc488. `--concat-boundary-gap` can be combined with ensembling:
-each member then tests every feasible even/odd first-stage boundary sector.
+for both cc666 and cc488.
+
+The optional `--concat-boundary-gap` flag also evaluates the four first-stage
+parity sectors of the two spatial boundaries for each ignored color. This is
+available with ensembling and selects the minimum-weight final correction over
+all feasible color, ensemble-member, and boundary-sector candidates. See
+[`concat_boundary_gap.md`](concat_boundary_gap.md) for the parity construction.
 
 `--concat-seed` controls the fixed graph ensemble independently of the sampling
 `--seed`. Its default is `20261024`, matching the validated exploratory decoder.
 It is shared across MPI ranks. The CLI requires positive `K` and a nonnegative
 ensemble seed.
-
-With ordinary boundaries, `--concat-gap-gating` can run the perturbed members
-only when the baseline winner's first-stage cluster gap is below a threshold
-(default 20 dB). Set it with `--concat-gap-gating-threshold-db`.
-See [gap gating](concat_gap_gating.md) for behavior and current combination limits.
 
 ## Algorithm
 
@@ -40,9 +39,8 @@ This uses the probability perturbations described for Libra, without its
 matching synthesis or degeneracy calculation.
 
 For K greater than one, equal selected virtual-detector sets are coalesced per
-ignored color across members and boundary sectors. Boundary-only edges that do
-not create a virtual check do not distinguish these sets. Each unique input is
-sent through the original second-stage matching once. The first representative
+ignored color across members. Each unique input is sent through the original
+second-stage matching once. The first representative
 retains its detector insertion order, so coalescing does not introduce new
 PyMatching tie choices. All unperturbed candidates precede perturbed ones.
 
@@ -66,8 +64,7 @@ separate CLI option.
 
 Inspected candidates expose `member` and canonical `virtual_detectors` fields.
 The matching core reports first-stage calls, unique second-stage calls,
-coalesced duplicates and infeasible sectors for its last candidate decode.
-Default K=1 intentionally retains the historical uncoalesced sector list.
+coalesced duplicates and infeasible candidates for its last decode.
 Instances own mutable PyMatching workspaces and should be used by one worker.
 
 The capacity and phenomenological benchmarks motivating K=20 are exploratory

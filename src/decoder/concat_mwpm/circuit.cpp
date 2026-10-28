@@ -51,13 +51,12 @@ read_coordinates(const stim::DetectorErrorModel& dem)
 } // namespace
 
 CircuitDecoder::CircuitDecoder(const stim::DetectorErrorModel& dem, bool memory_x,
-                               bool use_flags, size_t cache_capacity, bool boundary_gap, EnsembleConfig ensemble,
-                               FlagRenormalization renormalization, bool gap_gating,double gap_threshold_db,bool belief_propagation)
+                               bool use_flags, size_t cache_capacity, EnsembleConfig ensemble,
+                               FlagRenormalization renormalization, bool belief_propagation, bool boundary_gap)
     :num_detectors(dem.count_detectors()), faults(read_faults(dem)),
      coordinates(read_coordinates(dem)),
      flag_p_(num_detectors,0), measurement_p_(num_detectors, 0), use_flags_(use_flags),
-     boundary_gap_(boundary_gap), gap_gating_(gap_gating), gap_threshold_db_(gap_threshold_db),
-     ensemble_(ensemble), renormalization_(renormalization)
+     boundary_gap_(boundary_gap), ensemble_(ensemble), renormalization_(renormalization)
 {
     if (belief_propagation && (!use_flags || renormalization.enabled))
         throw std::invalid_argument("Concat BP requires flags and cannot be combined with flag renormalization");
@@ -66,10 +65,6 @@ CircuitDecoder::CircuitDecoder(const stim::DetectorErrorModel& dem, bool memory_
         throw std::invalid_argument("Flag renormalization needs 0 <= physical error rate < 1");
     if (ensemble.size == 0 || !(ensemble.spread_scale >= 0) || !std::isfinite(ensemble.spread_scale))
         throw std::invalid_argument("Invalid concatenated matching ensemble configuration");
-    if (!std::isfinite(gap_threshold_db) || gap_threshold_db<0)
-        throw std::invalid_argument("Concat gap-gating threshold must be finite and nonnegative");
-    if (gap_gating && boundary_gap)
-        throw std::invalid_argument("--concat-gap-gating cannot be combined with --concat-boundary-gap");
     if (dem.count_observables() != 1 || cache_capacity == 0)
         throw std::invalid_argument("Concatenated MWPM needs one observable and positive cache capacity");
     std::vector<size_t> local(num_detectors, SIZE_MAX);
@@ -201,8 +196,7 @@ CircuitDecoder::CircuitDecoder(const stim::DetectorErrorModel& dem, bool memory_
         // Contributor: OpenAI Codex. For untagged circuits, only same-round
         // multi-color support supplies the spatial missing-color convention.
         // Explicit native-generator provenance takes precedence below.
-        // Singleton or cross-round mixed events have ambiguous provenance and
-        // keep colorless sink access in every boundary-parity sector.
+        // Singleton or cross-round mixed events have ambiguous provenance.
         std::set<int> colors;
         const double time = coordinates.at(check_globals[group.checks[0]])[2];
         bool same_time = true;
@@ -314,7 +308,7 @@ CircuitDecoder::flag_neighborhoods(const std::vector<uint8_t>& syndrome) const
 CircuitDecoder::Context
 CircuitDecoder::make_context(const std::vector<uint8_t>& syndrome) const
 {
-    Model model{colors_, {}, renormalization_.enabled};
+    Model model{colors_, {}, renormalization_.enabled,boundary_gap_};
     Context out;
     std::vector<size_t> observed_flags;
     if (use_flags_) for (auto f : flag_globals) if (syndrome[f]) observed_flags.push_back(f);
@@ -422,11 +416,11 @@ CircuitDecoder::context(const std::vector<uint8_t>& syndrome)
     {
         // Author: OpenAI Codex. Compile every possible event/projection once.
         // Disabled classes are represented by absent backend adjacency entries.
-        Model topology{colors_,{},renormalization_.enabled};
+        Model topology{colors_,{},renormalization_.enabled,boundary_gap_};
         topology.events.reserve(classes_.size());
         for (const auto& group : classes_)
             topology.events.push_back({.1,group.checks,0,group.boundary_hint});
-        context_.decoder = std::make_unique<Decoder>(std::move(topology),false,boundary_gap_,ensemble_,
+        context_.decoder = std::make_unique<Decoder>(std::move(topology),false,ensemble_,
             renormalization_.enabled || bool(flag_bp_));
         if (flag_bp_)
             for (size_t i=0;i<classes_.size();i++)
@@ -459,11 +453,6 @@ CircuitDecoder::memory_syndrome(const std::vector<uint8_t>& full) const
 uint64_t
 CircuitDecoder::decode(const std::vector<uint8_t>& full, std::string* debug_info)
 {
-    if (gap_gating_ && ensemble_.size>1)
-    {
-        const auto gated=decode_gated(full,gap_threshold_db_,debug_info);
-        return gated.result.observable;
-    }
     if (!debug_info)
     {
         const auto result=context(full).decoder->decode(memory_syndrome(full));
@@ -486,74 +475,12 @@ CircuitDecoder::decode(const std::vector<uint8_t>& full, std::string* debug_info
     const auto inspected = inspect(full,&trace);
     const auto& best = inspected.correction;
     candidate_gap_=best.candidate_gap;
-    out << "Winner: !" << "RGB"[best.color] << " member=" << best.member << " boundary_mask=" << best.boundary_mask
+    out << "Winner: !" << "RGB"[best.color] << " member=" << best.member
         << " weight=" << best.weight << " observable=" << best.observable << " correction:";
     for (auto id : best.events) out << " E" << id;
     out << "\nSelection: minimum model correction weight; first candidate wins ties.\n";
     *debug_info = out.str();
     return best.observable;
-}
-
-GatedResult
-CircuitDecoder::decode_gated(const std::vector<uint8_t>& full,double threshold_db,std::string* debug_info)
-{
-    if (!gap_gating_ || ensemble_.size<=1)
-        throw std::logic_error("Concat gap gating is not active for this decoder");
-    if (boundary_gap_)
-        throw std::invalid_argument("--concat-gap-gating cannot be combined with --concat-boundary-gap");
-    auto& core=*context(full).decoder;
-    if (!debug_info)
-    {
-        auto result=core.decode_gated(memory_syndrome(full),threshold_db);
-        candidate_gap_=result.result.candidate_gap;
-        return result;
-    }
-    std::ostringstream out;
-    out<<std::setprecision(12)<<"ConcatMWPM gap-gated decode (W=-log(p))\n";
-    DebugTrace trace{out,{}};
-    for (auto id:check_globals)
-    {
-        const auto& c=coordinates.at(id);
-        std::ostringstream label;
-        label<<'D'<<id<<'['<<"RGB"[int(c[3])]<<",t="<<c[2]<<','<<(c[4]==0 ? 'X':'Z')<<']';
-        trace.detector_labels.push_back(label.str());
-    }
-    auto result=core.decode_gated(memory_syndrome(full),threshold_db,&trace);
-    const auto& best=result.result;
-    candidate_gap_=best.candidate_gap;
-    out<<"Winner: !"<<"RGB"[best.color]<<" member="<<best.member<<" weight="<<best.weight
-       <<" observable="<<best.observable<<" correction:";
-    for (auto event:best.events) out<<" E"<<event;
-    out<<"\nSelection: baseline winner's first-stage gap gates remaining ensemble members.\n";
-    *debug_info=out.str();
-    return result;
-}
-
-std::vector<FirstStageResult>
-CircuitDecoder::decode_first_stage(const std::vector<uint8_t>& full,size_t worker,size_t workers,bool paths)
-{
-    return context(full).decoder->decode_first_stage(memory_syndrome(full),worker,workers,paths);
-}
-
-std::vector<Result>
-CircuitDecoder::decode_second_stage(const std::vector<uint8_t>& full,
-    const std::vector<FirstStageResult>& first,size_t worker,size_t workers,std::string* debug)
-{
-    auto& decoder=*context(full).decoder;
-    if (!debug) return decoder.decode_second_stage(memory_syndrome(full),first,worker,workers);
-    std::ostringstream out;
-    out<<std::setprecision(12)<<"ConcatMWPM MPI worker="<<worker<<" (W=-log(p))\n";
-    DebugTrace trace{out,{}};
-    for (auto id:check_globals)
-    {
-        const auto& c=coordinates.at(id);
-        std::ostringstream label;
-        label<<'D'<<id<<'['<<"RGB"[int(c[3])]<<",t="<<c[2]<<','<<(c[4]==0 ? 'X':'Z')<<']';
-        trace.detector_labels.push_back(label.str());
-    }
-    auto candidates=decoder.decode_second_stage(memory_syndrome(full),first,worker,workers,true,&trace);
-    *debug=out.str();
-    return candidates;
 }
 
 CircuitResult

@@ -12,14 +12,14 @@ else:
 
 seed = 0
 if output_folder == 'auto':
-    output_folder = f'out/{decoder}_cc_capacity_error_rates_p{p:.2e}'
+    output_folder = f'out/{decoder}_cc_error_rates_p{p:.2e}'
 else:
-    output_folder = f'out/{output_folder}_cc_capacity_error_rates_p{p:.2e}'
+    output_folder = f'out/{output_folder}_cc_error_rates_p{p:.2e}'
 
 # (d, shots)
 SHOTS = 10_000_000
 comb = [
-    (d, SHOTS) for d in range(5, 31+1, 2)
+    (d, SHOTS) for d in range(5, 13+1, 2)
 ]
 ETH = 5 / SHOTS
 
@@ -48,7 +48,7 @@ Timing data: invalid (no decoding was performed).
         print(f'Skipping d{d}: {reason}')
         continue
 
-    cmd = f'mpirun -np {cores} ./build/qudec {decoder} {d} -p {p} --seed {seed} --mc-max-samples {shots} {cli_args} --code-capacity > {output_folder}/d{d}/output.log'
+    cmd = f'mpirun -np {cores} ./build/qudec {decoder} {d} -p {p} --seed {seed} --mc-max-samples {shots} {cli_args} > {output_folder}/d{d}/output.log'
     print(cmd)
     status = os.system(cmd)
     previous_ler = None

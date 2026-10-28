@@ -53,8 +53,8 @@ Hyperedges remain undecomposed at the input to concatenated matching.
 The posterior-weighted model updates **both matching stages**, including
 projected first-stage edges and second-stage event edges. The existing projection
 aggregation is reused, although posterior event marginals are not independent.
-Ensembling, boundary-gap, gap gating and grouped MPI use the same posterior
-model. Final candidate selection minimizes the sum of -log(posterior model
+Ensembling uses the same posterior model. Final candidate selection minimizes
+the sum of -log(posterior model
 probability) over correction events, using unperturbed probabilities. No p^m
 penalty or unexplained-flag cost is added. Debug output identifies posterior
 mode and includes the normal first/second-stage traces.
@@ -94,11 +94,9 @@ No-alternative shots are excluded from all three distributions. If truth is
 absent, only the unsigned distribution is updated. Existing sampler callers
 supply truth. `matching_data.gap` follows the signed convention when available.
 
-The existing first-stage cluster gap and `--concat-gap-gating` are unchanged and
-remain distinct from this final-correction gap. When gating skips ensembles,
-only candidates actually evaluated contribute. Grouped MPI computes the margin
-from gathered candidates and records statistics on the group leader; histogram
-and availability reductions are included in `mpi_accumulate`.
+The margin is computed from the candidates evaluated by the configured
+ensemble. MPI sampling records statistics across ranks through
+`mpi_accumulate`.
 
 ## Sparse matching-weight updates
 
@@ -136,13 +134,9 @@ labels. Per-class diagnostic detector lists are constructed only by inspection.
 
 Ensemble graph updates are demand-driven. A changed context updates the three
 unperturbed first-stage graphs and second-stage graphs immediately, but marks
-additional ensemble members stale. Each stale graph is prepared once, immediately
-before it is used. With `--concat-gap-gating`, a skipped expansion therefore
-performs no extra ensemble graph updates. Without gating, all members are still
-prepared and solved. Seeded multipliers, their ordering, quantization and scoring
-are unchanged. Explicit weight audits materialize all graphs for diagnostics.
-This changes preparation costs, not the gating threshold or confidence formula;
-gating remains opt-in and its circuit-level accuracy must be evaluated separately.
+additional ensemble members stale. Each stale graph is prepared once before its
+first use. Seeded multipliers, their ordering, quantization and scoring are
+unchanged. Explicit weight audits materialize all graphs for diagnostics.
 
 The graph backend applies successive absolute weights; ordinary BP decoding does
 not clear/restore the original graph between shots. Consequently a bulk restore

@@ -31,7 +31,7 @@ void tests()
         detector(0,0,0,-1,0,1) D4
         detector(0,0,1,-1,0,1) D5
     )");
-    dec::concat::CircuitDecoder core(dem,false,true,16,false,{}, {true,.001});
+    dec::concat::CircuitDecoder core(dem,false,true,16,{}, {true,.001});
     std::vector<uint8_t> syndrome(core.num_detectors);
     auto weight = [](const auto& detail,std::vector<size_t> support) -> const dec::concat::FlagWeight&
     {
@@ -74,7 +74,7 @@ void tests()
     require(wrapper.decode(input,truth).flipped_obs[0] == detail.correction.observable,
             "Wrapper lost renormalization configuration");
     bool rejected = false;
-    try { dec::concat::CircuitDecoder invalid(dem,false,true,16,false,{}, {true,-.1}); }
+    try { dec::concat::CircuitDecoder invalid(dem,false,true,16,{}, {true,-.1}); }
     catch (const std::invalid_argument&) { rejected = true; }
     require(rejected,"Invalid physical probability accepted");
 }

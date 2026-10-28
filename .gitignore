@@ -10,3 +10,5 @@ out/
 *.tar.xz
 
 .agentic_artifacts
+
+*.zip

@@ -68,19 +68,13 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
     bool enable_cluster_gap{false};
     bool print_cluster_gap_histogram{false};
     bool correlated_pymatching{false};
-    // Contributor: OpenAI Codex. Opt-in first-stage boundary-parity ensemble.
-    bool concat_boundary_gap{false};
-    // Contributor: OpenAI Codex. First-stage cluster-gap adaptive ensemble.
-    bool concat_gap_gating{false};
-    double concat_gap_gating_threshold_db{20.0};
+    bool concat_boundary_gap{false}; // Author: OpenAI Codex. First-stage boundary parity sectors.
     bool concat_bp{false}; // Author: OpenAI Codex. Flag BP updates both matching stages.
     bool concat_flag_renormalization{false}; // Author: OpenAI Codex, paper Sec. III D.
     bool decoder_debug{false};
     // Contributor: OpenAI Codex. Optional fixed first-stage probability ensemble.
     int64_t concat_ensemble_size{1};
     int64_t concat_ensemble_seed{20261024};
-    bool concat_parallel{false}; // Author: OpenAI Codex. Grouped MPI matching.
-    int64_t concat_cores{3};
     // OpenAI GPT-6-Sol: Let CLI experiments opt into interior opposite-basis checks.
     bool include_opposite_basis_detectors{false};
     dec::Libra::Config libra_config;
@@ -135,15 +129,11 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
         .optional("", "--superdense", "Use CNOT superdense color-code extraction (SI1000)", superdense, false)
         .optional("", "--superdense-start-phase", "4.8.8 superdense starting phase: 0 or 1", superdense_start_phase, 0)
         .optional("", "--debug", "Color-code decoders: populate and print decoder-specific debug information", decoder_debug, false)
-        .optional("", "--concat-boundary-gap", "ConcatMWPM: ensemble even/odd spatial-boundary sectors in stage one", concat_boundary_gap, false)
-        .optional("", "--concat-gap-gating", "ConcatMWPM: expand the first-stage ensemble below the winning-color gap threshold", concat_gap_gating, false)
-        .optional("", "--concat-gap-gating-threshold-db", "ConcatMWPM: first-stage gap trigger in dB", concat_gap_gating_threshold_db, 20.0)
+        .optional("", "--concat-boundary-gap", "ConcatMWPM: test all four spatial-boundary parity sectors per color", concat_boundary_gap, false)
         .optional("", "--concat-bp", "ConcatMWPM: condition hyperedges on flags and available opposite-basis checks using BP", concat_bp, false)
         .optional("", "--concat-flag-renormalization", "ConcatMWPM: use raw flag-fault probabilities and p^m ordinary-edge suppression", concat_flag_renormalization, false)
         .optional("", "--concat-ensemble", "ConcatMWPM: number of first-stage graphs per color (1 = unperturbed)", concat_ensemble_size, 1)
         .optional("", "--concat-seed", "ConcatMWPM: fixed first-stage ensemble seed", concat_ensemble_seed, concat_ensemble_seed)
-        .optional("", "--concat-parallel", "ConcatMWPM: distribute matching work within MPI decoder groups", concat_parallel, false)
-        .optional("", "--concat-cores", "MPI ranks per parallel ConcatMWPM decoder", concat_cores, 3)
         .optional("", "--uf-weight-scale", "Union-find: quantization units per natural-log weight", uf_weight_scale, 1024)
 
         .optional("", "--seed-decoder", "SeededMatching first decoder: pymatching or uf", seed_decoder, "pymatching")
@@ -260,21 +250,6 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
         throw std::invalid_argument("--concat-ensemble and --concat-seed require concat_mwpm");
     if (concat_boundary_gap && decoder_name != "concat_mwpm")
         throw std::invalid_argument("--concat-boundary-gap requires concat_mwpm");
-    if (!std::isfinite(concat_gap_gating_threshold_db) || concat_gap_gating_threshold_db<0)
-        throw std::invalid_argument("--concat-gap-gating-threshold-db must be finite and nonnegative");
-    if (concat_gap_gating && decoder_name != "concat_mwpm")
-        throw std::invalid_argument("--concat-gap-gating requires concat_mwpm");
-    if (!concat_gap_gating && concat_gap_gating_threshold_db!=20.0)
-        throw std::invalid_argument("--concat-gap-gating-threshold-db requires --concat-gap-gating");
-    if (concat_gap_gating && concat_boundary_gap)
-        throw std::invalid_argument("--concat-gap-gating cannot be combined with --concat-boundary-gap");
-    if (concat_gap_gating && concat_parallel)
-        throw std::invalid_argument("--concat-gap-gating does not support grouped MPI decoding");
-    if (concat_cores<1 || ((concat_parallel || concat_cores!=3) && decoder_name!="concat_mwpm") ||
-        (!concat_parallel && concat_cores!=3))
-        throw std::invalid_argument("--concat-cores requires --concat-parallel with concat_mwpm and a positive count");
-    if (chain_mode && concat_parallel)
-        throw std::invalid_argument("qudec_chains does not support grouped MPI decoding");
     if (concat_bp && decoder_name != "concat_mwpm")
         throw std::invalid_argument("--concat-bp requires concat_mwpm");
     if (concat_bp && concat_flag_renormalization)
@@ -410,17 +385,13 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
                       << " p=" << p << " sampling_seed=" << conf.seed
                       << " boundary_gap=" << concat_boundary_gap
                       << " ensemble_size=" << concat_ensemble_size << " ensemble_seed=" << concat_ensemble_seed
-                      << " decoding_cores=" << (concat_parallel ? concat_cores:1)
-                      << " gap_gating=" << concat_gap_gating
-                      << " gap_threshold_db=" << concat_gap_gating_threshold_db
                       << " belief_propagation=" << concat_bp
                       << " flag_renormalization=" << concat_flag_renormalization << '\n';
-        run(dec::ConcatMWPM(dem,{.boundary_gap=concat_boundary_gap,
+        run(dec::ConcatMWPM(dem,{
+            .boundary_gap=concat_boundary_gap,
             .ensemble_size=static_cast<size_t>(concat_ensemble_size),
             .ensemble_seed=static_cast<uint64_t>(concat_ensemble_seed),.debug=decoder_debug,
             .flag_renormalization=concat_flag_renormalization,.physical_error_rate=p,
-            .decoding_cores=static_cast<size_t>(concat_parallel ? concat_cores:1),
-            .gap_gating=concat_gap_gating,.gap_gating_threshold_db=concat_gap_gating_threshold_db,
             .belief_propagation=concat_bp}), [] (auto, auto, auto) {});
     }
     else if (decoder_name == "pymatching")

@@ -9,32 +9,28 @@
 #include <cmath>
 #include <iomanip>
 #include <stdexcept>
-#include <memory>
 
 #if defined(ENABLE_MPI)
 #include <mpi.h>
 #endif
 
-// Author: OpenAI Codex. A decoder group shares one shot stream. Helpers enter
-// every collective decode, but only its first rank samples and counts outcomes.
+// Author: OpenAI Codex. Each MPI rank samples its own stream and uses a serial
+// decoder instance for every shot.
 namespace sampler_detail
 {
 struct Group
 {
     int world_rank{0},world_size{1};
-    size_t cores{1},index{0},count{1};
-    bool root{true};
+    size_t index{0},count{1};
 };
-template<class D> Group group(const D& decoder)
+Group group()
 {
     Group g;
 #if defined(ENABLE_MPI)
     MPI_Comm_rank(MPI_COMM_WORLD,&g.world_rank);MPI_Comm_size(MPI_COMM_WORLD,&g.world_size);
 #endif
-    g.cores=dec::decoding_core_count(decoder);
-    if (!g.cores || g.cores>size_t(g.world_size) || size_t(g.world_size)%g.cores)
-        throw std::invalid_argument("MPI world must contain complete decoding_core_count() groups");
-    g.index=g.world_rank/g.cores;g.count=g.world_size/g.cores;g.root=g.world_rank%g.cores==0;
+    g.index=g.world_rank;
+    g.count=g.world_size;
     return g;
 }
 }
@@ -66,7 +62,7 @@ monte_carlo_sampler(const stim::DetectorErrorModel& dem,
                     ExperimentConfig conf, 
                     const ErrorCallback& error_callback)
 {
-    const auto group=sampler_detail::group(decoder);
+    const auto group=sampler_detail::group();
     const int world_rank=group.world_rank;
 
     const bool can_print_progress = (conf.print_progress && conf.verbosity == 0 && world_rank == 0);
@@ -76,10 +72,7 @@ monte_carlo_sampler(const stim::DetectorErrorModel& dem,
     // initialize sampler:
     std::mt19937_64 rng;
     rng.seed(conf.seed + group.index);
-    std::unique_ptr<stim::DemSampler<64>> sampler;
-    if (group.root) sampler=std::make_unique<stim::DemSampler<64>>(dem,std::move(rng),SHOTS_PER_BATCH);
-    dec::SyndromeType helper_syndrome(dem.count_detectors());
-    dec::ObsType helper_truth(dem.count_observables());
+    stim::DemSampler<64> sampler(dem,std::move(rng),SHOTS_PER_BATCH);
 
     const size_t num_observables = dem.count_observables();
 
@@ -87,15 +80,10 @@ monte_carlo_sampler(const stim::DetectorErrorModel& dem,
             errors{0};
     while (t < conf.monte_carlo.max_samples && errors < conf.monte_carlo.stop_at_error_count)
     {
-        if (group.root) sampler->resample(false);
-        // detectors and observables are in `sampler.det_buffer` and `sampler.obs_buffer`
-        // (each stored as [event x shot]); transpose so each row is one shot.
-        SyndromeTable detector_table(0,0),obs_table(0,0);
-        if (group.root)
-        {
-            detector_table=sampler->det_buffer.transposed();
-            obs_table=sampler->obs_buffer.transposed();
-        }
+        sampler.resample(false);
+        // Transpose [event x shot] tables so each row is one shot.
+        const SyndromeTable detector_table=sampler.det_buffer.transposed();
+        const SyndromeTable obs_table=sampler.obs_buffer.transposed();
 
         const int64_t batch_samples = std::min<int64_t>(conf.monte_carlo.max_samples - t,
                                                        group.count * SHOTS_PER_BATCH);
@@ -103,10 +91,9 @@ monte_carlo_sampler(const stim::DetectorErrorModel& dem,
         uint64_t new_errors{0};
         for (size_t i = 0; i < local_samples; i++)
         {
-            auto syndrome=group.root ? detector_table[i]:dec::SyndromeRef(helper_syndrome);
-            auto truth=group.root ? obs_table[i]:dec::ObsRef(helper_truth);
+            auto syndrome=detector_table[i];
+            auto truth=obs_table[i];
             auto result = decoder.decode(syndrome,truth);
-            if (!group.root) continue;
             // Contributor: OpenAI Codex. Opt-in diagnostic text is decoder-owned.
             if constexpr (requires { result.debug_info; })
                 if (!result.debug_info.empty()) std::cout << result.debug_info;
@@ -159,7 +146,7 @@ rare_event_sampler(const stim::DetectorErrorModel& dem,
         conf.rare_event.relative_tail_tolerance < 0 || conf.rare_event.relative_tail_tolerance > 1)
         throw std::invalid_argument("Invalid rare_event sample counts, count limit, or tail tolerance");
 
-    const auto group=sampler_detail::group(decoder);
+    const auto group=sampler_detail::group();
     const int world_rank=group.world_rank;
     const size_t limit = std::min<size_t>(conf.rare_event.max_level, dem.count_errors() + 1);
     ConditionalErrorSampler conditional(dem, limit);
@@ -205,13 +192,12 @@ rare_event_sampler(const stim::DetectorErrorModel& dem,
         while (samples < maximum && errors < uint64_t(conf.rare_event.max_errors_per_level)) {
             const uint64_t count = std::min<uint64_t>(maximum - samples, batch_size * group.count);
             const size_t local = count / group.count + (group.index < count % group.count);
-            auto [syndromes, truths] = conditional.sample_syndromes(k,group.root ? local:0,rng);
+            auto [syndromes, truths] = conditional.sample_syndromes(k,local,rng);
             uint64_t new_errors = 0;
             for (size_t i = 0; i < local; ++i) {
-                auto syndrome=group.root ? syndromes[i]:dec::SyndromeRef(helper_syndrome);
-                auto truth=group.root ? truths[i]:dec::ObsRef(helper_truth);
+                auto syndrome=syndromes[i];
+                auto truth=truths[i];
                 auto result = decoder.decode(syndrome,truth);
-                if (!group.root) continue;
                 if constexpr (requires { result.debug_info; })
                     if (!result.debug_info.empty()) std::cout << result.debug_info;
                 if (is_decoding_error(result, truth, observables)) {

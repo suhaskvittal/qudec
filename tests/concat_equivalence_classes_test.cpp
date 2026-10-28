@@ -127,7 +127,7 @@ void extraction_basis_flags()
              << "detector(0,0,0,0," << basis << ",0) D0\n"
              << "detector(0,0,0,99," << 1-basis << ",1) D1\n"
              << "detector(0,0,0,-1," << basis << ",1) D2\n";
-        dec::concat::CircuitDecoder core(stim::DetectorErrorModel(text.str()),memory_x,true,16,false,{}, {paper,.001});
+        dec::concat::CircuitDecoder core(stim::DetectorErrorModel(text.str()),memory_x,true,16,{}, {paper,.001});
         require(core.flag_globals==std::vector<size_t>{1},"Wrong check-extraction flag basis kept");
         require(core.equivalence_classes()[0].flags==std::vector<size_t>{1},"Ignored flag remained on a class member");
         require(core.flag_measurement_probabilities()[2]==0,"Ignored flag prior was retained");

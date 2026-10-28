@@ -60,23 +60,22 @@ void flags()
     require(!empty.flipped_obs[0],"Trace changed vacuum correction");
     require(traced.decode(syndrome,truth).debug_info == empty.debug_info,"Cached debug output is not deterministic");
 
-    dec::ConcatMWPM ensemble(dem,{.boundary_gap=true,.ensemble_size=3,.debug=true});
+    dec::ConcatMWPM ensemble(dem,{.ensemble_size=3,.debug=true});
     syndrome[0] = syndrome[1] = syndrome[2] = syndrome[3] = 1;
     const auto candidates = ensemble.decode(syndrome,truth);
     require(candidates.debug_info.find("member=2")!=std::string::npos,"Missing perturbed matching calls");
     require(candidates.debug_info.find("Coalesced:")!=std::string::npos,"Missing duplicate first-stage solution");
-    require(candidates.debug_info.find("infeasible")!=std::string::npos,"Missing infeasible boundary sectors");
 }
 void native_models()
 {
-    for (bool octagons : {false,true}) for (bool pheno : {false,true}) for (bool boundary : {false,true})
+    for (bool octagons : {false,true}) for (bool pheno : {false,true})
     {
         const auto circuit = pheno
             ? (octagons ? cc488_phenomenological(3,3,.001,.001,false) : cc666_phenomenological(3,3,.001,.001,false))
             : (octagons ? cc488_code_capacity(3,.001,false) : cc666_code_capacity(3,.001,false));
         const auto dem = stim::circuit_to_dem(circuit,{});
-        dec::ConcatMWPM plain(dem,{.boundary_gap=boundary,.ensemble_size=3});
-        dec::ConcatMWPM traced(dem,{.boundary_gap=boundary,.ensemble_size=3,.debug=true});
+        dec::ConcatMWPM plain(dem,{.ensemble_size=3});
+        dec::ConcatMWPM traced(dem,{.ensemble_size=3,.debug=true});
         dec::concat::CircuitDecoder source(dem,false);
         dec::ObsType truth(1);
         for (size_t event = 0; event < source.faults.size(); event++)

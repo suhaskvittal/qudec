@@ -82,7 +82,7 @@ void channels_and_provenance()
                 count++;
             });
             require(count==d*(measurement_only ? m:n),"Unexpected independent event count");
-            dec::concat::CircuitDecoder decoder(dem,memory_x,true,16,true);
+            dec::concat::CircuitDecoder decoder(dem,memory_x,true,16);
             const auto inspect=decoder.inspect(std::vector<uint8_t>(dem.count_detectors()));
             require(inspect.ambiguous_boundary_events==0,"Known generator has ambiguous boundary provenance");
             for (const auto& event:inspect.model.events)
@@ -91,11 +91,11 @@ void channels_and_provenance()
                 require(decoder.decode(decoder.fault_syndrome({id}))==decoder.fault_observable({id}),"Integrated single fault failed");
         }
         const auto cap=octagons ? cc488_code_capacity(d,.01,memory_x):cc666_code_capacity(d,.01,memory_x);
-        auto dem=stim::circuit_to_dem(cap,{});dec::concat::CircuitDecoder decoder(dem,memory_x,true,16,true);
+        auto dem=stim::circuit_to_dem(cap,{});dec::concat::CircuitDecoder decoder(dem,memory_x,true,16);
         require(decoder.inspect(std::vector<uint8_t>(dem.count_detectors())).ambiguous_boundary_events==0,"Capacity corner provenance unknown");
     }
     const stim::DetectorErrorModel mixed("error[qudec_data](0.01) D0\nerror[qudec_measurement](0.02) D0\ndetector(0,0,0,0,1,0) D0\nlogical_observable L0\n");
-    dec::concat::CircuitDecoder decoder(mixed,false,true,16,true);
+    dec::concat::CircuitDecoder decoder(mixed,false,true,16);
     const auto inspect=decoder.inspect({0});
     require(inspect.model.events[0].boundary_hint==dec::concat::BoundaryHint::Unknown,"Mixed provenance not conservative");
     require(inspect.ambiguous_boundary_events==1,"Mixed provenance count wrong");
@@ -119,7 +119,7 @@ void disorder()
             distinct.insert(op.args[0]);require(op.tag=="qudec_measurement","MPP transform lost tag");
         });
         require(repeats>0 && distinct.size()>1,"No fixed per-check disorder");
-        const auto dem=stim::circuit_to_dem(perturbed,{});dec::concat::CircuitDecoder decoder(dem,false,true,16,true);
+        const auto dem=stim::circuit_to_dem(perturbed,{});dec::concat::CircuitDecoder decoder(dem,false,true,16);
         require(decoder.inspect(std::vector<uint8_t>(dem.count_detectors())).ambiguous_boundary_events==0,"Nonuniform rewriting lost provenance");
     }
     const auto batched=apply_component_error_distribution(stim::Circuit("MPP[qudec_measurement](0.02) X0*X1 Z0*Z1\n"),noise);

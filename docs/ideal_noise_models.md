@@ -5,9 +5,9 @@ The default qudec noise model remains SI1000. Select the ideal-check models with
 these mutually exclusive aliases:
 
 ```sh
-qudec concat_mwpm 7 --code cc666 -cap -p 0.01 --concat-boundary-gap
+qudec concat_mwpm 7 --code cc666 -cap -p 0.01
 qudec concat_mwpm 7 --code cc666 --code-capacity -p 0.01
-qudec concat_mwpm 7 --code cc666 -pheno -p 0.01 --concat-boundary-gap
+qudec concat_mwpm 7 --code cc666 -pheno -p 0.01
 qudec concat_mwpm 7 --code cc666 --phenomenological -p 0.01 \
     --measurement-error-rate 0.005
 ```
@@ -47,13 +47,10 @@ basis across rounds. Changing the nominal p/q rescales the same component draws.
 
 Native data channels carry the reserved Stim tag `qudec_data`, while noisy MPP
 check measurements carry `qudec_measurement`. Stim propagates these tags to DEM
-errors, including after nonuniform noise rewriting. ConcatMWPM uses them as
-explicit spatial/temporal endpoint provenance, so known singleton data corners
-are represented through explicit first-stage boundary parity vertices by
-`--concat-boundary-gap`. This does not infer physical origin from logical
-observable labels. Conflicting tagged/untagged provenance
-on a merged event remains Unknown and is handled conservatively. Untagged
-SI1000 circuits retain their previous adapter convention.
+errors, including after nonuniform noise rewriting. The circuit adapter retains
+their spatial/temporal provenance for diagnostics; logical effects are never used
+to infer physical fault locations. Untagged SI1000 circuits retain their previous
+adapter convention.
 
 ## C++ generators
 

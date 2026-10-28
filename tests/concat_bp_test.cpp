@@ -39,7 +39,7 @@ void auxiliary_check_conditioning()
         "error(0.1) D0 D1\nerror(0.2) D1\nerror(0.07) D0\nerror(0.3) D2\n"
         "detector(0,0,0,0,1,0) D0\ndetector(0,0,0,1,0,0) D1\n"
         "detector(0,0,0,-1,0,1) D2\nlogical_observable L0\n");
-    CircuitDecoder bp(dem,false,true,16,false,{}, {},false,20,true);
+    CircuitDecoder bp(dem,false,true,16,{}, {},true);
     std::vector<uint8_t> quiet(3),fired{0,1,0};
     const auto even=bp.inspect(quiet).model,odd=bp.inspect(fired).model;
     require(even.events.size()==1 && odd.events.size()==1,"Pure auxiliary event became a matching edge");
@@ -54,7 +54,7 @@ void integration(bool memory_x,bool opposite=false)
 {
     using namespace dec::concat;
     const auto dem=stim::circuit_to_dem(cc666_si1000(5,5,.001,memory_x,opposite),{});
-    CircuitDecoder legacy(dem,memory_x),bp(dem,memory_x,true,16,false,{3,20261024},{},false,20,true);
+    CircuitDecoder legacy(dem,memory_x),bp(dem,memory_x,true,16,{3,20261024},{},true);
     std::vector<uint8_t> zero(dem.count_detectors());
     require(bp.decode(zero)==0,"Noiseless BP decoding failed");
     size_t x_flags=0,z_flags=0;
@@ -149,14 +149,14 @@ void integration(bool memory_x,bool opposite=false)
             reference.events.push_back({std::clamp(best->second,1e-12,1-1e-9),classes[i].checks,best->first,classes[i].boundary_hint});
             require(std::abs(reference.events.back().probability-result.model.events[i].probability)<1e-11,"Integrated posterior differs from exact reference");
         }
-        Decoder direct(reference,false,false,{3,20261024});
+        Decoder direct(reference,false,{3,20261024});
         std::vector<uint8_t> checks;for (auto d:bp.check_globals) checks.push_back(syndrome[d]);
         const auto expected=direct.decode(checks);
         require(expected.observable==result.correction.observable && std::abs(expected.weight-result.correction.weight)<1e-8,
             "Posterior update did not reach both matching stages");
     }
     bool rejected=false;
-    try {CircuitDecoder invalid(dem,memory_x,true,16,false,{}, {true,.001},false,20,true);}
+    try {CircuitDecoder invalid(dem,memory_x,true,16,{}, {true,.001},true);}
     catch (const std::invalid_argument&) {rejected=true;}
     require(rejected,"BP and renormalization conflict accepted");
 }

@@ -31,17 +31,17 @@ const dec::concat::Result& prefix(const std::vector<dec::concat::Result>& candid
     require(out,"Empty ensemble prefix");
     return *out;
 }
-void model_tests(bool pheno,bool boundary)
+void model_tests(bool pheno)
 {
     const auto circuit = pheno ? cc666_phenomenological(7,7,.01,.01,false)
                                : cc666_code_capacity(7,.03,false);
     const auto dem = stim::circuit_to_dem(circuit,{});
-    dec::concat::CircuitDecoder source(dem,false,true,16,boundary);
+    dec::concat::CircuitDecoder source(dem,false,true,16);
     const auto model = source.inspect(std::vector<uint8_t>(source.num_detectors)).model;
-    dec::concat::Decoder full(model,false,boundary,{60,20261024,1});
-    dec::concat::Decoder small(model,false,boundary,{20,20261024,1});
-    dec::concat::Decoder repeated(model,false,boundary,{60,20261024,1});
-    dec::concat::Decoder identical(model,false,boundary,{20,20261024,0});
+    dec::concat::Decoder full(model,false,{60,20261024,1});
+    dec::concat::Decoder small(model,false,{20,20261024,1});
+    dec::concat::Decoder repeated(model,false,{60,20261024,1});
+    dec::concat::Decoder identical(model,false,{20,20261024,0});
     require(full.audit_weights()>0,"No ensemble graph weights audited");
     std::mt19937_64 rng(1729);
     for (size_t shot = 0; shot < 40; shot++)
@@ -104,12 +104,12 @@ void additional_models()
 {
     // Exercise the second tiling and real Bell-flag contexts, including eviction.
     const auto square_dem = stim::circuit_to_dem(cc488_code_capacity(5,.01,false),{});
-    dec::concat::CircuitDecoder squares(square_dem,false,true,1,false,{20,20261024,1});
+    dec::concat::CircuitDecoder squares(square_dem,false,true,1,{20,20261024,1});
     for (size_t id = 0; id < squares.faults.size(); id++)
         require(squares.decode(squares.fault_syndrome({id}))==squares.fault_observable({id}),
                 "cc488 ensemble single fault failed");
     const auto bell_dem = stim::circuit_to_dem(cc666_si1000(5,5,.0005,false,true),{});
-    dec::concat::CircuitDecoder bell(bell_dem,false,true,1,false,{20,20261024,1});
+    dec::concat::CircuitDecoder bell(bell_dem,false,true,1,{20,20261024,1});
     size_t checked = 0;
     for (size_t id = 0; id < bell.faults.size() && checked < 6; id++)
     {
@@ -136,7 +136,7 @@ void flag_cache()
         "error(0.0001) D0 D1 D2 L0\nerror(0.0003) D0 D1 D2 D3 L0\nerror(0.003) D3\n"
         "detector(0,0,1,0,1,0) D0\ndetector(1,0,1,1,1,0) D1\n"
         "detector(0,1,1,2,1,0) D2\ndetector(0,0,1,99,0,1) D3\n");
-    dec::concat::CircuitDecoder core(dem,false,true,1,false,{20,20261024,1});
+    dec::concat::CircuitDecoder core(dem,false,true,1,{20,20261024,1});
     const std::vector<uint8_t> fired{1,1,1,1}, empty{0,0,0,0};
     const auto first = core.inspect(fired).correction;
     require(core.decode(empty)==0 && core.inspect(fired).correction.events==first.events,
@@ -148,7 +148,7 @@ void flag_cache()
     dec::ObsType truth(1);
     require(wrapped.decode(syndrome,truth).flipped_obs[0],"Wrapper lost ensemble options");
     bool rejected = false;
-    try { dec::concat::CircuitDecoder invalid(dem,false,true,1,false,{0,0,1}); }
+    try { dec::concat::CircuitDecoder invalid(dem,false,true,1,{0,0,1}); }
     catch (const std::invalid_argument&) { rejected = true; }
     require(rejected,"Zero-sized ensemble accepted");
 }
@@ -157,7 +157,7 @@ int main()
 {
     try
     {
-        for (bool pheno : {false,true}) for (bool boundary : {false,true}) model_tests(pheno,boundary);
+        for (bool pheno : {false,true}) model_tests(pheno);
         flag_cache();
         additional_models();
         std::cout << "PASS first-stage ensemble, spacetime, prefix, coalescing and flag-cache regressions\n";

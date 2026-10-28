@@ -19,7 +19,7 @@ else:
 # (d, shots)
 SHOTS = 100_000_000
 comb = [
-    (d, SHOTS) for d in range(3, 25+1, 2)
+    (d, SHOTS) for d in range(3, 13+1, 2)
 ]
 ETH = 5 / SHOTS
 

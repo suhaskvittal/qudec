@@ -15,7 +15,7 @@ void require(bool ok,const char* message)
 int main() try
 {
     const auto dem=stim::circuit_to_dem(cc666_code_capacity(5,.08,false),{});
-    dec::concat::CircuitDecoder reference(dem,false,true,16,false,{10,20261024},{},false,20,true);
+    dec::concat::CircuitDecoder reference(dem,false,true,16,{10,20261024},{},true);
     dec::ConcatMWPM decoder(dem,{.ensemble_size=10,.belief_propagation=true});
     stim::DemSampler<64> sampler(dem,std::mt19937_64(78263),256);
     sampler.resample(false);
@@ -55,18 +55,9 @@ int main() try
     require(!decoder.decode(zero,truth).has_candidate_gap,"Vacuum should not imply infinite confidence");
     std::ostringstream report;decoder.print_stats(report);
     require(report.str().find("CONCAT_BP_SIGNED_GAP_DB")!=std::string::npos,"Gap histogram missing from output");
-    // The gated path must use only candidates that actually ran.
-    dec::ConcatMWPM gated(dem,{.ensemble_size=10,.gap_gating=true,.gap_gating_threshold_db=0,.belief_propagation=true});
-    dec::ConcatMWPM single(dem,{.belief_propagation=true});
-    for (size_t i=0;i<32;i++)
-    {
-        const auto a=gated.decode(shots[i],truth),b=single.decode(shots[i],truth);
-        require(a.flipped_obs[0]==b.flipped_obs[0] && a.has_candidate_gap==b.has_candidate_gap,"Gating used unseen candidates");
-        if (a.has_candidate_gap) require(std::abs(a.candidate_gap_db-b.candidate_gap_db)<1e-9,"Gated candidate gap changed");
-    }
     // Real flagged circuit: posterior weights, debug path, and both matching stages.
     const auto circuit_dem=stim::circuit_to_dem(cc666_si1000(5,5,.001,false),{});
-    dec::concat::CircuitDecoder bp_reference(circuit_dem,false,true,16,false,{3,20261024},{},false,20,true);
+    dec::concat::CircuitDecoder bp_reference(circuit_dem,false,true,16,{3,20261024},{},true);
     dec::ConcatMWPM bp_decoder(circuit_dem,{.ensemble_size=3,.debug=true,.belief_propagation=true});
     stim::DemSampler<64> circuit_sampler(circuit_dem,std::mt19937_64(92815),32);
     circuit_sampler.resample(false);

@@ -25,13 +25,6 @@ using SyndromeRef = stim::simd_bits_range_ref<64>;
 using ObsType = SyndromeType;
 using ObsRef = SyndromeRef;
 
-// Author: OpenAI Codex. Existing serial decoders need no MPI-specific method.
-template<class D> size_t decoding_core_count(const D& decoder)
-{
-    if constexpr (requires { decoder.decoding_core_count(); }) return decoder.decoding_core_count();
-    else return 1;
-}
-
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 

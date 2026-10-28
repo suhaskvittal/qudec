@@ -3,7 +3,7 @@
 
 ConcatMWPM now updates its existing PyMatching graphs when the relevant flag
 syndrome changes. This applies to both the conditional flag policy and
-`--concat-flag-renormalization`, including ensembles and boundary-gap sectors.
+`--concat-flag-renormalization`, including ensembles.
 No additional CLI flag is required.
 
 Each decoder instance compiles the union of its possible check-support classes

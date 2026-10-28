@@ -27,7 +27,7 @@ nonempty returned diagnostic string.
 ```sh
 qudec_chains concat_mwpm -d 7 -k 3 -pheno -n 1 --print-chains 1 --debug
 qudec_chains concat_mwpm --code cc488 -d 5 -k 2 -n 1 --print-chains 1 \
-    --concat-ensemble 3 --concat-boundary-gap --debug
+    --concat-ensemble 3 --debug
 ```
 
 ## Concatenated MWPM
@@ -35,10 +35,8 @@ qudec_chains concat_mwpm --code cc488 -d 5 -k 2 -n 1 --print-chains 1 \
 The trace records actual matching calls rather than rerunning matching for
 presentation. It reports:
 
-- Each first-stage attempt on `!R` (GB), `!G` (BR) and `!B` (RG), its ensemble
-  member and boundary-parity mask. Without boundary gap the mask is a placeholder
-  and is labeled "ordinary boundaries". With boundary gap, its two bits specify
-  parity for colors `(ignored_color+1)%3` and `(ignored_color+2)%3`.
+- Each first-stage attempt on `!R` (GB), `!G` (BR) and `!B` (RG), with its
+  ensemble member.
 - Matched endpoints and ordered first-stage paths, with edge probabilities and
   natural-log weights `W=-log(p)`. `base_p` is the flag-conditioned projected
   probability before ensemble perturbation; `p` is the value used by that member.
@@ -47,13 +45,11 @@ presentation. It reports:
   projected edges do not create fired virtual detectors, as in normal decoding.
 - The second-stage matched endpoints and ordered paths, model event IDs,
   candidate correction weights and logical predictions, and the final winner.
-- First-stage solutions coalesced before stage two, and infeasible sectors.
+- First-stage solutions coalesced before stage two, and infeasible candidates.
 
 Real vertices use original DEM detector IDs with color, detector time and basis,
 for example `D85[R,t=4,Z]`. These global IDs agree with the chain event listings
-and the ASCII legend. `RBoundary`, `GBoundary` and `BBoundary` are explicit spatial
-parity vertices when applicable; `BoundarySink` denotes PyMatching's collapsed
-boundary. These are distinct kinds of vertices.
+and the ASCII legend. `BoundarySink` denotes PyMatching's collapsed boundary.
 
 `Cj` denotes an equivalence class keyed **only by the unflagged check-detector
 support**, using the adapter's existing memory-basis projection and full detector

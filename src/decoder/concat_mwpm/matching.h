@@ -24,8 +24,7 @@
 namespace dec::concat
 {
 
-// Contributor: OpenAI Codex. Provenance of projected singleton endpoints.
-// Unknown endpoints retain colorless sink access in every boundary-parity sector.
+// Contributor: OpenAI Codex. Spatial/temporal provenance retained for diagnostics.
 enum class BoundaryHint { Unknown, Spatial, Temporal };
 
 struct Event
@@ -43,6 +42,7 @@ struct Model
     std::vector<int> colors;
     std::vector<Event> events;
     bool flag_renormalization{false}; // Prefer supported contributions after projection.
+    bool boundary_gap{false}; // Add spatial boundary parity vertices to stage one.
 };
 
 struct Result
@@ -54,26 +54,15 @@ struct Result
     std::vector<std::vector<size_t>> restricted_edges;
     // Ordered original-model event IDs on each second-stage matched path.
     std::vector<std::vector<size_t>> second_stage_paths;
-    // Contributor: OpenAI Codex. Bits fire boundary parity vertices of colors (color+1)%3 and (color+2)%3.
-    // In boundary-gap mode zero means even and one means odd. Spatial boundary
-    // vertex IDs in restricted_edges are model.colors.size()+color.
-    int boundary_mask{3};
     // Contributor: OpenAI Codex. Ensemble provenance and coalesced second-stage input.
     size_t member{0};
     std::vector<size_t> virtual_detectors;
     // Author: OpenAI Codex. Best sampled opposing-frame margin, natural-log units.
     // Missing means no opposing frame was found; this is not infinite confidence.
     std::optional<double> candidate_gap;
+    // Author: OpenAI Codex. Parity sector of the two retained boundaries in stage one.
+    int boundary_mask{3};
 
-};
-
-// Contributor: OpenAI Codex. Adaptive first-stage ensemble decision.
-struct GatedResult
-{
-    Result result;
-    double gap_db;
-    bool used_ensemble;
-    int baseline_color{-1};
 };
 
 // Contributor: OpenAI Codex. Fixed first-stage graph ensemble; member zero is unperturbed.
@@ -90,17 +79,6 @@ struct Statistics
     size_t ensemble_updates{0}; // OpenAI Codex: graphs prepared on demand.
 };
 
-// Author: OpenAI Codex. Transferable first-stage work for grouped MPI decoding.
-// Selected IDs name the shared projection topology; path data is optional.
-struct FirstStageResult
-{
-    int color, boundary_mask;
-    size_t member;
-    std::vector<size_t> selected;
-    std::vector<std::vector<size_t>> paths;
-    std::vector<std::vector<int64_t>> nodes;
-};
-
 // Contributor: OpenAI Codex. Names map local checks to original DEM detectors.
 struct DebugTrace
 {
@@ -114,21 +92,12 @@ public:
     // Section 3 uses uniform restricted-lattice weights for code capacity.
     // Algorithm 1 uses compressed projected probabilities for noisy readout.
     explicit Decoder(Model, bool uniform_restricted_weights = false,
-                     bool boundary_gap = false, EnsembleConfig config = {},
+                     EnsembleConfig config = {},
                      bool edge_weight_updates = false);
     Result decode(const std::vector<uint8_t>& syndrome);
-    GatedResult decode_gated(const std::vector<uint8_t>& syndrome, double threshold_db,
-        DebugTrace* debug = nullptr);
     std::array<Result, 3> decode_colors(const std::vector<uint8_t>& syndrome, bool trace = true);
-    // Contributor: OpenAI Codex. Three original or every feasible boundary-parity candidate (normally six).
+    // Three color candidates per ensemble member, coalesced by second-stage syndrome.
     std::vector<Result> decode_candidates(const std::vector<uint8_t>& syndrome, bool trace = true, DebugTrace* debug = nullptr);
-    std::vector<FirstStageResult> decode_first_stage(const std::vector<uint8_t>&,
-        size_t worker, size_t workers, bool paths = false);
-    // The complete first-stage array must have serial member/color/sector order.
-    // Coalescing occurs globally before distributing second-stage work.
-    std::vector<Result> decode_second_stage(const std::vector<uint8_t>&,
-        const std::vector<FirstStageResult>&, size_t worker, size_t workers,
-        bool trace = false, DebugTrace* debug = nullptr);
     size_t ambiguous_boundary_events() const;
     // Verify the actual integer matching/search weights against -log(probability).
     size_t audit_weights();
@@ -151,12 +120,10 @@ private:
     EnsembleConfig config_;
     bool uniform_;
     bool edge_weight_updates_; // OpenAI Codex: sparse API for BP/renormalization.
-    bool collect_gap_{false};
     std::map<std::vector<size_t>,size_t> event_slots_;
     std::vector<size_t> active_events_;
-    std::optional<Result> decode_color(const std::vector<uint8_t>&, int color, int mask, size_t member, bool trace,
-        std::map<std::vector<uint64_t>,bool>& seen, DebugTrace* debug,
-        const FirstStageResult* first = nullptr);
+    std::optional<Result> decode_color(const std::vector<uint8_t>&, int color, size_t member, int boundary_mask, bool trace,
+        std::map<std::vector<uint64_t>,bool>& seen, DebugTrace* debug);
 };
 
 } // namespace dec::concat
