@@ -1,5 +1,8 @@
 # Comparing pre-decoding gap prediction at distances 7 and 9
 
+The `export_affinity_dataset` commands below document a historical study. The
+standalone exporter has been removed from the current build.
+
 Contributor: OpenAI Codex.
 
 This experiment follows the [million-shot d=7 study](gap-confidence-million-study.md).

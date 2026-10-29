@@ -13,8 +13,7 @@ With `--rounds -1` (the default), circuit-level and phenomenological runs use
 the selected code's distance for the number of rounds. Code capacity always
 uses one round. An explicit positive `--rounds` overrides the default except
 for code capacity, which requires one round. SI1000 uses Bell-flagged extraction;
-`-cap` and `-pheno` use ideal product-check measurements. `--superdense` applies
-only to planar color codes.
+`-cap` and `-pheno` use ideal product-check measurements.
 
 | Code name | Dataset directory | Default rounds |
 |---|---|---:|

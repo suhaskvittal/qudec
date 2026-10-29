@@ -2,7 +2,7 @@
  *  contributor: OpenAI Codex
  * */
 
-#include "libra_rare_event.h"
+#include "rare_event.h"
 
 #include <array>
 #include <stdexcept>
@@ -20,7 +20,7 @@ int main()
         "error(0.1) D0 L0\n"
         "error(0.4) D1 L0\n"
         "error(0.7) D2 L0\n");
-    LibraRareEventSampler sampler(dem, 4);
+    ConditionalErrorSampler sampler(dem, 4);
     const auto& pk = sampler.count_probabilities();
 
     const std::array<double, 4> expected{

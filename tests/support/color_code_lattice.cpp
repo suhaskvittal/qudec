@@ -2,19 +2,16 @@
  *  author: OpenAI Codex
  *  date:   21 October 2026
  *
- *  Algorithm references: Kubica--Delfosse, arXiv:1905.07393;
- *  triangular-boundary assignment components follow the construction used
- *  by Suhas Vittal in qontra/src/qontra/decoder/restriction.cpp.
- *  This is an independent implementation, using vendored PyMatching.
+ *  Test-only triangular color-code lattice construction.
  * */
-#include "decoder/restriction/lattice.h"
+#include "color_code_lattice.h"
 #include "circuit_generator.h"
 
 #include <cmath>
 #include <set>
 #include <stdexcept>
 
-namespace dec::restriction
+namespace test_support
 {
 
 namespace
@@ -97,4 +94,4 @@ make_code_capacity_lattice(bool octagons, uint32_t distance, double p)
     return out;
 }
 
-} // namespace dec::restriction
+} // namespace test_support

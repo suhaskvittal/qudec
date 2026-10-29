@@ -1,5 +1,8 @@
 # Predicting surface-code gaps before decoding
 
+The `export_affinity_dataset` commands below document a historical study. The
+standalone exporter has been removed from the current build.
+
 Contributor: OpenAI Codex.
 
 This study asks whether syndrome and fixed detector-error-model (DEM) features

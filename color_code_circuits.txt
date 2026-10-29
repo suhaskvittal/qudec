@@ -8,7 +8,7 @@ Public API (src/circuit_generator.h):
     stim::Circuit cc488_si1000(uint32_t distance, uint32_t rounds,
                               double p, bool is_memory_x, bool include_opposite_basis_detectors = false);
 
-Implemented in src/color_code_circuits.cpp and linked into qudeclib.
+Implemented in src/circuit_generator/planar_color_code.cpp and linked into qudeclib.
 Example: auto circuit = cc488_si1000(5, 5, 0.001, false);
 Write circuit.str() to a .stim file to use it with other Stim tools.
 The `qudec` CLI exposes this detector option with `--include-opposite-basis-detectors`.
@@ -205,24 +205,3 @@ Data/check tags preserve spatial/temporal provenance in Stim DEM errors and
 through component-rate rewriting. Native generators support nonuniform data
 and check rates. CLI: -cap/--code-capacity and -pheno/--phenomenological;
 see docs/ideal_noise_models.md for full interface and model assumptions.
-
-Superdense extraction (Author: OpenAI Codex)
-------------------------------------------
-cc666_superdense and cc488_superdense in circuit_generator.h implement the
-triangular superdense schedules of arXiv:2609.21376v3. Both accept a noise
-policy, memory basis, opposite-basis option and component-rate distribution.
-The CNOT representation is the default; native CZ is an optional compilation.
-CLI: --superdense, --superdense-start-phase 0|1. CLI extraction uses CNOTs.
-cc666 supports odd d>=3 and uses eight CNOT layers per complete cycle.
-cc488 uses the published shared-ancilla brickwork layout, all 90 local
-boundary scheduling classes, and alternating twelve-layer cycles. This
-specific family supports d=3,7,11,15,..., not every odd distance.
-Detectors track incoming/outgoing check parities and logical Pauli-frame
-updates derived by binary CSS Choi elimination. Colors and bases retain the
-six-coordinate format. Independent 4.8.8 routing flags are colorless and
-single-cycle detectors. No comparison of successive flags is performed.
-Use Tesseract for noisy superdense decoding: the existing concatenated-MWPM
-implementation rejects some of these circuits' hyperedge shapes.
-See docs/superdense_color_code_circuits.md for API, circuit boundaries,
-metadata conventions and validation; docs/superdense_source_NOTICE.md
-records upstream authors and the retained source license.

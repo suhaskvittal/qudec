@@ -52,7 +52,7 @@ adapter convention.
 ## C++ generators
 
 Declared in `src/circuit_generator.h` and implemented with the existing layout
-functions in `src/color_code_circuits.cpp`:
+functions in `src/circuit_generator/planar_color_code.cpp`:
 
 ```cpp
 auto capacity = cc666_code_capacity(distance, p, memory_x);

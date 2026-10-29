@@ -124,7 +124,9 @@ void check_schedule_and_noise(const stim::Circuit& circuit, double p) {
             require(near(op.args[0], p), "Wrong SI1000 two-qubit depolarization");
             channels.insert(op.gate_type);
         } else if (op.gate_type == stim::GateType::X_ERROR) {
-            require(near(op.args[0], 2 * p) || near(op.args[0], 5 * p), "Wrong reset/readout error rate");
+            require(op.tag == "qudec_data" ? near(op.args[0], p)
+                    : near(op.args[0], 2 * p) || near(op.args[0], 5 * p),
+                    "Wrong SI1000 X-error rate");
             channels.insert(op.gate_type);
         }
     });

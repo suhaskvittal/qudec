@@ -8,8 +8,6 @@ This opt-in implements a DEM-based adaptation of Section 3.4 (Section III D in
 
 ```sh
 qudec concat_mwpm -d 5 -p 0.0005 --code cc666 --concat-flag-renormalization
-qudec_chains concat_mwpm -d 5 -r 5 -k 2 -p 0.0005 --all \
-    --concat-flag-renormalization --debug --print-failures 1
 ```
 
 The corresponding `dec::ConcatMWPM::config_type` fields are

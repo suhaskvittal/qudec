@@ -1,4 +1,4 @@
-// Author: OpenAI Codex. Shared Tesseract options for qudec and qudec_chains.
+// Author: OpenAI Codex. Tesseract options for qudec.
 #ifndef QUDEC_TESSERACT_OPTIONS_H
 #define QUDEC_TESSERACT_OPTIONS_H
 

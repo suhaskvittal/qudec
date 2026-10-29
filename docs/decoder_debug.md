@@ -14,16 +14,13 @@ auto result = decoder.decode(syndrome, unused_truth);
 std::cout << result.debug_info;
 ```
 
-Both CLIs expose `--debug` for `concat_mwpm`. Unsupported decoders reject this option. In
-`qudec_chains`, diagnostic text is printed with each chain selected by
-`--print-failures N` or `--print-chains N`. Debug does not by itself print every
-sampled chain. Normal `qudec` Monte Carlo and rare-event sampling print every
-nonempty returned diagnostic string.
+`qudec` exposes `--debug` for `concat_mwpm`. Unsupported decoders reject this
+option. Monte Carlo and rare-event sampling print every nonempty returned
+diagnostic string.
 
 ```sh
-qudec_chains concat_mwpm -d 7 -k 3 -pheno -n 1 --print-chains 1 --debug
-qudec_chains concat_mwpm --code cc488 -d 5 -k 2 -n 1 --print-chains 1 \
-    --concat-ensemble 3 --debug
+qudec concat_mwpm -d 7 -pheno --mc-max-samples 100 --debug
+qudec concat_mwpm --code cc488 -d 5 --concat-ensemble 3 --debug
 ```
 
 ## Concatenated MWPM

@@ -2,12 +2,11 @@ Author: OpenAI Codex
 
 # Auxiliary-detector BP preprocessing for concatenated MWPM
 
-Enable `--concat-bp` with `concat_mwpm` in either `qudec` or `qudec_chains`:
+Enable `--concat-bp` with `qudec concat_mwpm`:
 
 ```
 qudec concat_mwpm -d 7 --code cc666 -p 0.001 --concat-ensemble 60 --concat-bp \
     --include-opposite-basis-detectors
-qudec_chains concat_mwpm -d 7 -k 2 -n 100 --concat-bp --debug
 ```
 
 This optional mode replaces flag representative selection and flag

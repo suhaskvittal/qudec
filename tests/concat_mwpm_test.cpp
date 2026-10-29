@@ -8,7 +8,7 @@
 #include "circuit_generator.h"
 #include "decoder/concat_mwpm.h"
 #include "decoder/concat_mwpm/circuit.h"
-#include "decoder/restriction/lattice.h"
+#include "support/color_code_lattice.h"
 #include <stim/util_top/circuit_to_dem.h>
 
 #include <cmath>
@@ -142,7 +142,7 @@ incident_flag_weights()
 void
 capacity()
 {
-    const auto lattice = dec::restriction::make_code_capacity_lattice(false,5,.01);
+    const auto lattice = test_support::make_code_capacity_lattice(false,5,.01);
     dec::concat::Model model;
     for (size_t v = 0; v < lattice.num_checks; v++) model.colors.push_back(lattice.vertices[v].color);
     for (const auto& face : lattice.faces)

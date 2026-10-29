@@ -2,17 +2,17 @@
  *  author: OpenAI Codex
  *  date:   21 October 2026
  *
- *  Color-code lattice representation used by matching tests.
+ *  Color-code lattice fixture for matching tests.
  * */
-#ifndef DECODER_RESTRICTION_LATTICE_h
-#define DECODER_RESTRICTION_LATTICE_h
+#ifndef TESTS_COLOR_CODE_LATTICE_H
+#define TESTS_COLOR_CODE_LATTICE_H
 
 #include <stim.h>
 #include <array>
 #include <cstdint>
 #include <vector>
 
-namespace dec::restriction
+namespace test_support
 {
 
 using det_id_type = int32_t;
@@ -47,5 +47,5 @@ struct Lattice
 
 Lattice make_code_capacity_lattice(bool octagons, uint32_t distance, double p);
 
-} // namespace dec::restriction
+} // namespace test_support
 #endif

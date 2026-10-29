@@ -86,35 +86,8 @@ uncertainty within sampled levels.
 Sample and error budgets are global across MPI ranks. Error stopping occurs
 after synchronized batches and can overshoot the error target; the sample
 limit is respected exactly. Legacy configurations that skip levels or start
-above K=0 are rejected. `LibraRareEventSampler` remains a compatibility alias.
+above K=0 are rejected.
 IEEE floating point behavior is retained for Libra scores and sampler bounds.
-
-## Corrected splitting evaluator
-
-For very small logical error rates, the existing corrected splitting method
-remains available as a normal build target:
-
-```sh
-.agentic_artifacts/build/libra_splitting_evaluate \
-    13 64 3000000 20261001 .agentic_artifacts/splitting_d13.txt \
-    0.8 8 1000 512 4
-```
-
-Arguments are distance, worker threads (at most 64), tilted base-shot cap,
-seed, output path, initial odds tilt, bridge count, burn-in, records per
-worker per stage, and proposal stride. It uses SI1000 p=1e-3, Z memory,
-rounds=distance, and opposing basis detectors. Run one process: this executable
-uses threads internally. It enables the validated local-swap kernel,
-systematic resampling, and fast failure-union callback used for the reported
-distance 13–17 results. It evaluates Libra and ordinary PyMatching together.
-Its sampling records are correlated, and its diagnostics should be retained.
-
-The shared-shot Monte Carlo and latency evaluator is also built normally:
-
-```sh
-.agentic_artifacts/build/libra_evaluate mc \
-    9 64 10000000 20261001 .agentic_artifacts/libra_mc_d9.txt --max-errors 20
-```
 
 ## C++ API
 

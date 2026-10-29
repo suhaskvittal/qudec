@@ -1,6 +1,6 @@
 /* Contributor: OpenAI Codex. Harmony prototype, arXiv:2401.12434. */
 #include "harmony.h"
-#include "harmony_likelihood.h"
+#include "harmony/likelihood.h"
 #include <pymatching/sparse_blossom/driver/mwpm_decoding.h>
 #include <pymatching/sparse_blossom/driver/user_graph.h>
 #include <algorithm>

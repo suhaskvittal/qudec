@@ -2,6 +2,10 @@ LIBRA: IMPLEMENTATION, EVALUATION, AND GPU RESOURCE ANALYSIS
 ==========================================================
 Evaluation dates: 2026-10-01 to 2026-10-02
 
+Archival study record: the standalone Libra evaluators and their three libra_*
+helper headers were removed from the current build. Paths and build commands
+below describe the historical study, not the current source tree.
+
 Results for SI1000 p=0.001, opposing basis detectors enabled:
 
  d   method       PyMatching LER      Libra LER   PM/Libra   Libra mean us

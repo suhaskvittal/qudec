@@ -1,5 +1,8 @@
 # Million-shot study of pre-decoding gap confidence
 
+The `export_affinity_dataset` commands below document a historical study. The
+standalone exporter has been removed from the current build.
+
 Contributor: OpenAI Codex.
 
 This follows the [initial affinity study](affinity-gap-study.md) and the

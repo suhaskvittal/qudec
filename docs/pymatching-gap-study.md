@@ -1,5 +1,8 @@
 # PyMatching gap studies
 
+The `qudec_eval_gap` commands below document a historical study. The standalone
+evaluator has been removed from the current build.
+
 Contributor: OpenAI Codex.
 
 ## Complementary gap statistics

@@ -2,12 +2,10 @@
 #include "circuit_generator.h"
 #include "decoder/concat_mwpm.h"
 #include "decoder/concat_mwpm/circuit.h"
-#include "error_chain.h"
 #include <stim/util_top/circuit_to_dem.h>
 
 #include <cmath>
 #include <iostream>
-#include <sstream>
 #include <stdexcept>
 
 namespace
@@ -85,21 +83,9 @@ void native_models()
         }
     }
 }
-void chain_output()
-{
-    const stim::DetectorErrorModel dem("error(0.1) D0 L0");
-    std::ostringstream out;
-    evaluate_error_chains(dem,{.length=1,.samples=1,.print_chains=1},[](auto,auto)
-    {
-        dec::Result result;
-        result.debug_info = "decoder-specific sentinel\n";
-        return result;
-    },out);
-    require(out.str().find("Decoder decisions:\ndecoder-specific sentinel")!=std::string::npos,"Chain report drops debug_info");
-}
 }
 int main()
 {
-    try {flags(); native_models(); chain_output(); std::cout << "Decoder debug tests passed\n";}
+    try {flags(); native_models(); std::cout << "Decoder debug tests passed\n";}
     catch (const std::exception& error) {std::cerr << error.what() << '\n'; return 1;}
 }
