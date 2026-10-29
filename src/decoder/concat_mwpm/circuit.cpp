@@ -33,7 +33,7 @@ read_faults(const stim::DetectorErrorModel& dem)
         for (auto target : instruction.target_data)
         {
             if (target.is_relative_detector_id()) fault.detectors.push_back(target.val());
-            else if (target.is_observable_id()) fault.observable ^= uint64_t{1} << target.val();
+            else if (target.is_observable_id()) fault.observable.toggle(target.val());
             else throw std::invalid_argument("Need original, undecomposed DEM events");
         }
         faults.push_back(std::move(fault));
@@ -65,8 +65,8 @@ CircuitDecoder::CircuitDecoder(const stim::DetectorErrorModel& dem, bool memory_
         throw std::invalid_argument("Flag renormalization needs 0 <= physical error rate < 1");
     if (ensemble.size == 0 || !(ensemble.spread_scale >= 0) || !std::isfinite(ensemble.spread_scale))
         throw std::invalid_argument("Invalid concatenated matching ensemble configuration");
-    if (dem.count_observables() != 1 || cache_capacity == 0)
-        throw std::invalid_argument("Concatenated MWPM needs one observable and positive cache capacity");
+    if (dem.count_observables() == 0 || cache_capacity == 0)
+        throw std::invalid_argument("Concatenated MWPM needs observables and positive cache capacity");
     std::vector<size_t> local(num_detectors, SIZE_MAX);
     std::vector<bool> keep_flag(num_detectors,false);
     for (const auto& [global, c] : coordinates)
@@ -108,7 +108,7 @@ CircuitDecoder::CircuitDecoder(const stim::DetectorErrorModel& dem, bool memory_
     // before marginalization; a flag+opposite-basis-check fault is not an
     // isolated flag flip. Correlated multi-flag faults are not singletons.
     for (const auto& fault : faults)
-        if (fault.detectors.size() == 1 && fault.observable == 0 &&
+        if (fault.detectors.size() == 1 && !fault.observable &&
             keep_flag[fault.detectors[0]])
         {
             auto& old = measurement_p_[fault.detectors[0]];
@@ -122,7 +122,7 @@ CircuitDecoder::CircuitDecoder(const stim::DetectorErrorModel& dem, bool memory_
     // Contributor: OpenAI Codex. Check the complete original detector signature
     // before discarding any opposite-basis checks. Different flag signatures
     // may distinguish different logical effects; identical full signatures cannot.
-    std::map<std::vector<size_t>,std::pair<uint64_t,size_t>> signatures;
+    std::map<std::vector<size_t>,std::pair<Frame,size_t>> signatures;
     for (size_t id = 0; id < faults.size(); id++)
     {
         const auto& fault = faults[id];
@@ -143,7 +143,7 @@ CircuitDecoder::CircuitDecoder(const stim::DetectorErrorModel& dem, bool memory_
     }
     // Marginalize opposite-basis checks and same-basis extraction flags. Merge
     // independent variants only when checks, flags and logical effects agree.
-    using Key = std::tuple<std::vector<size_t>, uint64_t, std::vector<size_t>>;
+    using Key = std::tuple<std::vector<size_t>, Frame, std::vector<size_t>>;
     std::map<Key, double> probabilities;
     std::map<Key, std::pair<BoundaryHint,bool>> provenance;
     for (const auto& fault : faults)
@@ -231,7 +231,7 @@ CircuitDecoder::CircuitDecoder(const stim::DetectorErrorModel& dem, bool memory_
             bp_aux_globals_.push_back(d);
         std::map<std::vector<size_t>,size_t> class_ids;
         for (size_t id=0;id<classes_.size();id++) class_ids[classes_[id].checks]=id;
-        using BPKey=std::tuple<size_t,uint64_t,std::vector<size_t>>;
+        using BPKey=std::tuple<size_t,Frame,std::vector<size_t>>;
         std::map<BPKey,double> merged;
         for (const auto& fault:faults)
         {
@@ -259,7 +259,7 @@ CircuitDecoder::CircuitDecoder(const stim::DetectorErrorModel& dem, bool memory_
         flag_bp_=std::make_unique<FlagBP>(num_detectors,std::move(variables));
         // Allocate frame slots once, preserving the map's ascending-frame tie rule
         // and variable summation order used by the original implementation.
-        std::vector<std::set<uint64_t>> labels(classes_.size());
+        std::vector<std::set<Frame>> labels(classes_.size());
         for (const auto& variable:flag_bp_->variables()) if (variable.class_id!=SIZE_MAX)
             labels[variable.class_id].insert(variable.observable);
         bp_frame_offsets_.push_back(0);
@@ -356,7 +356,7 @@ CircuitDecoder::make_context(const std::vector<uint8_t>& syndrome) const
                 best_distance = distance;
             }
         }
-        const uint64_t observable = selected ? selected->observable : 0;
+        const Frame observable = selected ? selected->observable : Frame{};
         double probability = selected ? selected->probability : 0;
         double denominator = 1;
         const bool flag_supported = selected && !selected->flags.empty();
@@ -450,7 +450,7 @@ CircuitDecoder::memory_syndrome(const std::vector<uint8_t>& full) const
     return out;
 }
 
-uint64_t
+Frame
 CircuitDecoder::decode(const std::vector<uint8_t>& full, std::string* debug_info)
 {
     if (!debug_info)
@@ -535,10 +535,10 @@ CircuitDecoder::fault_syndrome(const std::vector<size_t>& ids) const
     return out;
 }
 
-uint64_t
+Frame
 CircuitDecoder::fault_observable(const std::vector<size_t>& ids) const
 {
-    uint64_t out = 0;
+    Frame out;
     for (auto id : ids) out ^= faults.at(id).observable;
     return out;
 }

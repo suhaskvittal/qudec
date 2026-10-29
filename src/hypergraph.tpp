@@ -1,4 +1,5 @@
 /*
+ * author: Suhas Vittal
  * author: OpenAI GPT-6-Luna
  * contributor: OpenAI Codex (template macro cleanup).
  * purpose: Provide template definitions for the standalone global Hypergraph.
@@ -11,6 +12,10 @@
 
 #define TEMPL_PARAM template <class V, class E, size_t K>
 #define TEMPL_CLASS Hypergraph<V,E,K>
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
 TEMPL_PARAM typename TEMPL_CLASS::id_type
 TEMPL_CLASS::add_vertex(V d)
 {

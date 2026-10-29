@@ -18,6 +18,7 @@
 #include <sampler.h>
 #include <error_chain.h>
 #include "qudec_cli.h"
+#include "code_catalog.h"
 #include "tesseract_options.h"
 
 #include <stim/gen/gen_surface_code.h>
@@ -31,6 +32,7 @@
 #include <limits>
 #include <stdexcept>
 #include <chrono>
+#include <filesystem>
 
 #if defined(ENABLE_MPI)
 #include <mpi.h>
@@ -108,8 +110,8 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
             .optional("", "--print-chains", "Print the first N chains, including correctly decoded chains", print_chains, 0)
             .optional("", "--error-model", "si1000, code_capacity, or phenomenological", chain_error_model, "si1000");
     }
-    else parser.required("code-distance", "Code distance", d);
-    parser.optional("-c", "--code", chain_mode ? "Color code: cc666 (default) or cc488" : "Code family: sc, cc666, or cc488 (default: cc666 for color-code decoders, sc otherwise)", code_name, "")
+    else parser.optional_positional("code-distance", "Planar code distance (ignored for named hyperbolic codes)", d, 5);
+    parser.optional("-c", "--code", chain_mode ? "Color code: cc666 (default) or cc488" : "Code: sc, cc666, cc488, or a hycc_* catalog name", code_name, "")
         .optional("-p", "--physical-error-rate", "Physical error rate", p, 1e-3)
         .optional("-r", "--rounds", "Number of rounds (-1 = distance; code capacity uses one)", r, -1)
         .optional("-cap", "--code-capacity", "Use one-round code-capacity noise", code_capacity, false)
@@ -165,6 +167,11 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
     tesseract_options.add_arguments(parser);
     parser.parse(argc, argv);
     tesseract_options.validate(decoder_name,argc,argv);
+    const bool color_decoder = decoder_name == "concat_mwpm" ||
+        decoder_name == "restriction" || decoder_name == "correlated_restriction";
+    if (code_name.empty()) code_name = (chain_mode || color_decoder) ? "cc666" : "sc";
+    const CatalogCode* external_code = chain_mode ? nullptr : find_external_code(code_name);
+    if (external_code) d = external_code->default_rounds;
 
     if (chain_mode)
     {
@@ -211,10 +218,8 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
     {
         throw std::invalid_argument("Unknown decoder name: " + decoder_name);
     }
-    const bool color_decoder = decoder_name == "concat_mwpm" || decoder_name == "restriction" || decoder_name == "correlated_restriction";
     if (decoder_debug && !color_decoder)
         throw std::invalid_argument("--debug supports concat_mwpm, restriction, and correlated_restriction");
-    if (code_name.empty()) code_name = (chain_mode || color_decoder) ? "cc666" : "sc";
     if (chain_mode)
     {
         if (code_name != "cc666" && code_name != "cc488")
@@ -222,12 +227,12 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
         chain_config.code = code_name;
         chain_config.distance = static_cast<uint32_t>(d);
     }
-    if (code_name != "sc" && code_name != "cc666" && code_name != "cc488")
-        throw std::invalid_argument("Unknown code family: " + code_name);
-    if (color_decoder && (code_name != "cc666" && code_name != "cc488"))
-        throw std::invalid_argument(decoder_name+" requires --code cc666 or cc488");
-    if (superdense && (code_name=="sc" || code_capacity || phenomenological))
-        throw std::invalid_argument("--superdense requires a color code and SI1000 noise");
+    if (code_name != "sc" && code_name != "cc666" && code_name != "cc488" && !external_code)
+        throw std::invalid_argument("Unknown code: " + code_name);
+    if (color_decoder && (code_name != "cc666" && code_name != "cc488" && !external_code))
+        throw std::invalid_argument(decoder_name+" requires a color code");
+    if (superdense && (code_name=="sc" || external_code || code_capacity || phenomenological))
+        throw std::invalid_argument("--superdense supports planar color codes with SI1000 noise");
     if ((!superdense && superdense_start_phase) || superdense_start_phase<0 ||
         superdense_start_phase>(code_name=="cc488" ? 1:0))
         throw std::invalid_argument("Invalid --superdense-start-phase or missing --superdense");
@@ -328,6 +333,11 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
         circuit = cc666_circuit(d,r,operation_policy,false,include_opposite_basis_detectors,noise_distribution);
     else if (code_name == "cc488")
         circuit = cc488_circuit(d,r,operation_policy,false,include_opposite_basis_detectors,noise_distribution);
+    else if (external_code)
+        circuit = hyperbolic_color_code_circuit(
+            (std::filesystem::path(QUDEC_SOURCE_DIR) / "hyperbolic_color_codes_L2" /
+             external_code->directory).string(), static_cast<uint32_t>(r), operation_policy,
+            false, include_opposite_basis_detectors, noise_distribution);
     else
         circuit = sc_circuit(d,r,operation_policy,false,include_opposite_basis_detectors,noise_distribution);
     if (world_rank == 0 && noise_distribution.log_stddev > 0)

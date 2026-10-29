@@ -10,6 +10,7 @@
 
 #include <stim.h>
 #include <pymatching/sparse_blossom/driver/mwpm_decoding.h>
+#include "decoder/concat_mwpm/frame.h"
 
 #include <array>
 #include <cstddef>
@@ -31,7 +32,7 @@ struct Event
 {
     double probability;
     std::vector<size_t> detectors;
-    uint64_t observable;
+    Frame observable;
     BoundaryHint boundary_hint{BoundaryHint::Unknown};
     // Author: OpenAI Codex. Raw single-fault contribution to the paper's C_f.
     bool flag_supported{false};
@@ -47,7 +48,7 @@ struct Model
 
 struct Result
 {
-    uint64_t observable;
+    Frame observable;
     double weight;
     int color;
     std::vector<size_t> events;
@@ -106,7 +107,10 @@ public:
     // constructor's event supports and change their frames and probabilities.
     void update(Model);
     // Author: OpenAI Codex. Same ordered, positive event supports; no model copies.
-    void update_dense(const std::vector<double>&,const std::vector<uint64_t>&);
+    void update_dense(const std::vector<double>&,const std::vector<Frame>&);
+    void update_dense(const std::vector<double>& probabilities,const std::vector<uint64_t>& low_frames) {
+        update_dense(probabilities, std::vector<Frame>(low_frames.begin(), low_frames.end()));
+    }
     Model model;
     Statistics statistics;
 

@@ -31,7 +31,10 @@ void SI1000NoisePolicy::append(stim::Circuit& c,const CircuitOperation& op) cons
         case CircuitOperationKind::GateIdle: noise("DEPOLARIZE1",p/10);break;
         case CircuitOperationKind::MeasurementIdle: noise("DEPOLARIZE1",2*p);break;
         case CircuitOperationKind::PostMeasurement: noise("DEPOLARIZE1",p);break;
-        case CircuitOperationKind::RoundStart: break;
+        case CircuitOperationKind::RoundStart: 
+            c.safe_append_ua("X_ERROR",op.targets,p,"qudec_data");
+            c.safe_append_ua("Z_ERROR",op.targets,p,"qudec_data");
+            break;
         case CircuitOperationKind::ProductMeasurement:
             throw std::invalid_argument("SI1000 needs an explicit extraction gate schedule");
     }

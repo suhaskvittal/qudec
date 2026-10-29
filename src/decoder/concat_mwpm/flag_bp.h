@@ -6,6 +6,8 @@
 #ifndef DECODER_CONCAT_MWPM_FLAG_BP_h
 #define DECODER_CONCAT_MWPM_FLAG_BP_h
 
+#include "decoder/concat_mwpm/frame.h"
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -18,7 +20,7 @@ struct FlagBPVariable
     double probability;
     std::vector<size_t> flags; // Original auxiliary detector IDs: flags or opposite-basis checks.
     size_t class_id{SIZE_MAX}; // Pure auxiliary faults have no matching event.
-    uint64_t observable{0};
+    Frame observable{};
 };
 
 class FlagBP

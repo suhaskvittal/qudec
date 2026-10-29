@@ -1,0 +1,31 @@
+{
+  "name": "8.8.8_L2_D444-109_n1600_k104",
+  "tiling": "8.8.8",
+  "side_length": 2,
+  "symmetry_group": "Delta(4,4,4)_109",
+  "n": 1600,
+  "k": 104,
+  "d": "14-16",
+  "d_lower_bound": 14,
+  "d_upper_bound": 16,
+  "num_checks": 750,
+  "rank_H": 748,
+  "orientable": true,
+  "euler_characteristic": -50,
+  "num_octagon_modules": 50,
+  "check_weight_histogram_by_color": {
+    "0": {
+      "6": 200,
+      "8": 50
+    },
+    "1": {
+      "6": 200,
+      "8": 50
+    },
+    "2": {
+      "6": 200,
+      "8": 50
+    }
+  },
+  "logical_basis": "tree_cotree_gram_schmidt"
+}

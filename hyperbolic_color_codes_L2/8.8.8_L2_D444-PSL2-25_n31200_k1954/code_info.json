@@ -1,0 +1,31 @@
+{
+  "name": "8.8.8_L2_D444-PSL2-25_n31200_k1954",
+  "tiling": "8.8.8",
+  "side_length": 2,
+  "symmetry_group": "Delta(4,4,4)|PSL(2,25)",
+  "n": 31200,
+  "k": 1954,
+  "d": "22-24",
+  "d_lower_bound": 22,
+  "d_upper_bound": 24,
+  "num_checks": 14625,
+  "rank_H": 14623,
+  "orientable": false,
+  "euler_characteristic": -975,
+  "num_octagon_modules": 975,
+  "check_weight_histogram_by_color": {
+    "0": {
+      "6": 3900,
+      "8": 975
+    },
+    "1": {
+      "6": 3900,
+      "8": 975
+    },
+    "2": {
+      "6": 3900,
+      "8": 975
+    }
+  },
+  "logical_basis": "tree_cotree_gram_schmidt"
+}

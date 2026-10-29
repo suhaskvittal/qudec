@@ -71,7 +71,7 @@ void tests()
     dec::SyndromeType input(core.num_detectors);
     for (size_t v=0;v<syndrome.size();v++) input[v]=syndrome[v];
     dec::ObsType truth(1);
-    require(wrapper.decode(input,truth).flipped_obs[0] == detail.correction.observable,
+    require(wrapper.decode(input,truth).flipped_obs[0] == static_cast<uint64_t>(detail.correction.observable),
             "Wrapper lost renormalization configuration");
     bool rejected = false;
     try { dec::concat::CircuitDecoder invalid(dem,false,true,16,{}, {true,-.1}); }

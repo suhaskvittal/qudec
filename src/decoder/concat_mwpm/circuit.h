@@ -26,7 +26,7 @@ struct CircuitFault
 {
     double probability;
     std::vector<size_t> detectors;
-    uint64_t observable;
+    Frame observable;
     // Contributor: OpenAI Codex. Reserved native-generator noise tags.
     BoundaryHint boundary_hint{BoundaryHint::Unknown};
 };
@@ -34,7 +34,7 @@ struct CircuitFault
 struct FlagWeight
 {
     std::vector<size_t> checks; // Local memory-sector detector IDs.
-    uint64_t observable;
+    Frame observable;
     double unflagged_probability;
     double effective_probability;
     size_t relevant_flags;
@@ -69,13 +69,13 @@ public:
                    bool use_flags = true, size_t cache_capacity = 16,
                    EnsembleConfig ensemble = {}, FlagRenormalization renormalization = {},
                    bool belief_propagation = false, bool boundary_gap = false);
-    uint64_t decode(const std::vector<uint8_t>& full_syndrome, std::string* debug_info = nullptr);
+    Frame decode(const std::vector<uint8_t>& full_syndrome, std::string* debug_info = nullptr);
     // Author: OpenAI Codex. Natural-log gap from the most recent serial decode.
     std::optional<double> candidate_gap() const { return candidate_gap_; }
 
     CircuitResult inspect(const std::vector<uint8_t>& full_syndrome, DebugTrace* debug = nullptr);
     std::vector<uint8_t> fault_syndrome(const std::vector<size_t>& ids) const;
-    uint64_t fault_observable(const std::vector<size_t>& ids) const;
+    Frame fault_observable(const std::vector<size_t>& ids) const;
 
     const size_t num_detectors;
     const std::vector<CircuitFault> faults;
@@ -92,7 +92,7 @@ public:
     {
         std::vector<size_t> flags;
         double probability;
-        uint64_t observable;
+        Frame observable;
     };
     struct Class
     {
@@ -137,7 +137,7 @@ private:
     // Author: OpenAI Codex. Fixed class/frame slots and reusable per-shot numeric buffers.
     void update_bp_context(const std::vector<uint8_t>&);
     std::vector<size_t> bp_frame_offsets_,bp_variable_slots_;
-    std::vector<uint64_t> bp_frame_labels_,bp_frames_;
+    std::vector<Frame> bp_frame_labels_,bp_frames_;
     std::vector<double> bp_frame_mass_,bp_probabilities_;
     Context& context(const std::vector<uint8_t>&);
     std::vector<uint8_t> memory_syndrome(const std::vector<uint8_t>&) const;

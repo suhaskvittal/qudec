@@ -48,9 +48,9 @@ Model
 compress(Model model)
 {
     if (model.colors.empty()) throw std::invalid_argument("Concatenated MWPM needs check detectors");
-    std::map<std::pair<std::vector<size_t>, uint64_t>, double> merged;
-    std::map<std::pair<std::vector<size_t>, uint64_t>, BoundaryHint> boundary_kind;
-    std::map<std::pair<std::vector<size_t>, uint64_t>, bool> supported;
+    std::map<std::pair<std::vector<size_t>, Frame>, double> merged;
+    std::map<std::pair<std::vector<size_t>, Frame>, BoundaryHint> boundary_kind;
+    std::map<std::pair<std::vector<size_t>, Frame>, bool> supported;
     for (auto& e : model.events)
     {
         std::sort(e.detectors.begin(), e.detectors.end());
@@ -629,7 +629,7 @@ Decoder::update(Model input)
 }
 
 void
-Decoder::update_dense(const std::vector<double>& probabilities,const std::vector<uint64_t>& frames)
+Decoder::update_dense(const std::vector<double>& probabilities,const std::vector<Frame>& frames)
 {
     if (probabilities.size()!=model.events.size() || frames.size()!=model.events.size())
         throw std::invalid_argument("Dense update changes event count");
@@ -682,7 +682,7 @@ Decoder::refresh_weights()
             const auto active = active_events_[slot];
             sub.original_events[slot] = active;
             e.probability = active == SIZE_MAX ? 0 : model.events[active].probability;
-            e.observable = active == SIZE_MAX ? 0 : model.events[active].observable;
+            e.observable = active == SIZE_MAX ? Frame{} : model.events[active].observable;
             if (active != SIZE_MAX && sub.second_projection[slot] != SIZE_MAX)
                 e.detectors.back() = sub.virtual_ids[sub.second_projection[slot]];
         }

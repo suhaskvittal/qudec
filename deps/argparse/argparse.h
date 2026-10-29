@@ -7,6 +7,7 @@
 #define ARGPARSE_h
 
 #include <algorithm>
+#include <cctype>
 #include <stdexcept>
 #include <iomanip>
 #include <iostream>
@@ -45,6 +46,7 @@ public:
     };
 private:
     std::vector<required_argument_type> required_arguments;
+    std::vector<required_argument_type> optional_positionals;
     std::vector<optional_argument_type> optional_arguments;
 
     std::stringstream usage_strm;
@@ -53,6 +55,8 @@ public:
     ARGPARSE() =default;
 
     template <class T> ARGPARSE& required(std::string_view name, std::string_view description, T& ref);
+    template <class T, class DT> ARGPARSE& optional_positional(std::string_view name,
+        std::string_view description, T& ref, DT default_value);
     template <class T, class DT> ARGPARSE& optional(std::string_view flag_name, std::string_view full_name,
                                             std::string_view description, T& ref, DT default_value);
     void parse(int argc, char** argv);
@@ -96,7 +100,7 @@ argparse_check_valid_type()
 template <class T> ARGPARSE&
 ARGPARSE::required(std::string_view name, std::string_view description, T& ref)
 {
-    if (optional_arguments.size() > 0)
+    if (!optional_positionals.empty() || !optional_arguments.empty())
         throw std::runtime_error("required arguments must be added before optional arguments");
 
     argparse_check_valid_type<T>();
@@ -110,6 +114,26 @@ ARGPARSE::required(std::string_view name, std::string_view description, T& ref)
                 << std::setw(8) << std::left << "string"
                 << std::setw(24) << std::left << "required" << "\n";
 
+    return *this;
+}
+
+template <class T, class DT> ARGPARSE&
+ARGPARSE::optional_positional(std::string_view name, std::string_view description,
+    T& ref, DT default_value)
+{
+    if (!optional_arguments.empty())
+        throw std::runtime_error("optional positional arguments must precede named options");
+    argparse_check_valid_type<T>();
+    ref = static_cast<T>(default_value);
+    optional_positionals.push_back({name, description, static_cast<void*>(&ref),
+                                    argparse_get_type_info<T>()});
+    usage_strm << " [" << name << "]";
+    const char* type_name = std::is_same_v<T, std::string> ? "string" :
+        std::is_same_v<T, double> ? "float" : std::is_same_v<T, bool> ? "bool" : "int";
+    options_strm << std::setw(72) << std::left << name
+                 << std::setw(80) << std::left << description
+                 << std::setw(8) << std::left << type_name
+                 << std::setw(24) << std::left << "optional, default: " << default_value << "\n";
     return *this;
 }
 
@@ -218,6 +242,7 @@ ARGPARSE::parse(int argc, char** argv)
 
     // now read the command line arguments:
     size_t required_idx{0};
+    size_t positional_idx{0};
     for (size_t i = 1; i < argc; ++i)
     {
         std::string x{argv[i]};
@@ -238,6 +263,13 @@ ARGPARSE::parse(int argc, char** argv)
         }
         else
         {
+            if (positional_idx < optional_positionals.size() &&
+                (x.front() != '-' || (x.size() > 1 && std::isdigit(static_cast<unsigned char>(x[1])))))
+            {
+                const auto& arg = optional_positionals[positional_idx++];
+                read_argument_and_write_to_ptr(x, arg.ptr, arg.type);
+                continue;
+            }
             if (x.front() != '-')
                 _die_with_error("expected optional argument but got `" + x + "`", usage);
 

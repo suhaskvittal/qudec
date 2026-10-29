@@ -1,0 +1,30 @@
+{
+  "name": "6.8.8_L2_D344-22_n768_k36",
+  "tiling": "6.8.8",
+  "side_length": 2,
+  "symmetry_group": "Delta(3,4,4)_22",
+  "n": 768,
+  "k": 36,
+  "d": "14",
+  "d_lower_bound": 14,
+  "d_upper_bound": 14,
+  "num_checks": 368,
+  "rank_H": 366,
+  "orientable": true,
+  "euler_characteristic": -16,
+  "num_octagon_modules": 24,
+  "check_weight_histogram_by_color": {
+    "0": {
+      "6": 128
+    },
+    "1": {
+      "6": 96,
+      "8": 24
+    },
+    "2": {
+      "6": 96,
+      "8": 24
+    }
+  },
+  "logical_basis": "symplectic_homology_basis"
+}

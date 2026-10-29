@@ -103,7 +103,7 @@ void integration(bool memory_x,bool opposite=false)
         for (size_t i=0;i<classes.size();i++) ids[classes[i].checks]=i;
         std::vector<size_t> local(dem.count_detectors(),SIZE_MAX);
         for (size_t i=0;i<bp.check_globals.size();i++) local[bp.check_globals[i]]=i;
-        using Key=std::tuple<size_t,uint64_t,std::vector<size_t>>;
+        using Key=std::tuple<size_t,dec::concat::Frame,std::vector<size_t>>;
         std::map<Key,double> priors;
         for (const auto& fault:bp.faults)
         {
@@ -124,7 +124,7 @@ void integration(bool memory_x,bool opposite=false)
         }
         FlagBP reference_bp(dem.count_detectors(),variables);
         const auto posterior=reference_bp.posterior(syndrome);
-        std::vector<std::map<uint64_t,double>> frames(classes.size());
+        std::vector<std::map<dec::concat::Frame,double>> frames(classes.size());
         for (size_t i=0;i<variables.size();i++)
         {
             const auto& v=variables[i];

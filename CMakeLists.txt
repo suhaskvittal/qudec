@@ -78,6 +78,7 @@ set(QUDEC_FILES
     src/circuit_generator.cpp
     src/circuit_noise_policy.cpp
     src/color_code_circuits.cpp
+    src/hyperbolic_color_code_circuits.cpp
     src/superdense_color_code_circuits.cpp # Author: OpenAI Codex.
     src/decoder/pymatching.cpp
     src/decoder/blossom5.cpp
@@ -142,6 +143,7 @@ endif()
 
 # Contributor: OpenAI Codex. Share circuit/decoder options across both CLIs.
 add_library(qudec_cli OBJECT main/qudec.cpp main/tesseract_options.cpp)
+target_compile_definitions(qudec_cli PRIVATE QUDEC_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_options(qudec_cli PRIVATE ${COMPILE_OPTIONS} -fno-fast-math)
 target_link_libraries(qudec_cli PUBLIC qudeclib)
 add_executable(qudec main/qudec_main.cpp)
@@ -183,6 +185,20 @@ target_link_libraries(qudec_eval_gap PRIVATE qudeclib)
 
 include(CTest)
 if(BUILD_TESTING)
+    add_test(NAME optional_distance_cli COMMAND qudec concat_mwpm -cap -p 0 --mc-max-samples 1)
+    set_tests_properties(optional_distance_cli PROPERTIES PASS_REGULAR_EXPRESSION "distance=5 rounds=1")
+    add_test(NAME hycc_distance_cli COMMAND qudec concat_mwpm 3 --code hycc_888_64_8_6
+        -r -1 -p 0 --mc-max-samples 1)
+    set_tests_properties(hycc_distance_cli PROPERTIES PASS_REGULAR_EXPRESSION "distance=6 rounds=6")
+    add_test(NAME hycc_capacity_cli COMMAND qudec concat_mwpm --code hycc_888_128_12_8
+        -cap -p 0 --mc-max-samples 1)
+    set_tests_properties(hycc_capacity_cli PROPERTIES PASS_REGULAR_EXPRESSION "distance=8 rounds=1")
+    add_test(NAME hycc_pheno_rounds_cli COMMAND qudec concat_mwpm --code hycc_688_384_20_12
+        -pheno -r 2 -p 0 --mc-max-samples 1)
+    set_tests_properties(hycc_pheno_rounds_cli PROPERTIES PASS_REGULAR_EXPRESSION "distance=12 rounds=2")
+    add_test(NAME hycc_superdense_invalid_cli COMMAND qudec concat_mwpm --code hycc_888_64_8_6
+        --superdense --mc-max-samples 1)
+    set_tests_properties(hycc_superdense_invalid_cli PROPERTIES WILL_FAIL TRUE)
     # Contributor: OpenAI Codex (weighted union-find regression cases).
     foreach(test IN ITEMS concat_flat_lazy concat_weight_update pymatching_weight_modifications concat_candidate_gap concat_bp superdense_color_code_circuits concat_inplace concat_flag_renormalization concat_equivalence_classes decoder_debug error_chain circuit_noise_policy component_error_distribution color_code_circuits ideal_color_code_circuits restriction concat_mwpm concat_ensemble correlated_restriction cluster_gap uf seeded_matching libra libra_assignment libra_rare_event pymatching_reporting
                           libra_splitting libra_local_splitting rare_event_sampler libra_integration)

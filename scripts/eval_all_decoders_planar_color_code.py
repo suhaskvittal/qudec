@@ -2,9 +2,9 @@ import os
 cores = 144
 
 PLIST ={
-    'capacity': [0.12, 0.11, 0.1, 0.075, 0.05, 0.025],
-    'pheno': [0.03, 0.025, 0.02, 0.015, 0.01, 0.009],
-    'circuit': [0.002, 0.0015, 0.001, 0.00085, 0.0007]
+#   'capacity': [0.12, 0.11, 0.1, 0.075, 0.05, 0.025],
+#   'pheno': [0.03, 0.025, 0.02, 0.015, 0.01, 0.009],
+    'circuit': [0.002, 0.0015, 0.001, 0.00085]
 }
 
 EXE = f'mpirun -np {cores} ./build/qudec'
@@ -45,15 +45,15 @@ for (error_model, plist) in PLIST.items():
                 ensemble_flag_opt = '--concat-bp' if error_model == 'circuit' else ''
 
                 ## Concat-MWPM
-                run(f'{EXE} concat_mwpm {d} -p {p} --seed 0 --mc-max-samples {SHOTS} --code {code_type} {model_opt} {concat_mwpm_flag_opt} > out/concat_mwpm/{folder_suffix}/{filename}')
+                run(f'{EXE} concat_mwpm {d} -p {p} --seed 0 --mc-max-samples {SHOTS} --code {code_type} {model_opt} {concat_mwpm_flag_opt} -pp > out/concat_mwpm/{folder_suffix}/{filename}')
                 ## Concat-MWPM with ensembling
-                run(f'{EXE} concat_mwpm {d} -p {p} --seed 0 --mc-max-samples {SHOTS} --code {code_type} {model_opt} --concat-ensemble {ENSEMBLE_SIZE} {ensemble_flag_opt} > out/concat_mwpm_ensemble/{folder_suffix}/{filename}')
+                run(f'{EXE} concat_mwpm {d} -p {p} --seed 0 --mc-max-samples {SHOTS} --code {code_type} {model_opt} --concat-ensemble {ENSEMBLE_SIZE} {ensemble_flag_opt} -pp > out/concat_mwpm_ensemble/{folder_suffix}/{filename}')
 
                 ## Concat-MWPM with BP renormalization
                 if error_model == 'circuit':
-                    run(f'{EXE} concat_mwpm {d} -p {p} --seed 0 --mc-max-samples {SHOTS} --code {code_type} {model_opt} --concat-bp > out/concat_mwpm_bp_renorm/{folder_suffix}/{filename}')
+                    run(f'{EXE} concat_mwpm {d} -p {p} --seed 0 --mc-max-samples {SHOTS} --code {code_type} {model_opt} --concat-bp -pp > out/concat_mwpm_bp_renorm/{folder_suffix}/{filename}')
 
                 ## Tesseract
                 if d < 11:
-                    run(f'{EXE} tesseract {d} -p {p} --seed 0 --mc-max-samples {SHOTS} --code {code_type} {model_opt} {TESSERACT_OPTS} > out/tesseract/{folder_suffix}/{filename}')
+                    run(f'{EXE} tesseract {d} -p {p} --seed 0 --mc-max-samples {SHOTS} --code {code_type} {model_opt} {TESSERACT_OPTS} -pp > out/tesseract/{folder_suffix}/{filename}')
 

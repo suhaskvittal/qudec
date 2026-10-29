@@ -77,7 +77,7 @@ void model_tests(bool pheno)
                     "Duplicate virtual syndrome was decoded twice");
             auto residual = local;
             double score = 0;
-            uint64_t logical = 0;
+            dec::concat::Frame logical;
             for (auto id : candidate.events)
             {
                 const auto& event = full.model.events[id];

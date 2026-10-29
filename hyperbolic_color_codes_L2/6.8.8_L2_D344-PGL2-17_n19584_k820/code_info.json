@@ -1,0 +1,30 @@
+{
+  "name": "6.8.8_L2_D344-PGL2-17_n19584_k820",
+  "tiling": "6.8.8",
+  "side_length": 2,
+  "symmetry_group": "Delta(3,4,4)|PGL(2,17)",
+  "n": 19584,
+  "k": 820,
+  "d": "24",
+  "d_lower_bound": 24,
+  "d_upper_bound": 24,
+  "num_checks": 9384,
+  "rank_H": 9382,
+  "orientable": true,
+  "euler_characteristic": -408,
+  "num_octagon_modules": 612,
+  "check_weight_histogram_by_color": {
+    "0": {
+      "6": 2448,
+      "8": 612
+    },
+    "1": {
+      "6": 3264
+    },
+    "2": {
+      "6": 2448,
+      "8": 612
+    }
+  },
+  "logical_basis": "tree_cotree_gram_schmidt"
+}

@@ -34,7 +34,7 @@ int main() try
         for (size_t d=0;d<bits.size();d++) bits[d]=shots[i][d];
         for (auto d:bp.check_globals) memory.push_back(bits[d]);
         const auto inspected=bp.inspect(bits);
-        std::vector<double> probabilities;std::vector<uint64_t> frames;
+        std::vector<double> probabilities;std::vector<dec::concat::Frame> frames;
         for (const auto& event:inspected.model.events)
         { probabilities.push_back(event.probability);frames.push_back(event.observable); }
         // Dense update must preserve full paths/corrections versus the general model path.

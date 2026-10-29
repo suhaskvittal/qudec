@@ -231,6 +231,28 @@ circuit_regression()
     catch (const std::invalid_argument&) { rejected = true; }
     require(rejected,"Short syndrome was accepted");
 }
+
+void
+multiple_observables()
+{
+    stim::DetectorErrorModel dem(R"(
+        error(0.01) D0 D1 D2 L0 L65 L339
+        detector(0,0,0,0,1,0) D0
+        detector(1,0,0,1,1,0) D1
+        detector(2,0,0,2,1,0) D2
+    )");
+    dec::ConcatMWPM decoder(dem);
+    dec::SyndromeType syndrome(dem.count_detectors());
+    dec::ObsType truth(dem.count_observables());
+    syndrome[0] = syndrome[1] = syndrome[2] = 1;
+    const auto result = decoder.decode(syndrome, truth);
+    require(dem.count_observables() == 340 &&
+            result.flipped_obs[0] && result.flipped_obs[65] && result.flipped_obs[339],
+            "Multi-observable frame was truncated");
+    for (size_t id = 0; id < 340; ++id)
+        if (id != 0 && id != 65 && id != 339)
+            require(!result.flipped_obs[id], "Unexpected observable flip");
+}
 } // namespace
 
 int
@@ -241,5 +263,6 @@ main()
     incident_flag_weights();
     capacity();
     circuit_regression();
+    multiple_observables();
     std::cout << "Concatenated MWPM regressions passed\n";
 }

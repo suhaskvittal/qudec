@@ -1,4 +1,5 @@
 /*
+ *  author: Suhas Vittal
  *  author: OpenAI GPT-6-Luna
  *  purpose: Define the reusable Hypergraph template in the global namespace.
  * */

@@ -1,0 +1,16 @@
+name,tiling,side_length,symmetry_group,n,k,d,d_lower_bound,d_upper_bound,num_checks,orientable,euler_characteristic,num_octagon_modules,logical_basis,fig3a
+8.8.8_L2_D444-32_n64_k8,8.8.8,2,"Delta(4,4,4)_32",64,8,6,6,6,30,True,-2,2,symplectic_homology_basis,simulated
+8.8.8_L2_D444-40_n128_k12,8.8.8,2,"Delta(4,4,4)_40",128,12,8,8,8,60,True,-4,4,symplectic_homology_basis,simulated
+8.8.8_L2_D444-58_n512_k36,8.8.8,2,"Delta(4,4,4)_58",512,36,12,12,12,240,True,-16,16,symplectic_homology_basis,simulated
+8.8.8_L2_D444-109_n1600_k104,8.8.8,2,"Delta(4,4,4)_109",1600,104,14-16,14,16,750,True,-50,50,tree_cotree_gram_schmidt,simulated
+8.8.8_L2_D444-96_n1344_k88,8.8.8,2,"Delta(4,4,4)_96",1344,88,14,14,14,630,True,-42,42,tree_cotree_gram_schmidt,
+8.8.8_L2_D444-271_n5376_k340,8.8.8,2,"Delta(4,4,4)_271",5376,340,18-20,18,20,2520,True,-168,168,tree_cotree_gram_schmidt,extrapolated
+8.8.8_L2_D444-PSL2-23_n24288_k1522,8.8.8,2,"Delta(4,4,4)|PSL(2,23)",24288,1522,22,22,22,11385,False,-759,759,tree_cotree_gram_schmidt,
+8.8.8_L2_D444-PSL2-25_n31200_k1954,8.8.8,2,"Delta(4,4,4)|PSL(2,25)",31200,1954,22-24,22,24,14625,False,-975,975,tree_cotree_gram_schmidt,extrapolated
+6.8.8_L2_D344-18_n384_k20,6.8.8,2,"Delta(3,4,4)_18",384,20,12,12,12,184,True,-8,12,symplectic_homology_basis,
+6.8.8_L2_D344-22_n768_k36,6.8.8,2,"Delta(3,4,4)_22",768,36,14,14,14,368,True,-16,24,symplectic_homology_basis,
+6.8.8_L2_D344-32_n1536_k68,6.8.8,2,"Delta(3,4,4)_32",1536,68,16,16,16,736,True,-32,48,tree_cotree_gram_schmidt,
+6.8.8_L2_D344-45_n3840_k164,6.8.8,2,"Delta(3,4,4)_45",3840,164,20,20,20,1840,True,-80,120,tree_cotree_gram_schmidt,
+6.8.8_L2_D344-79_n10368_k436,6.8.8,2,"Delta(3,4,4)_79",10368,436,22,22,22,4968,True,-216,324,tree_cotree_gram_schmidt,
+6.8.8_L2_D344-PGL2-17_n19584_k820,6.8.8,2,"Delta(3,4,4)|PGL(2,17)",19584,820,24,24,24,9384,True,-408,612,tree_cotree_gram_schmidt,
+6.8.8_L2_D344-PGL2-23_n48576_k2028,6.8.8,2,"Delta(3,4,4)|PGL(2,23)",48576,2028,28,28,28,23276,True,-1012,1518,tree_cotree_gram_schmidt,

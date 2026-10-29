@@ -56,7 +56,7 @@ ConcatMWPM::decode(SyndromeRef syndrome, ObsRef truth)
         result.candidate_gap_db=*candidate_gap*(10/std::log(10.0));
     }
     result.flipped_obs = ObsType(num_observables);
-    result.flipped_obs[0] = frame & 1;
+    for (auto id : frame.ids()) result.flipped_obs[id] = 1;
     result.matching_data.frame_flips = result.flipped_obs;
     result.decode_latency_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::steady_clock::now()-start).count();
@@ -67,7 +67,10 @@ ConcatMWPM::decode(SyndromeRef syndrome, ObsRef truth)
             stats_.candidate_gap_available++;
             const double gap=result.candidate_gap_db;
             s_unsigned_gap.add(gap);
-            const bool error=truth.num_bits_padded() && truth[0]!=result.flipped_obs[0];
+            bool error = false;
+            if (truth.num_bits_padded() >= num_observables)
+                for (size_t id = 0; id < num_observables; ++id)
+                    error |= truth[id] != result.flipped_obs[id];
             if (error) s_unsigned_gap_errors.add(gap);
             if (truth.num_bits_padded()) s_signed_gap.add(error ? -gap:gap);
             result.matching_data.gap=error ? -gap:gap;

@@ -31,9 +31,10 @@ int main() try
         for (const auto& c:inspection.candidates) if (c.observable!=best.observable)
             expected=std::min(expected,std::max(0.0,c.weight-best.weight));
         dec::ObsType correct(1),wrong(1);
-        correct[0]=best.observable;wrong[0]=!best.observable;
+        correct[0]=static_cast<uint64_t>(best.observable);wrong[0]=!best.observable;
         const auto a=decoder.decode(shots[shot],correct),b=decoder.decode(shots[shot],wrong);
-        require(a.flipped_obs[0]==best.observable && b.flipped_obs[0]==best.observable,"Truth changed prediction");
+        require(a.flipped_obs[0]==static_cast<uint64_t>(best.observable) &&
+                b.flipped_obs[0]==static_cast<uint64_t>(best.observable),"Truth changed prediction");
         require(a.has_candidate_gap==std::isfinite(expected),"Missing frame treated as finite gap");
         require(a.has_candidate_gap==b.has_candidate_gap,"Truth changed gap availability");
         if (a.has_candidate_gap)
@@ -71,7 +72,7 @@ int main() try
         for (const auto& c:inspected.candidates) if (c.observable!=inspected.correction.observable)
             expected=std::min(expected,std::max(0.0,c.weight-inspected.correction.weight));
         const auto result=bp_decoder.decode(circuit_shots[i],truth);
-        require(result.flipped_obs[0]==inspected.correction.observable,"BP debug altered prediction");
+        require(result.flipped_obs[0]==static_cast<uint64_t>(inspected.correction.observable),"BP debug altered prediction");
         require(result.has_candidate_gap==std::isfinite(expected),"Flag-conditioned alternative missing");
         if (result.has_candidate_gap)
             require(std::abs(result.candidate_gap_db-expected*10/std::log(10.0))<1e-9,"BP posterior gap incorrect");

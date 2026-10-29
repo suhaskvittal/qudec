@@ -12,6 +12,7 @@
 #include "circuit_noise_policy.h"
 
 #include <cstdint>
+#include <string>
 #include <type_traits>
 #include <utility>
 
@@ -31,6 +32,16 @@ stim::Circuit cc666_circuit(uint32_t distance, uint32_t rounds,
     const ComponentErrorDistribution& noise_distribution = {});
 stim::Circuit cc488_circuit(uint32_t distance, uint32_t rounds,
     const CircuitNoisePolicy& policy, bool is_memory_x,
+    bool include_opposite_basis_detectors = false,
+    const ComponentErrorDistribution& noise_distribution = {});
+
+// Bell-flagged SI1000 extraction or ideal MPP extraction for a hyperbolic color code exported in the
+// hyperbolic_color_codes_L2 MatrixMarket/text format. X and Z checks are
+// extracted in separate passes; `data_directory` contains H.txt, Lx.mtx,
+// Lz.mtx, and check_colors.txt. H.txt uses zero-based qubit IDs; MatrixMarket
+// uses one-based coordinates. The selected memory basis determines the observable basis.
+stim::Circuit hyperbolic_color_code_circuit(const std::string& data_directory,
+    uint32_t rounds, const CircuitNoisePolicy& policy, bool is_memory_x,
     bool include_opposite_basis_detectors = false,
     const ComponentErrorDistribution& noise_distribution = {});
 

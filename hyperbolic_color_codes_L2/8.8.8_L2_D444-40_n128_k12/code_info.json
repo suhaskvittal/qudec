@@ -1,0 +1,31 @@
+{
+  "name": "8.8.8_L2_D444-40_n128_k12",
+  "tiling": "8.8.8",
+  "side_length": 2,
+  "symmetry_group": "Delta(4,4,4)_40",
+  "n": 128,
+  "k": 12,
+  "d": "8",
+  "d_lower_bound": 8,
+  "d_upper_bound": 8,
+  "num_checks": 60,
+  "rank_H": 58,
+  "orientable": true,
+  "euler_characteristic": -4,
+  "num_octagon_modules": 4,
+  "check_weight_histogram_by_color": {
+    "0": {
+      "6": 16,
+      "8": 4
+    },
+    "1": {
+      "6": 16,
+      "8": 4
+    },
+    "2": {
+      "6": 16,
+      "8": 4
+    }
+  },
+  "logical_basis": "symplectic_homology_basis"
+}
