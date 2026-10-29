@@ -5,19 +5,16 @@ The default qudec noise model remains SI1000. Select the ideal-check models with
 these mutually exclusive aliases:
 
 ```sh
-qudec concat_mwpm 7 --code cc666 -cap -p 0.01
-qudec concat_mwpm 7 --code cc666 --code-capacity -p 0.01
-qudec concat_mwpm 7 --code cc666 -pheno -p 0.01
-qudec concat_mwpm 7 --code cc666 --phenomenological -p 0.01 \
+qudec concat_mwpm -d 7 --code cc666 -cap -p 0.01
+qudec concat_mwpm -d 7 --code cc666 --code-capacity -p 0.01
+qudec concat_mwpm -d 7 --code cc666 -pheno -p 0.01
+qudec concat_mwpm -d 7 --code cc666 --phenomenological -p 0.01 \
     --measurement-error-rate 0.005
 ```
 
 The ideal selectors support `sc`, `cc666`, and `cc488`. Surface-code ideal
 extraction uses the existing check geometry with MPP measurements.
-The restriction variants require cc666 because their lifting geometry is cc666,
-and require at least two syndrome rounds for their canonical time slice. They
-reject code capacity and one-round phenomenological requests. ConcatMWPM accepts
-either color-code family and supports both ideal models.
+ConcatMWPM accepts either color-code family and supports both ideal models.
 
 Code capacity uses one noisy data-error layer and exactly one perfect stabilizer
 extraction round. It defaults to one round regardless of distance; an explicit

@@ -6,7 +6,7 @@ preserves the baseline decoder. `K` counts one unperturbed matcher and `K-1` per
 of the three ignored colors. For example:
 
 ```sh
-./qudec concat_mwpm 9 --code cc666 --code-capacity -p 0.03 \
+./qudec concat_mwpm -d 9 --code cc666 --code-capacity -p 0.03 \
     --concat-ensemble 20 --concat-seed 20261024 --seed 42 \
     --mc-max-samples 100000 --mc-stop-at-errors 100000
 ```

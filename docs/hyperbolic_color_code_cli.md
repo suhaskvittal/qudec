@@ -1,12 +1,12 @@
 # Hyperbolic color codes in `qudec`
 
-`qudec` accepts a code name from the catalog below. The positional distance is
+`qudec` accepts a code name from the catalog below. `-d` / `--distance` is
 optional and defaults to 5 for planar codes. For a named hyperbolic code, the
-name selects its geometry and distance; any positional distance is ignored.
+name selects its geometry and distance; a supplied `-d` is ignored.
 
 ```sh
 qudec concat_mwpm --code hycc_888_64_8_6 -p 0.001 --mc-max-samples 1000
-qudec concat_mwpm 5 --code hycc_688_384_20_12 -cap -p 0.01
+qudec concat_mwpm -d 5 --code hycc_688_384_20_12 -cap -p 0.01
 ```
 
 With `--rounds -1` (the default), circuit-level and phenomenological runs use

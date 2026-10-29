@@ -43,8 +43,8 @@ Useful options:
 For example:
 
 ```sh
-qudec seeded 9 --seed-decoder pymatching --second-decoder correlated_pymatching --seed-postprocess
-qudec seeded 9 --seed-decoder uf --second-decoder libra --seed-gap cluster --seed-gap-threshold-db 40
+qudec seeded -d 9 --seed-decoder pymatching --second-decoder correlated_pymatching --seed-postprocess
+qudec seeded -d 9 --seed-decoder uf --second-decoder libra --seed-gap cluster --seed-gap-threshold-db 40
 ```
 
 The SI1000 circuit for this decoder always includes opposing-basis detectors.

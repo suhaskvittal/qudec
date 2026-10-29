@@ -72,7 +72,7 @@ auto nonuniform = apply_component_error_distribution(uniform_circuit, device);
 ```
 
 ```bash
-./build/qudec pymatching 5 -p 0.001 --noise-log-stddev 0.7 --noise-seed 123 \
+./build/qudec pymatching -d 5 -p 0.001 --noise-log-stddev 0.7 --noise-seed 123 \
     --seed 456 --mc-max-samples 100000 --mc-stop-at-errors 100001
 ```
 

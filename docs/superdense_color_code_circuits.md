@@ -11,8 +11,8 @@ Use `--superdense` with `qudec` or `qudec_chains`, selecting `--code cc666` or
 `--code cc488`. Existing Bell-flagged extraction remains the default.
 
 ```sh
-qudec tesseract 7 --code cc666 --superdense -p 0.0005
-qudec tesseract 7 --code cc488 --superdense --superdense-start-phase 1 -p 0.0005
+qudec tesseract -d 7 --code cc666 --superdense -p 0.0005
+qudec tesseract -d 7 --code cc488 --superdense --superdense-start-phase 1 -p 0.0005
 qudec_chains tesseract -d 7 --code cc488 --superdense -k 2 -n 1000
 ```
 

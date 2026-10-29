@@ -2,8 +2,6 @@
 #include "circuit_generator.h"
 #include "decoder/concat_mwpm.h"
 #include "decoder/concat_mwpm/circuit.h"
-#include "decoder/correlated_restriction.h"
-#include "decoder/restriction.h"
 #include "error_chain.h"
 #include <stim/util_top/circuit_to_dem.h>
 
@@ -87,31 +85,6 @@ void native_models()
         }
     }
 }
-void restriction()
-{
-    const auto dem = stim::circuit_to_dem(cc666_phenomenological(5,5,.001,.001,false),{});
-    dec::SyndromeType syndrome(dem.count_detectors());
-    dec::ObsType truth(1);
-    syndrome[0] = 1;
-    for (bool correlated : {false,true})
-    {
-        dec::CorrelatedRestrictionDecoder plain(dem,{.distance=5,.physical_p=.001,.correlated=correlated});
-        dec::CorrelatedRestrictionDecoder traced(dem,{.distance=5,.physical_p=.001,.correlated=correlated,.debug=true});
-        const auto result = traced.decode(syndrome,truth);
-        require(result.flipped_obs[0] == plain.decode(syndrome,truth).flipped_obs[0],"Debug changed restriction decision");
-        require(result.debug_info.find("Restriction initial matching")!=std::string::npos,"Missing initial restriction matching");
-        require(result.debug_info.find("Lifted correction:")!=std::string::npos,"Missing restriction lifting");
-        require(result.debug_info.find("p_M=")==std::string::npos && result.debug_info.find("p_flagged=")==std::string::npos,
-                "Restriction debug contains flag metadata");
-        if (correlated) require(result.debug_info.find("correlated one-pass")!=std::string::npos,"Missing correlated matching");
-    }
-    dec::RestrictionDecoder legacy(dem,{.distance=5,.physical_p=.001,.debug=true});
-    syndrome.clear();
-    require(!legacy.decode(syndrome,truth).debug_info.empty(),"Legacy restriction API debug missing");
-    dec::CorrelatedRestrictionDecoder model(3,1,.01,true,true);
-    dec::SyndromeType spatial(model.num_detectors);
-    require(!model.decode(spatial,truth).debug_info.empty(),"Model restriction API debug missing");
-}
 void chain_output()
 {
     const stim::DetectorErrorModel dem("error(0.1) D0 L0");
@@ -127,6 +100,6 @@ void chain_output()
 }
 int main()
 {
-    try {flags(); native_models(); restriction(); chain_output(); std::cout << "Decoder debug tests passed\n";}
+    try {flags(); native_models(); chain_output(); std::cout << "Decoder debug tests passed\n";}
     catch (const std::exception& error) {std::cerr << error.what() << '\n'; return 1;}
 }

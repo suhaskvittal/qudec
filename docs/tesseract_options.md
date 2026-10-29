@@ -7,7 +7,7 @@ options. Existing circuit, noise, sampling, MPI and component-rate options
 remain available. For example:
 
 ```sh
-qudec tesseract 7 --code cc666 --superdense -p .0005 \
+qudec tesseract -d 7 --code cc666 --superdense -p .0005 \
     --tesseract-beam 20 --tesseract-beam-climbing \
     --tesseract-pqlimit 1000000 --tesseract-num-det-orders 21 \
     --tesseract-det-order-bfs --tesseract-det-order-index \

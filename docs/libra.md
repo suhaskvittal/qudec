@@ -27,7 +27,7 @@ The Libra implementation and integration were contributed by OpenAI Codex.
 ## Monte Carlo through the normal CLI
 
 ```sh
-mpirun -np 64 .agentic_artifacts/build/qudec libra 9 -p 1e-3 -r 9 \
+mpirun -np 64 .agentic_artifacts/build/qudec libra -d 9 -p 1e-3 -r 9 \
     -m monte_carlo --seed 20261001 --libra-seed 20261001 \
     --mc-max-samples 10000000 --mc-stop-at-errors 25 --print-progress
 ```
@@ -61,7 +61,7 @@ The normal `rare_event` method now works with every decoder accepted by
 `qudec`, including Libra:
 
 ```sh
-mpirun -np 64 .agentic_artifacts/build/qudec libra 9 -p 1e-3 -r 9 \
+mpirun -np 64 .agentic_artifacts/build/qudec libra -d 9 -p 1e-3 -r 9 \
     -m rare_event --seed 20261001 --libra-seed 20261001 \
     --rare-samples-per-level 10000 --rare-max-errors-per-level 25 \
     --rare-max-level 128 --rare-tail-tolerance 1e-12 --print-progress

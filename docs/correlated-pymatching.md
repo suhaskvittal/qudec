@@ -5,7 +5,7 @@ Contributor: OpenAI Codex.
 Use the existing PyMatching decoder with `--correlated`:
 
 ```sh
-mpirun -np 64 ./build/qudec pymatching 9 --correlated \
+mpirun -np 64 ./build/qudec pymatching -d 9 --correlated \
     --mc-max-samples 1000000 --mc-stop-at-errors 1000000
 ```
 

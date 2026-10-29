@@ -94,8 +94,7 @@ All decoder options retain their `qudec` meaning, including `--concat-ensemble`,
 `--concat-seed`, `--correlated`, Libra, Harmony, seeded
 matching and union-find settings; see `--help`. Normal Monte Carlo and rare-event
 sampler settings do not control this executable. `--method rare_event` is
-rejected. Restriction variants retain their existing cc666/two-round limitation
-and reject code capacity. Graphlike decoders can reject color-code hyperedges.
+rejected. Graphlike decoders can reject color-code hyperedges.
 Tesseract receives the undecomposed DEM. Each invocation runs on one MPI rank.
 
 ## Event supports and ASCII lattice
@@ -130,8 +129,8 @@ physical data-qubit error, so physical fault locations are not inferred.
 <build-directory>/qudec_chains concat_mwpm -d 7 -k 3 -pheno -n 1 --print-chains 1
 ```
 
-`--debug` enables decoder-specific decisions for concat_mwpm and restriction
-variants. Nonempty `dec::Result::debug_info` is printed after the ASCII drawing
+`--debug` enables decoder-specific decisions for concat_mwpm. Nonempty
+`dec::Result::debug_info` is printed after the ASCII drawing
 for each reported chain. Combine `--debug --print-chains 1` to inspect a successful
 chain. See [decoder_debug.md](decoder_debug.md) for matching-path IDs and candidate
 selection.

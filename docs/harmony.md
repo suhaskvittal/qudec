@@ -11,7 +11,7 @@ member configurations contribute once per member, as in arXiv:2401.12434.
 SI1000 circuits include opposing-basis detectors automatically.
 
 ```sh
-mpirun -np 64 ./build/qudec harmony 9 -r 9 -p 0.001 \
+mpirun -np 64 ./build/qudec harmony -d 9 -r 9 -p 0.001 \
     --harmony-ensemble-size 20 --harmony-full-ensemble \
     --mc-max-samples 1000000 --mc-stop-at-errors 1000000 --seed 0
 ```
@@ -40,7 +40,7 @@ For example, compare full ensembles on the same sampling streams:
 
 ```sh
 for size in 1 4 8 16 32 64 100; do
-    mpirun -np 64 ./build/qudec harmony 9 --harmony-ensemble-size "$size" \
+    mpirun -np 64 ./build/qudec harmony -d 9 --harmony-ensemble-size "$size" \
         --harmony-full-ensemble --mc-max-samples 100000 \
         --mc-stop-at-errors 100000 --seed 0
 done

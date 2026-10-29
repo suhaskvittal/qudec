@@ -7,7 +7,6 @@
 #include <circuit_generator.h>
 #include <decoder/pymatching.h>
 #include <decoder/concat_mwpm.h>
-#include <decoder/correlated_restriction.h>
 #include <decoder/blossom5.h>
 #include <decoder/libra.h>
 #include <decoder/harmony.h>
@@ -99,19 +98,18 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
     std::string chain_error_model;
     bool all_combinations = false;
     ARGPARSE parser;
-    parser.required("decoder-name", "Decoder: pymatching, blossom5, tesseract, libra, seeded, uf, harmony, concat_mwpm, restriction, correlated_restriction", decoder_name);
+    parser.required("decoder-name", "Decoder: pymatching, blossom5, tesseract, libra, seeded, uf, harmony, concat_mwpm", decoder_name);
     if (chain_mode)
     {
-        parser.optional("-d", "--distance", "Code distance", d, 5)
-            .optional("-k", "--chain-length", "Number of distinct DEM events in a connected chain", chain_length, 2)
+        parser.optional("-k", "--chain-length", "Number of distinct DEM events in a connected chain", chain_length, 2)
             .optional("-n", "--samples", "Random chains to sample (with replacement)", chain_samples, 10000)
             .optional("", "--all", "Enumerate all k-subsets; decode only connected subsets", all_combinations, false)
             .optional("", "--print-failures", "Number of failing chains to print", print_failures, 1)
             .optional("", "--print-chains", "Print the first N chains, including correctly decoded chains", print_chains, 0)
             .optional("", "--error-model", "si1000, code_capacity, or phenomenological", chain_error_model, "si1000");
     }
-    else parser.optional_positional("code-distance", "Planar code distance (ignored for named hyperbolic codes)", d, 5);
-    parser.optional("-c", "--code", chain_mode ? "Color code: cc666 (default) or cc488" : "Code: sc, cc666, cc488, or a hycc_* catalog name", code_name, "")
+    parser.optional("-d", "--distance", "Planar code distance (ignored for named hyperbolic codes)", d, 5)
+        .optional("-c", "--code", chain_mode ? "Color code: cc666 (default) or cc488" : "Code: sc, cc666, cc488, or a hycc_* catalog name", code_name, "")
         .optional("-p", "--physical-error-rate", "Physical error rate", p, 1e-3)
         .optional("-r", "--rounds", "Number of rounds (-1 = distance; code capacity uses one)", r, -1)
         .optional("-cap", "--code-capacity", "Use one-round code-capacity noise", code_capacity, false)
@@ -167,8 +165,7 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
     tesseract_options.add_arguments(parser);
     parser.parse(argc, argv);
     tesseract_options.validate(decoder_name,argc,argv);
-    const bool color_decoder = decoder_name == "concat_mwpm" ||
-        decoder_name == "restriction" || decoder_name == "correlated_restriction";
+    const bool color_decoder = decoder_name == "concat_mwpm";
     if (code_name.empty()) code_name = (chain_mode || color_decoder) ? "cc666" : "sc";
     const CatalogCode* external_code = chain_mode ? nullptr : find_external_code(code_name);
     if (external_code) d = external_code->default_rounds;
@@ -214,12 +211,12 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
 
     if (decoder_name != "pymatching" && decoder_name != "blossom5" &&
         decoder_name != "tesseract" && decoder_name != "libra" && decoder_name != "seeded" &&
-        decoder_name != "uf" && decoder_name != "harmony" && decoder_name != "concat_mwpm" && decoder_name != "restriction" && decoder_name != "correlated_restriction")
+        decoder_name != "uf" && decoder_name != "harmony" && decoder_name != "concat_mwpm")
     {
         throw std::invalid_argument("Unknown decoder name: " + decoder_name);
     }
     if (decoder_debug && !color_decoder)
-        throw std::invalid_argument("--debug supports concat_mwpm, restriction, and correlated_restriction");
+        throw std::invalid_argument("--debug supports concat_mwpm");
     if (chain_mode)
     {
         if (code_name != "cc666" && code_name != "cc488")
@@ -237,11 +234,6 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
         superdense_start_phase>(code_name=="cc488" ? 1:0))
         throw std::invalid_argument("Invalid --superdense-start-phase or missing --superdense");
     chain_config.superdense=superdense;
-    if ((decoder_name == "restriction" || decoder_name == "correlated_restriction") && code_name != "cc666")
-        throw std::invalid_argument(decoder_name+" currently requires --code cc666");
-    if ((decoder_name == "restriction" || decoder_name == "correlated_restriction") &&
-        (code_capacity || (phenomenological && r < 2)))
-        throw std::invalid_argument(decoder_name+" requires at least two syndrome rounds and does not support --code-capacity");
     if (color_decoder && enable_gap)
         throw std::invalid_argument("--gap is not available for "+decoder_name);
 
@@ -378,17 +370,7 @@ run_cli(int argc, char* argv[], int world_rank, bool chain_mode)
         }
     };
 
-    if (decoder_name == "correlated_restriction" || decoder_name == "restriction")
-    {
-        if (world_rank == 0)
-            std::cout << (decoder_name == "restriction" ? "RestrictionDecoder " : "CorrelatedRestrictionDecoder ")
-                      << code_name << ' ' << noise_model << ": distance=" << d << " rounds=" << r
-                      << " p=" << p << " sampling_seed=" << conf.seed << '\n';
-        run(dec::CorrelatedRestrictionDecoder(dem,{.distance=static_cast<uint32_t>(d),.physical_p=p,
-            .correlated=decoder_name == "correlated_restriction",.debug=decoder_debug}),
-            [] (auto, auto, auto) {});
-    }
-    else if (decoder_name == "concat_mwpm")
+    if (decoder_name == "concat_mwpm")
     {
         if (world_rank == 0)
             std::cout << "ConcatMWPM " << code_name << ' ' << noise_model << ": distance=" << d << " rounds=" << r

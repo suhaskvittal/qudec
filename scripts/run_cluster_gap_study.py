@@ -131,7 +131,7 @@ def main():
         prefix = [launcher, "-np", str(args.cores), "--bind-to", "core", "--map-by", "core"]
     directory = args.output_root.expanduser().resolve() / (
         f"cluster_gap_{args.decoder}_d{args.distance}_" + datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f"))
-    command = prefix + [str(binary), args.decoder, str(args.distance), "-r", str(args.rounds or args.distance),
+    command = prefix + [str(binary), args.decoder, "-d", str(args.distance), "-r", str(args.rounds or args.distance),
         "-p", str(args.p), "--cluster-gap", "--cluster-gap-histogram", "--include-opposite-basis-detectors",
         "--method", "monte_carlo", "--seed", str(args.seed), "--mc-max-samples", str(args.shots),
         "--mc-stop-at-errors", str(args.max_errors), "--print-progress"]

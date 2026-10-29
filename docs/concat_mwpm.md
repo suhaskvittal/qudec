@@ -9,7 +9,7 @@ The matching stages use the vendored PyMatching C++ library.
 Run a cc666 Z-memory SI1000 experiment with:
 
 ```sh
-qudec concat_mwpm 7 -p 0.0005 -r 7 \
+qudec concat_mwpm -d 7 -p 0.0005 -r 7 \
     --mc-max-samples 10000 --mc-stop-at-errors 10000 --seed 42
 ```
 

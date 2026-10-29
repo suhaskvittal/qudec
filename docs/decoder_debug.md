@@ -5,11 +5,8 @@
 owned by each decoder and intended for human inspection, not a stable parsing
 schema. New decoders can populate it without changing sampler interfaces.
 
-The color-code wrappers `ConcatMWPM`, `CorrelatedRestrictionDecoder` (also used
-by the CLI's uncorrelated `restriction` choice), and the standalone
-`RestrictionDecoder` accept `config_type.debug = true`. The direct spatial/model
-constructors of the restriction wrappers also accept a final optional debug
-boolean. Debugging defaults to false. Decoding does not depend on supplied truth.
+The color-code wrapper `ConcatMWPM` accepts `config_type.debug = true`.
+Debugging defaults to false. Decoding does not depend on supplied truth.
 
 ```cpp
 dec::ConcatMWPM decoder(dem, {.ensemble_size=20, .debug=true});
@@ -17,8 +14,7 @@ auto result = decoder.decode(syndrome, unused_truth);
 std::cout << result.debug_info;
 ```
 
-Both CLIs expose `--debug` for `concat_mwpm`, `restriction` and
-`correlated_restriction`. Unsupported decoders reject this option. In
+Both CLIs expose `--debug` for `concat_mwpm`. Unsupported decoders reject this option. In
 `qudec_chains`, diagnostic text is printed with each chain selected by
 `--print-failures N` or `--print-chains N`. Debug does not by itself print every
 sampled chain. Normal `qudec` Monte Carlo and rare-event sampling print every
@@ -125,12 +121,3 @@ ensemble attempts and can be large. Graph construction and candidate generation
 are unchanged. Trace generation adds path reconstruction, weight auditing and
 formatting to measured decode latency, so debug latency is not a benchmark of
 normal decoding.
-
-## Restriction variants
-
-The CLI restriction variants report the actual initial restricted matching,
-selected graph edges and expanded assignment edges, and the lifted correction with connected-component/local-lift
-counts. Correlated restriction additionally reports its actual one-pass updated
-matching. Spatial model diagnostics report the selected state and termination.
-The older standalone `dec::RestrictionDecoder` API reports its actual lifted
-correction and lifting counts; it does not expose the detailed matching trace.

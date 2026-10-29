@@ -7,7 +7,7 @@ This opt-in implements a DEM-based adaptation of Section 3.4 (Section III D in
 [New Journal of Physics 22, 023019](https://doi.org/10.1088/1367-2630/ab68fd).
 
 ```sh
-qudec concat_mwpm 5 -p 0.0005 --code cc666 --concat-flag-renormalization
+qudec concat_mwpm -d 5 -p 0.0005 --code cc666 --concat-flag-renormalization
 qudec_chains concat_mwpm -d 5 -r 5 -k 2 -p 0.0005 --all \
     --concat-flag-renormalization --debug --print-failures 1
 ```
@@ -52,10 +52,10 @@ still use PyMatching.
 ## Scope
 
 This transfers the probability rule to the existing concatenated decoder and
-Bell-flagged circuits. The source paper analyzes different extraction circuits
-and the restriction decoder. Its distance claims therefore do not establish a
-distance guarantee for this implementation. The implementation leaves the
-existing matching stages and correction selection algorithm in place.
+Bell-flagged circuits. The source paper analyzes different extraction circuits,
+so its distance claims do not establish a distance guarantee for this
+implementation. The implementation leaves the existing matching stages and
+correction selection algorithm in place.
 
 The scale `p^m` is global across the observed relevant extraction circuits in the
 window. A local or per-round alternative would be a separate adaptation.
