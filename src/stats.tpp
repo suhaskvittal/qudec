@@ -9,9 +9,12 @@
 
 #include "globals.h"
 
+#include <algorithm>
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 
 #if defined(ENABLE_MPI)
 #include <mpi.h>
@@ -24,16 +27,24 @@ TEMPL_PARAM
 TEMPL_CLASS::StatsHistogram(std::string_view _name, 
                              T _range_min,
                              T _range_max,
-                             size_t _num_buckets)
+                             size_t _num_buckets,
+                             HistogramScale _scale)
     :name(_name),
     range_min(_range_min),
     range_max(_range_max),
-    bucket_width((range_max-range_min) / _num_buckets),
+    scale(_scale),
+    bucket_width((_scale == HistogramScale::Log10
+                  ? std::log10(double(_range_max) / double(_range_min))
+                  : double(_range_max) - double(_range_min)) / _num_buckets),
     num_buckets(_num_buckets),
     buckets_(num_buckets+2, 0)
 {
-    // verify that `bucket_width*num_buckets = (range_max-range_min)`
-    if (bucket_width * num_buckets != (range_max-range_min))
+    if (!_num_buckets || !(range_max > range_min) ||
+        (scale == HistogramScale::Log10 &&
+         (!(range_min > 0) || !std::isfinite(double(range_min)) || !std::isfinite(double(range_max)))))
+        throw std::invalid_argument("Invalid histogram range or bucket count");
+    // Preserve the existing exact-width check for linear histograms.
+    if (scale == HistogramScale::Linear && bucket_width * num_buckets != (range_max-range_min))
         std::cerr << "STATS_HISTOGRAM: bucket_width*num_buckets != range_max-range_min" << _die{};
 }
 
@@ -50,6 +61,9 @@ TEMPL_CLASS::add(U _x)
         idx = underflow_idx();
     else if (x >= range_max)
         idx = overflow_idx();
+    else if (scale == HistogramScale::Log10)
+        idx = std::min(num_buckets - 1,
+                       static_cast<size_t>(std::log10(double(x) / double(range_min)) / bucket_width));
     else
         idx = (x - range_min) / bucket_width;
     buckets_[idx]++;
@@ -129,12 +143,16 @@ TEMPL_CLASS::to_string_full() const
 
     if (underflow_count())
         strm << "<" << range_min << ":\t" << underflow_count() << "\n";
+    if (scale == HistogramScale::Log10)
+        strm << std::setprecision(10);
     for (size_t i = 0; i < num_buckets; i++)
     {
         if (!buckets_[i])
             continue;
-        T from = range_min + bucket_width*i,
-          to = range_min + bucket_width*(i+1);
+        T from = scale == HistogramScale::Log10
+            ? range_min * std::pow(10.0, bucket_width * i) : range_min + bucket_width * i;
+        T to = scale == HistogramScale::Log10
+            ? range_min * std::pow(10.0, bucket_width * (i + 1)) : range_min + bucket_width * (i + 1);
         strm << from << " <= X < " << to << ":\t" << buckets_[i] << "\n";
     }
     if (overflow_count())

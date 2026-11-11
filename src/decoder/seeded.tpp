@@ -120,7 +120,19 @@ Result SeededMatching<D1, D2>::decode(SyndromeRef syndrome, ObsRef truth)
         if constexpr (std::is_same_v<D2, CorrelatedPyMatching>) return &second_;
         else return libra_conditioning_.get();
     }();
-    if (conditioning) conditioning->prepare(selected_edges);
+    uint64_t reweight_ns = 0;
+    if (conditioning)
+    {
+        if constexpr (std::is_same_v<D2, CorrelatedPyMatching>)
+        {
+            const auto reweight_started = std::chrono::steady_clock::now();
+            conditioning->prepare(selected_edges);
+            reweight_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now() - reweight_started).count();
+        }
+        else
+            conditioning->prepare(selected_edges);
+    }
     // Keep the conditioned graph alive through the optional pair checks and
     // final matching pass, including on exception paths.
     struct RestoreGuard
@@ -151,7 +163,13 @@ Result SeededMatching<D1, D2>::decode(SyndromeRef syndrome, ObsRef truth)
             final_result = second_.decode_with_ensemble(residual, truth);
         else
             final_result = second_.decode_prepared(residual, truth);
-        second_total_ns_ += final_result.decode_latency_ns;
+        // The correlated second call includes graph reweighting, which happens
+        // before optional postprocessing. Libra's separate conditioning graph
+        // serves postprocessing and is not part of its second decoder call.
+        const uint64_t second_call_ns = final_result.decode_latency_ns + reweight_ns;
+        second_total_ns_ += second_call_ns;
+        if (config_.latency_histogram)
+            second_decode_latency_us_.add(double(second_call_ns) / 1000.0);
         final_result.flipped_obs ^= fixed_frame;
     }
     return finish(std::move(final_result));
@@ -168,6 +186,11 @@ void SeededMatching<D1, D2>::print_stats(std::ostream& out) const
         << (shots_ ? double(pipeline_total_ns_) / shots_ / 1000.0 : 0)
         << " second_weighted="
         << (shots_ ? double(second_total_ns_) / shots_ / 1000.0 : 0) << '\n';
+    if (config_.latency_histogram)
+    {
+        out << "Second decoder latency histogram: 1000 logarithmic bins (1 ns to 1 s; boundaries in us)\n";
+        out << second_decode_latency_us_.to_string_full() << '\n';
+    }
     seed_.print_stats(out);
     second_.print_stats(out);
     if (complementary_gap_)
@@ -190,6 +213,7 @@ void SeededMatching<D1, D2>::mpi_accumulate()
     gap_bypasses_ = counters[3]; frozen_pairs_ = counters[4]; input_events_ = counters[5];
     residual_events_ = counters[6]; pipeline_total_ns_ = counters[7]; second_total_ns_ = counters[8];
 #endif
+    if (config_.latency_histogram) second_decode_latency_us_.mpi_accumulate();
     seed_.mpi_accumulate();
     second_.mpi_accumulate();
     if (complementary_gap_) complementary_gap_->mpi_accumulate();

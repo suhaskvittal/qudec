@@ -36,12 +36,16 @@ public:
         // Use PyMatching's existing two-pass correlated MWPM backend.
         bool correlated{false};
         bool enable_cluster_gap{false};
-        bool print_cluster_gap_histogram{false};
+        bool print_cluster_gap_histogram{false}; // Compatibility option; bins print with enable_cluster_gap.
+        bool latency_histogram{false};
     };
 
-    // Full-value cluster output; histogram bins are printed only on request.
+    // Full-value cluster output and optional per-shot decode latency distribution.
     StatsHistogram<double> s_cluster_gap{"CLUSTER_GAP_DB", 0, 256, 256};
     StatsHistogram<double> s_cluster_gap_errors{"CLUSTER_GAP_DB_ERRORS", 0, 256, 256};
+    // 1000 logarithmic bins from 1 ns to 1 s, with underflow and overflow bins.
+    StatsHistogram<double> s_decode_latency_us{"PYMATCHING_DECODE_LATENCY_US", 0.001, 1e6,
+                                               1000, HistogramScale::Log10};
 
     struct Statistics
     {
@@ -60,9 +64,9 @@ public:
      * `s_gap` is the complementary gap distribution.
      * `s_gap_error` are logical errors at a given complementary gap.
      * */
-    StatsHistogram<double> s_signed_gap{"SIGNED_GAP", -256, 256, 256},
-                           s_unsigned_gap{"UNSIGNED_GAP", 0, 256, 256},
-                           s_unsigned_gap_errors{"UNSIGNED_GAP_ERRORS", 0, 256, 256};
+    StatsHistogram<double> s_signed_gap{"SIGNED_GAP", -128, 1024, 1152},
+                           s_unsigned_gap{"UNSIGNED_GAP", 0, 1024, 1024},
+                           s_unsigned_gap_errors{"UNSIGNED_GAP_ERRORS", 0, 1024, 1024};
 private:
     /*
      * When `conf.enable_gap_estimation` is set, the matching graph is built from an

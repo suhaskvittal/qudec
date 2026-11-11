@@ -41,6 +41,7 @@ public:
         bool degeneracy = true;
         bool validate = false;
         bool profile = false;
+        bool latency_histogram = false;
     };
 
     struct DetailedResult

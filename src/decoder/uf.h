@@ -43,10 +43,10 @@ public:
         // Decompose the chosen correction into detector pairs and physical paths.
         bool report_matching_data{false};
         bool enable_cluster_gap{false};
-        bool print_cluster_gap_histogram{false};
+        bool print_cluster_gap_histogram{false}; // Compatibility option; bins print with enable_cluster_gap.
     };
 
-    // Full-value cluster output; histogram bins are printed only on request.
+    // Full-value cluster output and histogram bins.
     StatsHistogram<double> s_cluster_gap{"CLUSTER_GAP_DB", 0, 256, 256};
     StatsHistogram<double> s_cluster_gap_errors{"CLUSTER_GAP_DB_ERRORS", 0, 256, 256};
 

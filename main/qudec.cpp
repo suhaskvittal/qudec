@@ -62,6 +62,7 @@ run_cli(int argc, char* argv[], int world_rank)
     bool enable_gap{false};
     bool enable_cluster_gap{false};
     bool print_cluster_gap_histogram{false};
+    bool latency_histogram{false};
     bool correlated_pymatching{false};
     bool concat_boundary_gap{false}; // Author: OpenAI Codex. First-stage boundary parity sectors.
     bool concat_bp{false}; // Author: OpenAI Codex. Flag BP updates both matching stages.
@@ -104,7 +105,8 @@ run_cli(int argc, char* argv[], int world_rank)
         .optional("-pp", "--print-progress", "Print simulation progress", conf.print_progress, false)
         .optional("-g", "--gap", "Enable complementary gap estimation (pymatching only)", enable_gap, false)
         .optional("", "--cluster-gap", "Full cluster soft output in dB (uncorrelated pymatching or uf)", enable_cluster_gap, false)
-        .optional("", "--cluster-gap-histogram", "Print cluster-gap bins (requires --cluster-gap)", print_cluster_gap_histogram, false)
+        .optional("", "--cluster-gap-histogram", "Compatibility option; bins print with --cluster-gap", print_cluster_gap_histogram, false)
+        .optional("", "--latency-histogram", "Collect and print latency bins (pymatching, libra, or seeded second decoder)", latency_histogram, false)
         .optional("", "--correlated", "PyMatching: use two-pass correlated MWPM", correlated_pymatching, false)
         .optional("", "--include-opposite-basis-detectors", "Include interior opposite-basis check detectors", include_opposite_basis_detectors, false)
         .optional("", "--debug", "Color-code decoders: populate and print decoder-specific debug information", decoder_debug, false)
@@ -208,6 +210,8 @@ run_cli(int argc, char* argv[], int world_rank)
         throw std::invalid_argument("--cluster-gap cannot be combined with --gap or --correlated");
     if (print_cluster_gap_histogram && !enable_cluster_gap)
         throw std::invalid_argument("--cluster-gap-histogram requires --cluster-gap");
+    if (latency_histogram && decoder_name != "pymatching" && decoder_name != "libra" && decoder_name != "seeded")
+        throw std::invalid_argument("--latency-histogram supports only pymatching, libra, and seeded");
     if (correlated_pymatching && enable_gap)
         throw std::invalid_argument("--correlated cannot currently be combined with --gap");
     if (decoder_name == "seeded")
@@ -229,6 +233,8 @@ run_cli(int argc, char* argv[], int world_rank)
     conf.rare_event.start_level = 0;
     libra_config.ensemble_size = static_cast<size_t>(libra_ensemble_size);
     libra_config.seed = static_cast<uint64_t>(libra_seed);
+    libra_config.latency_histogram = latency_histogram && decoder_name == "libra";
+    seeded_config.latency_histogram = latency_histogram;
     if (decoder_name == "harmony") {
         if (harmony_ensemble_size <= 0 || harmony_sentinel_size < 0 ||
             harmony_sentinel_size > harmony_ensemble_size)
@@ -317,7 +323,8 @@ run_cli(int argc, char* argv[], int world_rank)
     {
         run(dec::PyMatching(dem, {.enable_gap_estimation=enable_gap, .correlated=correlated_pymatching,
                                       .enable_cluster_gap=enable_cluster_gap,
-                                      .print_cluster_gap_histogram=print_cluster_gap_histogram}),
+                                      .print_cluster_gap_histogram=print_cluster_gap_histogram,
+                                      .latency_histogram=latency_histogram}),
             [] (auto, auto, auto) {});
     }
     else if (decoder_name == "harmony")

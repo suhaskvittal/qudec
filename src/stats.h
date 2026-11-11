@@ -10,6 +10,8 @@
 #include <string>
 #include <vector>
 
+enum class HistogramScale { Linear, Log10 };
+
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 
@@ -21,6 +23,7 @@ public:
 
     const T range_min;
     const T range_max;
+    const HistogramScale scale;
     const T bucket_width;
     const size_t num_buckets;
 private:
@@ -32,7 +35,8 @@ private:
     std::vector<size_t> buckets_;
     size_t count_{0};
 public:
-    StatsHistogram(std::string_view name, T range_min, T range_max, size_t num_buckets);
+    StatsHistogram(std::string_view name, T range_min, T range_max, size_t num_buckets,
+                   HistogramScale scale = HistogramScale::Linear);
 
     template <class U> void add(U);
 

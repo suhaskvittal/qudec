@@ -159,6 +159,8 @@ PyMatching::decode(SyndromeRef syn, ObsRef obs)
         stats_.decode_total_ns += elapsed_ns;
         stats_.decode_min_ns = std::min(stats_.decode_min_ns, elapsed_ns);
         stats_.decode_max_ns = std::max(stats_.decode_max_ns, elapsed_ns);
+        if (conf.latency_histogram)
+            s_decode_latency_us.add(double(elapsed_ns) / 1000.0);
         return elapsed_ns;
     };
     pm::total_weight_int w_primary = 0;
@@ -348,6 +350,8 @@ PyMatching::mpi_accumulate()
 #endif
     s_cluster_gap.mpi_accumulate();
     s_cluster_gap_errors.mpi_accumulate();
+    if (conf.latency_histogram)
+        s_decode_latency_us.mpi_accumulate();
     s_signed_gap.mpi_accumulate();
     s_unsigned_gap.mpi_accumulate();
     s_unsigned_gap_errors.mpi_accumulate();
@@ -365,15 +369,19 @@ PyMatching::print_stats(std::ostream& ostrm) const
           << " max=" << double(stats.decode_max_ns) / 1000.0
           << " includes_empty_syndromes=true scope=full_history"
           << " correlated=" << (conf.correlated ? "true" : "false") << '\n';
+    if (conf.latency_histogram)
+    {
+        ostrm << "Latency histogram: 1000 logarithmic bins (1 ns to 1 s; boundaries in us)\n";
+        ostrm << s_decode_latency_us.to_string_full() << '\n';
+    }
     if (conf.enable_cluster_gap)
     {
         ostrm << "Cluster gap (dB): count=" << stats.timed_shots;
         if (stats.timed_shots)
             ostrm << " " << s_cluster_gap.to_string_some();
         ostrm << "\n";
-        if (conf.print_cluster_gap_histogram)
-            ostrm << s_cluster_gap.to_string_full() << "\n"
-                  << s_cluster_gap_errors.to_string_full() << "\n";
+        ostrm << s_cluster_gap.to_string_full() << "\n"
+              << s_cluster_gap_errors.to_string_full() << "\n";
     }
     // The gap histogram is only populated when complementary-gap estimation is enabled;
     // otherwise it is empty (and its mean would divide by a zero count).

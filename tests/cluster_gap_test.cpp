@@ -9,6 +9,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 
 namespace
@@ -41,7 +42,7 @@ compare_assignments(const dec::Result& ordinary, const dec::Result& clustered)
 void
 check_decoder_outputs(const stim::DetectorErrorModel& dem, size_t count, bool exhaustive)
 {
-    dec::PyMatching ordinary(dem), cluster(dem, {.enable_cluster_gap=true});
+    dec::PyMatching ordinary(dem), cluster(dem, {.enable_cluster_gap=true, .latency_histogram=true});
     dec::PyMatching exact(dem, {.enable_gap_estimation=true});
     dec::PyMatching endpoints(dem, {.report_matching_data=true});
     dec::PyMatching cluster_endpoints(dem, {.report_matching_data=true, .enable_cluster_gap=true});
@@ -103,6 +104,24 @@ check_decoder_outputs(const stim::DetectorErrorModel& dem, size_t count, bool ex
     const auto empty_exact = exact.decode(synthetic, zero);
     require(std::abs(empty.cluster_gap_db - std::abs(empty_exact.matching_data.gap)) < 1e-8,
             "Empty syndrome cluster distance disagrees with logical-chain distance");
+
+    std::ostringstream matching_report, uf_report, ordinary_report;
+    cluster.print_stats(matching_report);
+    uf_cluster.print_stats(uf_report);
+    ordinary.print_stats(ordinary_report);
+    require(matching_report.str().find("PYMATCHING_DECODE_LATENCY_US") != std::string::npos,
+            "PyMatching latency histogram is missing");
+    require(cluster.s_decode_latency_us.num_buckets == 1000 &&
+            matching_report.str().find("1000 logarithmic bins") != std::string::npos,
+            "PyMatching latency histogram has the wrong resolution");
+    require(matching_report.str().find("CLUSTER_GAP_DB =================================") != std::string::npos,
+            "PyMatching cluster gap histogram is missing");
+    require(uf_report.str().find("CLUSTER_GAP_DB =================================") != std::string::npos,
+            "UF cluster gap histogram is missing");
+    require(ordinary_report.str().find("CLUSTER_GAP_DB =================================") == std::string::npos,
+            "Disabled cluster gap histogram was printed");
+    require(ordinary_report.str().find("PYMATCHING_DECODE_LATENCY_US") == std::string::npos,
+            "Disabled latency histogram was printed");
 }
 
 void
@@ -125,11 +144,29 @@ check_partial_edges()
             "Fully covered logical path must have zero cluster gap");
 }
 
+void
+check_logarithmic_latency_bins()
+{
+    StatsHistogram<double> histogram("LATENCY_US", 1, 1000, 3, HistogramScale::Log10);
+    for (double latency : {0.5, 1.0, 2.0, 10.0, 100.0, 999.0, 1000.0})
+        histogram.add(latency);
+    require(histogram.underflow_count() == 1 && histogram.overflow_count() == 1,
+            "Logarithmic histogram extreme counts are wrong");
+    require(histogram[0] == 2 && histogram[1] == 1 && histogram[2] == 2,
+            "Logarithmic histogram bucket counts are wrong");
+    const auto report = histogram.to_string_full();
+    require(report.find("1 <= X < 10:") != std::string::npos &&
+            report.find("10 <= X < 100:") != std::string::npos &&
+            report.find("100 <= X < 1000:") != std::string::npos,
+            "Logarithmic histogram printed incorrect microsecond boundaries");
+}
+
 } // namespace
 
 int
 main()
 {
+    check_logarithmic_latency_bins();
     check_partial_edges();
     for (const auto* text : {
             "error(0.1) D0 L0\nerror(0.2) D0 D1\nerror(0.3) D1\n",

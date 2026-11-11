@@ -6,6 +6,7 @@
 
 #include <stdexcept>
 #include <iostream>
+#include <sstream>
 
 int main()
 {
@@ -14,7 +15,7 @@ int main()
     dec::PyMatching reference(dem, {.correlated=true});
     dec::PyMatching seed(dem, {.report_matching_data=true});
     dec::CorrelatedPyMatching second(dem);
-    dec::SeededMatching pipeline(dem, seed, second);
+    dec::SeededMatching pipeline(dem, seed, second, {.latency_histogram=true});
     dec::ObsType truth(dem.count_observables());
     dec::SyndromeType syndrome(dem.count_detectors());
 
@@ -30,6 +31,12 @@ int main()
         if (expected.flipped_obs != actual.flipped_obs)
             throw std::runtime_error("Seeded correlated matching disagrees with the native two-pass decoder");
     }
+    std::ostringstream report;
+    pipeline.print_stats(report);
+    if (report.str().find("second_calls=63") == std::string::npos ||
+        report.str().find("SEEDED_SECOND_DECODE_LATENCY_US") == std::string::npos ||
+        report.str().find("count = 63") == std::string::npos)
+        throw std::runtime_error("Seeded latency histogram must count only second decoder calls");
 
     // Exercise both gap choices and the optional physical-path filter.
     dec::PyMatching gap_seed(dem, {.report_matching_data=true, .enable_cluster_gap=true});

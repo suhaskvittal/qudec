@@ -7,6 +7,7 @@
 #include "decoder/libra.h"
 #include "decoder/libra/assignment.h"
 #include "globals.h"
+#include "stats.h"
 
 #include <pymatching/sparse_blossom/driver/mwpm_decoding.h>
 #include <pymatching/sparse_blossom/driver/user_graph.h>
@@ -170,6 +171,8 @@ struct Libra::Impl
     std::unique_ptr<pm::Mwpm> fallback_matcher;
     std::vector<EnsembleMember> ensemble_members;
     Statistics stats;
+    StatsHistogram<double> decode_latency_us{"LIBRA_DECODE_LATENCY_US", 0.001, 1e6,
+                                             1000, HistogramScale::Log10};
     size_t correlation_rule_count = 0;
 
     // Sparse scratch tables avoid clearing every detector/edge on each decode.
@@ -936,6 +939,8 @@ Libra::decode(SyndromeRef syndrome, ObsRef)
     stats.decode_total_ns += elapsed_ns;
     stats.decode_min_ns = std::min(stats.decode_min_ns, elapsed_ns);
     stats.decode_max_ns = std::max(stats.decode_max_ns, elapsed_ns);
+    if (impl_->config.latency_histogram)
+        impl_->decode_latency_us.add(double(elapsed_ns) / 1000.0);
     return out;
 }
 
@@ -958,6 +963,8 @@ Libra::decode_with_ensemble(SyndromeRef syndrome, ObsRef)
     stats.decode_total_ns += out.decode_latency_ns;
     stats.decode_min_ns = std::min(stats.decode_min_ns, out.decode_latency_ns);
     stats.decode_max_ns = std::max(stats.decode_max_ns, out.decode_latency_ns);
+    if (impl_->config.latency_histogram)
+        impl_->decode_latency_us.add(double(out.decode_latency_ns) / 1000.0);
     return out;
 }
 
@@ -993,6 +1000,8 @@ Libra::syndrome_of(const IdList& errors) const
 void
 Libra::mpi_accumulate()
 {
+    if (impl_->config.latency_histogram)
+        impl_->decode_latency_us.mpi_accumulate();
 #if defined(ENABLE_MPI)
     auto& stats = impl_->stats;
     uint64_t counters[] = {stats.shots, stats.ensemble_shots, stats.fallback_shots, stats.improving_cycles,
@@ -1020,6 +1029,11 @@ Libra::print_stats(std::ostream& out) const
         << " min=" << double(stats.decode_min_ns) / 1000.0
         << " max=" << double(stats.decode_max_ns) / 1000.0
         << " includes_empty_syndromes=true scope=full_history\n";
+    if (impl_->config.latency_histogram)
+    {
+        out << "Latency histogram: 1000 logarithmic bins (1 ns to 1 s; boundaries in us)\n";
+        out << impl_->decode_latency_us.to_string_full() << '\n';
+    }
     if (impl_->config.profile)
         out << "Libra phase times (ns): complementary=" << stats.complementary_ns
             << " fallback=" << stats.fallback_ns << " ensemble=" << stats.ensemble_ns

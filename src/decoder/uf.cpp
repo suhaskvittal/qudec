@@ -477,9 +477,8 @@ UnionFind::print_stats(std::ostream& ostrm) const
         if (stats.timed_shots)
             ostrm << " " << s_cluster_gap.to_string_some();
         ostrm << "\n";
-        if (conf.print_cluster_gap_histogram)
-            ostrm << s_cluster_gap.to_string_full() << "\n"
-                  << s_cluster_gap_errors.to_string_full() << "\n";
+        ostrm << s_cluster_gap.to_string_full() << "\n"
+              << s_cluster_gap_errors.to_string_full() << "\n";
     }
 }
 

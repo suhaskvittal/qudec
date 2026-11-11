@@ -78,6 +78,7 @@ struct SeededMatchingConfig
     bool postprocess{false};
     SeedGapMode libra_gap_mode{SeedGapMode::Cluster};
     double libra_gap_threshold_db{40.0};
+    bool latency_histogram{false};
 };
 
 // D1 is PyMatching or UnionFind. D2 is CorrelatedPyMatching or Libra. Decoder
@@ -103,6 +104,8 @@ private:
     std::unique_ptr<CorrelatedPyMatching> libra_conditioning_;
     std::unique_ptr<SeededPostprocessor> postprocessor_;
     std::unique_ptr<PyMatching> complementary_gap_;
+    StatsHistogram<double> second_decode_latency_us_{"SEEDED_SECOND_DECODE_LATENCY_US", 0.001, 1e6,
+                                                     1000, HistogramScale::Log10};
     uint64_t shots_{0};
     uint64_t failures_{0};
     uint64_t second_calls_{0};
