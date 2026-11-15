@@ -175,6 +175,7 @@ PyMatching::decode(SyndromeRef syn, ObsRef obs)
     }
 
     // Complementary pass: fire the observable detector to force the opposite parity class.
+    const auto gap_estimation_start = std::chrono::steady_clock::now();
     pm::total_weight_int w_complement = 0;
     if (conf.report_matching_data)
     {
@@ -187,6 +188,8 @@ PyMatching::decode(SyndromeRef syn, ObsRef obs)
     }
     else
         internal_decode(syn, /*fire_obs_det=*/true, w_complement);
+
+    s_gap_estimation_latency_us.add(std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - gap_estimation_start).count());
 
     // set output observable:
     const bool predict_flip = (w_complement < w_primary);
@@ -235,6 +238,7 @@ PyMatching::internal_decode(SyndromeRef syn, bool fire_obs_det, pm::total_weight
     res.flipped_obs = ObsType(num_observables);
     std::function<void(const pm::Mwpm&)> before_extraction;
     if (conf.enable_cluster_gap)
+    {
         before_extraction = [&](const pm::Mwpm& matching)
         {
             std::vector<std::pair<size_t, double>> sources;
@@ -253,11 +257,16 @@ PyMatching::internal_decode(SyndromeRef syn, bool fire_obs_det, pm::total_weight
                     throw std::logic_error("MWPM cluster radius was negative");
                 sources.push_back({v, radius});
             }
-            res.cluster_gap_db = cluster_gap_graph_.gap(cluster_gap_graph_.ball_coverage(sources))
-                                 * decibels_per_w_;
+            const auto cluster_gap_start = std::chrono::steady_clock::now();
+            res.cluster_gap_db = cluster_gap_graph_.gap(cluster_gap_graph_.ball_coverage(sources)) * decibels_per_w_;
+            const auto cluster_gap_end = std::chrono::steady_clock::now();
+            auto gap_latency = std::chrono::duration<double, std::micro>(cluster_gap_end - cluster_gap_start).count();
             res.has_cluster_gap = true;
             s_cluster_gap.add(res.cluster_gap_db);
+            s_cluster_gap_latency_us.add(gap_latency);
         };
+    }
+
     if (report_matching_data)
     {
         pm::decode_detection_events_to_match_edges(mwpm_, det_events, before_extraction);
@@ -352,6 +361,8 @@ PyMatching::mpi_accumulate()
     s_cluster_gap_errors.mpi_accumulate();
     if (conf.latency_histogram)
         s_decode_latency_us.mpi_accumulate();
+    if (conf.enable_gap_estimation) s_gap_estimation_latency_us.mpi_accumulate();
+    if (conf.enable_cluster_gap) s_cluster_gap_latency_us.mpi_accumulate();
     s_signed_gap.mpi_accumulate();
     s_unsigned_gap.mpi_accumulate();
     s_unsigned_gap_errors.mpi_accumulate();
@@ -376,6 +387,7 @@ PyMatching::print_stats(std::ostream& ostrm) const
     }
     if (conf.enable_cluster_gap)
     {
+        ostrm << "Cluster gap estimation latency: " << s_cluster_gap_latency_us.to_string_some() << "\n";
         ostrm << "Cluster gap (dB): count=" << stats.timed_shots;
         if (stats.timed_shots)
             ostrm << " " << s_cluster_gap.to_string_some();
@@ -387,6 +399,7 @@ PyMatching::print_stats(std::ostream& ostrm) const
     // otherwise it is empty (and its mean would divide by a zero count).
     if (conf.enable_gap_estimation)
     {
+        ostrm << "Complementary gap estimation latency: " << s_gap_estimation_latency_us.to_string_some() << "\n";
         ostrm << s_signed_gap.to_string_full()
                 << "\n" << s_unsigned_gap.to_string_full()
                 << "\n" << s_unsigned_gap_errors.to_string_full()

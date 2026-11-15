@@ -46,6 +46,10 @@ public:
     // 1000 logarithmic bins from 1 ns to 1 s, with underflow and overflow bins.
     StatsHistogram<double> s_decode_latency_us{"PYMATCHING_DECODE_LATENCY_US", 0.001, 1e6,
                                                1000, HistogramScale::Log10};
+    StatsHistogram<double> s_gap_estimation_latency_us{"PYMATCHING_GAP_ESTIMATION_LATENCY_US", 0.001, 1e6,
+                                                       1000, HistogramScale::Log10};
+    StatsHistogram<double> s_cluster_gap_latency_us{"PYMATCHING_CLUSTER_GAP_LATENCY_US", 0.001, 1e6,
+                                                     1000, HistogramScale::Log10};
 
     struct Statistics
     {

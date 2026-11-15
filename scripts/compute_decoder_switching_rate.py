@@ -3,16 +3,16 @@
 
 Fit a separate binomial logistic model for P(L1 logical error | gap in dB) using
 the d=5,7,9,11 shot and error histograms for each L1. Shift each fitted curve
-to match a supplied d=31 per-round L1 error rate multiplied by 93 rounds
-(3d) before finding the cutoff. For a target residual L1 error rate, choose
+to match a supplied per-round L1 error rate multiplied by --ler-rounds
+(default: the requested distance) before finding the cutoff. For a target residual L1 error rate, choose
 the smallest gap cutoff that satisfies
 
-    sum_{gap > cutoff} P_d31(gap) P(L1 error | gap) <= target.
+    sum_{gap > cutoff} P_distance(gap) P(L1 error | gap) <= target.
 
-Both L1 estimates use the d=31 PyMatching gap frequencies. This treats L2
+Both L1 estimates use the PyMatching gap frequencies at --distance (default 29). This treats L2
 corrections as error-free; its own error contribution must be accounted for
 separately. Printed histogram bins are one dB wide, so cutoffs are bin edges.
-By default, a Gaussian approximation inferred from the d=31 histogram moments
+By default, a Gaussian approximation inferred from the selected histogram moments
 resolves its >=256 dB overflow. Use --overflow-model bound to leave it unresolved.
 """
 
@@ -79,7 +79,7 @@ def expand_overflow_normal(path, rows, overflow, total_shots):
     summary = parse_histograms(path)[SHOTS]
     mean, sd, maximum = summary["mean_db"], summary["std_db"], summary["max_db"]
     if any(value is None or not math.isfinite(value) for value in (mean, sd, maximum)):
-        raise ValueError(f"{path}: missing d=31 gap moments")
+        raise ValueError(f"{path}: missing gap moments")
     finite_sum = sum(n * (lo + hi) / 2 for lo, hi, n, _ in rows)
     finite_sq_sum = sum(n * ((lo + hi) / 2)**2 for lo, hi, n, _ in rows)
     overflow_mean = (total_shots * mean - finite_sum) / overflow_shots
@@ -154,7 +154,7 @@ def modeled_error_rate(rows, overflow, total_shots, intercept, slope):
 
 
 def calibrate_intercept(rows, overflow, total_shots, intercept, slope, baseline):
-    """Preserve the fitted gap slope while matching the supplied d=31 LER."""
+    """Preserve the fitted gap slope while matching the supplied LER."""
     low, high = intercept - 1000, intercept + 1000
     for _ in range(200):
         middle = (low + high) / 2
@@ -208,40 +208,45 @@ def positive_int(value):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--distance", type=positive_int, default=29,
+                        help="distance of the PyMatching gap histogram (default: 29)")
     parser.add_argument("--target-error-rate", type=positive_rate, required=True,
-                        help="maximum modeled residual L1 logical errors per d=31 shot")
+                        help="maximum modeled residual L1 logical errors per shot")
     parser.add_argument("--uf-ler-per-round", "--uf-ler", dest="uf_ler_per_round",
-                        type=positive_rate, default=2.2e-14,
-                        help="projected d=31 UF LER per round (default: 2.2e-14)")
+                        type=positive_rate, required=True,
+                        help="projected UF LER per round at the selected distance")
     parser.add_argument("--pymatching-ler-per-round", "--pymatching-ler",
-                        dest="pymatching_ler_per_round", type=positive_rate, default=8.0e-15,
-                        help="projected d=31 PyMatching LER per round (default: 8.0e-15)")
-    parser.add_argument("--ler-rounds", type=positive_int, default=93,
-                        help="rounds used to convert per-round LER to per-shot LER (default: 93 = 3*31)")
+                        dest="pymatching_ler_per_round", type=positive_rate, required=True,
+                        help="projected PyMatching LER per round at the selected distance")
+    parser.add_argument("--ler-rounds", type=positive_int,
+                        help="multiplier converting per-round LER to per-shot LER (default: --distance)")
     parser.add_argument("--overflow-model", choices=("normal", "bound"), default="normal",
-                        help="estimate d=31 >=256 dB gaps with a Gaussian or retain only bounds")
+                        help="estimate >=256 dB gaps with a Gaussian or retain only bounds")
     parser.add_argument("--input-root", type=Path, default=REPOSITORY / "out",
                         help="folder containing union_find_gap and pymatching_gap")
     args = parser.parse_args()
-    if max(args.uf_ler_per_round, args.pymatching_ler_per_round) * args.ler_rounds >= 1:
+    rounds = args.ler_rounds or args.distance
+    if max(args.uf_ler_per_round, args.pymatching_ler_per_round) * rounds >= 1:
         parser.error("per-round LER times --ler-rounds must be below 1")
     root = args.input_root.expanduser().resolve()
     try:
-        d31_path = root / "pymatching_gap" / "d31.out"
-        rows31, overflow31, total31, _ = histogram_rows(d31_path)
-        if not total31:
-            raise ValueError("d31 histogram contains no shots")
+        gap_path = root / "pymatching_gap" / f"d{args.distance}.out"
+        if not gap_path.is_file():
+            raise ValueError(f"missing PyMatching gap histogram: {gap_path}")
+        gap_rows, gap_overflow, total_shots, _ = histogram_rows(gap_path)
+        if not total_shots:
+            raise ValueError(f"{gap_path}: histogram contains no shots")
         modeled_overflow = None
         if args.overflow_model == "normal":
-            rows31, modeled_overflow = expand_overflow_normal(
-                d31_path, rows31, overflow31, total31)
-            overflow31_for_fit = []
+            gap_rows, modeled_overflow = expand_overflow_normal(
+                gap_path, gap_rows, gap_overflow, total_shots)
+            overflow_for_fit = []
         else:
-            overflow31_for_fit = overflow31
+            overflow_for_fit = gap_overflow
         results = []
         for label, folder, per_round_ler in (("UF", "union_find_gap", args.uf_ler_per_round),
                                              ("PyMatching", "pymatching_gap", args.pymatching_ler_per_round)):
-            baseline = per_round_ler * args.ler_rounds
+            baseline = per_round_ler * rounds
             pooled = defaultdict(lambda: [0, 0])
             observed = []
             training = []
@@ -259,11 +264,11 @@ def main():
                 raise ValueError(f"{label}: no training errors to fit")
             fit_rows = sorted((gap, pair[0], pair[1]) for gap, pair in pooled.items())
             intercept, slope = fit_error_curve(fit_rows)
-            raw_rate = modeled_error_rate(rows31, overflow31_for_fit, total31, intercept, slope)
+            raw_rate = modeled_error_rate(gap_rows, overflow_for_fit, total_shots, intercept, slope)
             calibrated_intercept = calibrate_intercept(
-                rows31, overflow31_for_fit, total31, intercept, slope, baseline)
+                gap_rows, overflow_for_fit, total_shots, intercept, slope, baseline)
             cutoff, switched, residual = switching_threshold(
-                rows31, overflow31_for_fit, total31, calibrated_intercept, slope,
+                gap_rows, overflow_for_fit, total_shots, calibrated_intercept, slope,
                 args.target_error_rate)
             results.append((label, training, max(observed), intercept, slope,
                             raw_rate, per_round_ler, baseline, calibrated_intercept,
@@ -272,12 +277,12 @@ def main():
         parser.exit(1, f"{parser.prog}: {error}\n")
 
     print(f"Target residual L1 error rate: {args.target_error_rate:.8g}")
-    print(f"LER conversion: per-round rate * {args.ler_rounds} rounds")
+    print(f"LER conversion: per-round rate * {rounds} rounds")
     print("L2 decoding errors are excluded from this estimate.")
-    print(f"d=31 PyMatching gap histogram: {total31:,} shots (used for both L1 decoders)")
-    if overflow31:
-        edge, count = overflow31[0]
-        print(f"d=31 >= {edge:g} dB overflow: {count:,} shots")
+    print(f"d={args.distance} PyMatching gap histogram: {total_shots:,} shots (used for both L1 decoders)")
+    if gap_overflow:
+        edge, count = gap_overflow[0]
+        print(f"d={args.distance} >= {edge:g} dB overflow: {count:,} shots")
         if modeled_overflow:
             mean, sd, _, upper = modeled_overflow
             print(f"Overflow estimate: Gaussian over [{edge:g}, {upper:g}) dB,"
@@ -291,26 +296,26 @@ def main():
             print(f"  Training d={distance}: {shots:,} shots, {errors:,} L1 errors")
         print(f"  Small-distance fit: P(error | gap g dB) = sigmoid({intercept:.8g} {slope:+.8g} * g)")
         print(f"  Largest gap bin with a training error: <{highest_error_gap:g} dB")
-        print(f"  Uncalibrated d=31 LER estimate: {raw_rate:.8g}")
-        print(f"  Supplied d=31 LER per round: {per_round_ler:.8g}")
-        print(f"  Baseline d=31 LER per shot: {baseline:.8g}")
-        print(f"  Calibrated d=31 curve: P(error | gap g dB) = sigmoid({calibrated_intercept:.8g} {slope:+.8g} * g)")
+        print(f"  Uncalibrated d={args.distance} LER estimate: {raw_rate:.8g}")
+        print(f"  Supplied d={args.distance} LER per round: {per_round_ler:.8g}")
+        print(f"  Baseline d={args.distance} LER per shot: {baseline:.8g}")
+        print(f"  Calibrated d={args.distance} curve: P(error | gap g dB) = sigmoid({calibrated_intercept:.8g} {slope:+.8g} * g)")
         if cutoff is None:
-            print("  Switching cutoff: below all observed d=31 gaps (no switching)")
+            print(f"  Switching cutoff: below all observed d={args.distance} gaps (no switching)")
         elif math.isinf(cutoff):
-            print(f"  Switching cutoff: unresolved within >= {overflow31[0][0]:g} dB overflow")
-            print(f"  Switching rate: between {(switched - overflow31[0][1]) / total31:.8g} and 1;"
+            print(f"  Switching cutoff: unresolved within >= {gap_overflow[0][0]:g} dB overflow")
+            print(f"  Switching rate: between {(switched - gap_overflow[0][1]) / total_shots:.8g} and 1;"
                   " all-L2 gives the zero-residual bound")
         else:
             print(f"  Switching cutoff: {cutoff:g} dB (switch bins with gap < {cutoff:g} dB)")
         if cutoff is None or not math.isinf(cutoff):
-            print(f"  Estimated switching rate: {switched / total31:.8g}"
-                  f" (~{switched:,.0f}/{total31:,} shots)")
+            print(f"  Estimated switching rate: {switched / total_shots:.8g}"
+                  f" (~{switched:,.0f}/{total_shots:,} shots)")
         print(f"  Modeled residual L1 error rate: {residual:.8g}")
-        print("  d=31 error risk extrapolates beyond training gaps with observed errors.")
+        print(f"  d={args.distance} error risk extrapolates beyond training gaps with observed errors.")
     if modeled_overflow:
         print("Overflow switching rates depend on the Gaussian approximation;"
-              " rerun the d=31 histogram with a wider range to measure them.")
+              f" rerun the d={args.distance} histogram with a wider range to measure them.")
 
 
 if __name__ == "__main__":
